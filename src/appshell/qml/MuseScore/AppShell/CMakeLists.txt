@@ -36,6 +36,8 @@ qt_add_qml_module(appshell_qml
         FirstLaunchSetup/themespagemodel.h
         FirstLaunchSetup/tutorialspagemodel.cpp
         FirstLaunchSetup/tutorialspagemodel.h
+        HomePage/homemenumodel.cpp
+        HomePage/homemenumodel.h
         maintoolbarmodel.cpp
         maintoolbarmodel.h
         mainwindowtitleprovider.cpp

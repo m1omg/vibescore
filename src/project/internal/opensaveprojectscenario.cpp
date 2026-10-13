@@ -27,6 +27,8 @@
 #include "engraving/infrastructure/mscio.h"
 #include "projecterrors.h"
 
+#include "muse_framework_config.h"
+
 using namespace muse;
 using namespace mu::project;
 
@@ -134,6 +136,10 @@ RetVal<muse::io::path_t> OpenSaveProjectScenario::askLocalPath(INotationProjectP
 
 RetVal<SaveLocationType> OpenSaveProjectScenario::saveLocationType() const
 {
+#ifndef MUSE_MODULE_CLOUD
+    // Without the cloud module, there is nothing to choose from
+    return RetVal<SaveLocationType>::make_ok(SaveLocationType::Local);
+#else
     bool shouldAsk = configuration()->shouldAskSaveLocationType();
     SaveLocationType lastUsed = configuration()->lastUsedSaveLocationType();
     if (!shouldAsk && lastUsed != SaveLocationType::Undefined) {
@@ -141,6 +147,7 @@ RetVal<SaveLocationType> OpenSaveProjectScenario::saveLocationType() const
     }
 
     return askSaveLocationType();
+#endif
 }
 
 RetVal<SaveLocationType> OpenSaveProjectScenario::askSaveLocationType() const

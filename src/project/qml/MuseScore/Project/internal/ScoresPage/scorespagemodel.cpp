@@ -25,6 +25,9 @@
 #include <QString>
 
 #include "actions/actiontypes.h"
+
+#include "muse_framework_config.h"
+
 #include "log.h"
 
 using namespace mu::project;
@@ -91,7 +94,17 @@ void ScoresPageModel::openScoreManager()
 
 int ScoresPageModel::tabIndex() const
 {
-    return configuration()->homeScoresPageTabIndex();
+    // Without the cloud, there is only the tab of local scores
+    return isCloudAvailable() ? configuration()->homeScoresPageTabIndex() : 0;
+}
+
+bool ScoresPageModel::isCloudAvailable() const
+{
+#ifdef MUSE_MODULE_CLOUD
+    return true;
+#else
+    return false;
+#endif
 }
 
 void ScoresPageModel::setTabIndex(int index)

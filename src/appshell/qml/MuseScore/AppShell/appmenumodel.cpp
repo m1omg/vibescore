@@ -206,11 +206,18 @@ MenuItem* AppMenuModel::makeFileMenu()
         makeSeparator(),
         makeMenuItem("file-save"),
         makeMenuItem("file-save-as"),
+#ifdef MUSE_MODULE_CLOUD
         makeMenuItem("file-save-to-cloud"),
+#endif
         makeMenu(TranslatableString("appshell/menu/file", "Save o&ther"), makeSaveOtherSubItems()),
+#ifdef MUSE_MODULE_CLOUD
         makeMenu(TranslatableString("appshell/menu/file", "Pu&blish online"), makePublishOnlineSubItems()),
+#endif
         makeSeparator(),
+#ifdef MUSE_MODULE_CLOUD
+        // Recognizing PDFs and images is a service of MuseScore.com
         makeMenuItem("file-convert-to-score"),
+#endif
         makeMenuItem("file-export"),
         makeSeparator(),
         makeMenuItem("project-properties"),

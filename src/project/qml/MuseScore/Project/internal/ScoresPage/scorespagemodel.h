@@ -41,6 +41,9 @@ class ScoresPageModel : public QObject, public muse::Contextable
     Q_PROPERTY(int tabIndex READ tabIndex WRITE setTabIndex NOTIFY tabIndexChanged)
     Q_PROPERTY(ViewType viewType READ viewType WRITE setViewType NOTIFY viewTypeChanged)
 
+    //! Online scores, the score manager and file conversion are services of MuseScore.com
+    Q_PROPERTY(bool isCloudAvailable READ isCloudAvailable CONSTANT)
+
     QML_ELEMENT
 
     muse::GlobalInject<IProjectConfiguration> configuration;
@@ -61,6 +64,8 @@ public:
 
     ViewType viewType() const;
     void setViewType(ViewType type);
+
+    bool isCloudAvailable() const;
 
     Q_INVOKABLE void createNewScore();
     Q_INVOKABLE void convertFileToScore();

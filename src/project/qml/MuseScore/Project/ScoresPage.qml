@@ -144,6 +144,10 @@ FocusScope {
 
             Layout.fillWidth: true
 
+            // "New & recent" alone needs no tab bar
+            opacity: scoresPageModel.isCloudAvailable ? 1 : 0
+            enabled: scoresPageModel.isCloudAvailable
+
             onCurrentIndexChanged: {
                 if (completed) {
                     scoresPageModel.tabIndex = currentIndex
@@ -366,6 +370,8 @@ FocusScope {
             minWidth: 216
             text: qsTrc("project", "Score manager (online)")
 
+            visible: scoresPageModel.isCloudAvailable
+
             onClicked: {
                 scoresPageModel.openScoreManager()
             }
@@ -397,6 +403,8 @@ FocusScope {
                 navigation.column: 3
 
                 text: qsTrc("project", "Convert…")
+
+                visible: scoresPageModel.isCloudAvailable
 
                 onClicked: {
                     scoresPageModel.convertFileToScore()

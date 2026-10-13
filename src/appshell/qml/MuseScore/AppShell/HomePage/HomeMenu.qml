@@ -38,6 +38,10 @@ Item {
 
     signal selected(string name)
 
+    HomeMenuModel {
+        id: menuModel
+    }
+
     NavigationSection {
         id: navSec
         name: "HomeMenuSection"
@@ -66,6 +70,8 @@ Item {
             Layout.preferredHeight: 60
             Layout.topMargin: 20
 
+            visible: menuModel.isAccountAvailable
+
             navigation.name: "AccountInfo"
             navigation.panel: navPanel
             navigation.row: 1
@@ -87,12 +93,20 @@ Item {
             orientation: ListView.Vertical
             spacing: 0
 
-            model: [
-                { "name": "scores", "title": qsTrc("appshell", "Scores"), "iconCode": IconCode.MUSIC_NOTES },
-                { "name": "extensions", "title": qsTrc("appshell", "Plugins"), "iconCode":  IconCode.PLUGIN },
-                { "name": "musesounds", "title": qsTrc("appshell", "MuseSounds"), "iconCode": IconCode.PLAY },
-                { "name": "learn", "title": qsTrc("appshell", "Learn"), "iconCode":  IconCode.MORTAR_BOARD }
-            ]
+            model: {
+                let items = [
+                    { "name": "scores", "title": qsTrc("appshell", "Scores"), "iconCode": IconCode.MUSIC_NOTES },
+                    { "name": "extensions", "title": qsTrc("appshell", "Plugins"), "iconCode":  IconCode.PLUGIN }
+                ]
+
+                if (menuModel.isMuseSoundsAvailable) {
+                    items.push({ "name": "musesounds", "title": qsTrc("appshell", "MuseSounds"), "iconCode": IconCode.PLAY })
+                }
+
+                items.push({ "name": "learn", "title": qsTrc("appshell", "Learn"), "iconCode":  IconCode.MORTAR_BOARD })
+
+                return items
+            }
 
             currentIndex: 0
 
