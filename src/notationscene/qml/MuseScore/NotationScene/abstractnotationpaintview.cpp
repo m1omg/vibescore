@@ -29,6 +29,9 @@
 
 #include "actions/actiontypes.h"
 #include "engraving/dom/shadownote.h"
+
+#include "notationviewtouchcontroller.h"
+
 #include "log.h"
 
 using namespace mu;
@@ -85,6 +88,20 @@ void AbstractNotationPaintView::load()
 
     m_loadCalled = true;
     m_inputController = std::make_unique<NotationViewInputController>(this, iocContext());
+
+    m_touchController.reset();
+    if (touchGesturesEnabled()) {
+        m_touchController = std::make_unique<NotationViewTouchController>(this, m_inputController.get());
+        connect(m_touchController.get(), &NotationViewTouchController::focusRequested, this, &AbstractNotationPaintView::forceFocusIn);
+        setAcceptTouchEvents(true);
+
+        // Pinch and two-finger pan are done by the touch controller; the PinchArea around the view
+        // (StyledViewScrollAndZoomArea) would otherwise take two-finger touches away from it
+        QQuickItem* parent = parentItem();
+        if (parent && parent->inherits("QQuickPinchArea")) {
+            parent->setFiltersChildMouseEvents(false);
+        }
+    }
     m_playbackCursor = std::make_unique<PlaybackCursor>(iocContext());
     m_playbackCursor->setVisible(false);
     m_noteInputCursor = std::make_unique<NoteInputCursor>(iocContext(), notationConfiguration()->thinNoteInputCursor());
@@ -1222,6 +1239,30 @@ void AbstractNotationPaintView::wheelEvent(QWheelEvent* event)
     if (isInited()) {
         m_inputController->wheelEvent(event);
     }
+}
+
+bool AbstractNotationPaintView::touchGesturesEnabled() const
+{
+    return NotationViewTouchController::isEnabled();
+}
+
+void AbstractNotationPaintView::touchEvent(QTouchEvent* event)
+{
+    if (isInited() && m_touchController && m_touchController->handleTouchEvent(event)) {
+        event->accept();
+        return;
+    }
+
+    QQuickPaintedItem::touchEvent(event);
+}
+
+void AbstractNotationPaintView::touchUngrabEvent()
+{
+    if (m_touchController) {
+        m_touchController->cancel();
+    }
+
+    QQuickPaintedItem::touchUngrabEvent();
 }
 
 void AbstractNotationPaintView::forceFocusIn()

@@ -78,6 +78,8 @@ qt_add_qml_module(notationscene_qml
         notationtoolbarmodel.h
         notationviewinputcontroller.cpp
         notationviewinputcontroller.h
+        notationviewtouchcontroller.cpp
+        notationviewtouchcontroller.h
         noteinputbarcustomiseitem.cpp
         noteinputbarcustomiseitem.h
         noteinputbarcustomisemodel.cpp

@@ -3665,7 +3665,12 @@ void NotationInteraction::drawGripPoints(muse::draw::Painter* painter, const eng
     m_editData.grips = gripsCount;
     m_editData.grip.resize(m_editData.grips);
 
+#if defined(Q_OS_ANDROID) || defined(Q_OS_IOS)
+    // Big enough to be grabbed with a finger
+    constexpr qreal DEFAULT_GRIP_SIZE = 16;
+#else
     constexpr qreal DEFAULT_GRIP_SIZE = 8;
+#endif
     qreal scaling = currentScaling(painter);
     qreal gripSize = DEFAULT_GRIP_SIZE / scaling;
     RectF newRect(-gripSize / 2, -gripSize / 2, gripSize, gripSize);

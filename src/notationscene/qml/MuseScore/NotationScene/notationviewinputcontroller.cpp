@@ -1738,9 +1738,41 @@ std::vector<int> NotationViewInputController::pitchesBeingDragged() const
     return pitches;
 }
 
+//! Selection proximity for touch input, in view pixels (about a fingertip)
+static constexpr int TOUCH_SELECTION_PROXIMITY = 24;
+
 float NotationViewInputController::hitWidth() const
 {
-    return configuration()->selectionProximity() * 0.5 / m_view->currentScaling();
+    int proximity = configuration()->selectionProximity();
+    if (m_touchInput) {
+        proximity = std::max(proximity, TOUCH_SELECTION_PROXIMITY);
+    }
+
+    return proximity * 0.5 / m_view->currentScaling();
+}
+
+void NotationViewInputController::setTouchInput(bool touchInput)
+{
+    m_touchInput = touchInput;
+}
+
+bool NotationViewInputController::isTouchDragTarget(const QPointF& viewPos) const
+{
+    INotationInteractionPtr interaction = viewInteraction();
+    if (!interaction) {
+        return false;
+    }
+
+    const PointF logicPos = m_view->toLogical(viewPos);
+    if (interaction->isHitGrip(logicPos)) {
+        return true;
+    }
+
+    const float width = std::max(configuration()->selectionProximity(), TOUCH_SELECTION_PROXIMITY) * 0.5
+                        / m_view->currentScaling();
+    const EngravingItem* item = interaction->hitElement(logicPos, width);
+
+    return item && item->selected();
 }
 
 ElementType NotationViewInputController::selectionType() const

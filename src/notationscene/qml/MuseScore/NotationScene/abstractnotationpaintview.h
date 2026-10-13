@@ -49,6 +49,10 @@
 #include "abstractelementpopupmodel.h"
 
 namespace mu::notation {
+class NotationViewTouchController;
+}
+
+namespace mu::notation {
 class AbstractNotationPaintView : public muse::uicomponents::QuickPaintedView, public IControlledView, public muse::Contextable,
     public muse::async::Asyncable, public muse::actions::Actionable
 {
@@ -206,6 +210,9 @@ protected:
 
     virtual void onMatrixChanged(const muse::draw::Transform& oldMatrix, const muse::draw::Transform& newMatrix, bool overrideZoomType);
 
+    //! Touch screen gestures on the score (see NotationViewTouchController)
+    virtual bool touchGesturesEnabled() const;
+
 protected slots:
     virtual void onViewSizeChanged();
 
@@ -230,6 +237,8 @@ private:
 
     // Input
     void wheelEvent(QWheelEvent* event) override;
+    void touchEvent(QTouchEvent* event) override;
+    void touchUngrabEvent() override;
     void mousePressEvent(QMouseEvent* event) override;
     void mouseMoveEvent(QMouseEvent* event) override;
     void mouseDoubleClickEvent(QMouseEvent* event) override;
@@ -283,6 +292,7 @@ private:
 
     bool m_loadCalled = false;
     std::unique_ptr<NotationViewInputController> m_inputController;
+    std::unique_ptr<NotationViewTouchController> m_touchController;
     std::unique_ptr<PlaybackCursor> m_playbackCursor;
     std::unique_ptr<NoteInputCursor> m_noteInputCursor;
     std::unique_ptr<NotationRuler> m_ruler;

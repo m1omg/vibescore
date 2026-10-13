@@ -91,6 +91,7 @@ private:
 
     void paint(QPainter* painter) override;
     void onViewSizeChanged() override;
+    bool touchGesturesEnabled() const override;
 
     void wheelEvent(QWheelEvent* event) override;
     void mousePressEvent(QMouseEvent* event) override;

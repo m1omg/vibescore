@@ -76,6 +76,12 @@ void NotationNavigator::load()
     rescaleIfVisible();
 }
 
+bool NotationNavigator::touchGesturesEnabled() const
+{
+    // Touches become mouse events, which the navigator handles itself (tap or drag to scroll the score)
+    return false;
+}
+
 void NotationNavigator::onLoadNotation(INotationPtr notation)
 {
     AbstractNotationPaintView::onLoadNotation(notation);

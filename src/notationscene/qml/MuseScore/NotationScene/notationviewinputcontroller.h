@@ -145,6 +145,13 @@ public:
     void dropEvent(QDropEvent* event);
 
     ElementType selectionType() const;
+
+    //! Touch input (see NotationViewTouchController) uses a larger hit tolerance than mouse and stylus input
+    void setTouchInput(bool touchInput);
+
+    //! Whether a touch drag starting at this position should move what is there (a selected element or
+    //! a grip) rather than pan the score
+    bool isTouchDragTarget(const QPointF& viewPos) const;
     muse::PointF selectionElementPos() const;
 
 private:
@@ -250,5 +257,6 @@ private:
     bool m_shouldSelectOnLeftClickRelease = false;
     bool m_shouldStartEditOnLeftClickRelease = false;
     bool m_ignoreNextMouseContextMenuEvent = false;
+    bool m_touchInput = false;
 };
 }
