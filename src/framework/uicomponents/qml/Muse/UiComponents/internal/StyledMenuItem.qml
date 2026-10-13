@@ -129,6 +129,11 @@ ListItemBlank {
         property bool isSelected: isSelectable && Boolean(root.modelData.selected)
 
         property bool hasIcon: Boolean(root.modelData?.icon) && root.modelData.icon !== IconCode.NONE
+
+        //! A finger hovers the item at the moment it presses it (see onClicked)
+        property double hoverTime: 0
+        property double pressTime: 0
+        readonly property int sameTouchInterval: 100 // ms
     }
 
     function calculatedLeftPartWidth() {
@@ -236,13 +241,26 @@ ListItemBlank {
 
     onHovered: function(isHovered, mouseX, mouseY) {
         if (isHovered) {
+            itemPrv.hoverTime = Date.now()
             root.openSubMenuRequested(true)
+        }
+    }
+
+    onPressed: function(isPressed) {
+        if (isPressed) {
+            itemPrv.pressTime = Date.now()
         }
     }
 
     onClicked: {
         if (root.hasSubMenu) {
-            root.openSubMenuRequested(false)
+            // On a touch screen, the tap's hover has just opened the submenu: this click must not close it again.
+            // With a mouse, the hover comes long before the click, which toggles the submenu
+            const openedByThisTap = root.subMenuShowed
+                                  && Math.abs(itemPrv.pressTime - itemPrv.hoverTime) < itemPrv.sameTouchInterval
+            if (!openedByThisTap) {
+                root.openSubMenuRequested(false)
+            }
             return
         }
 
