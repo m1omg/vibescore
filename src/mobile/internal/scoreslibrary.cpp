@@ -45,6 +45,11 @@ io::path_t ScoresLibrary::libraryPath() const
     return globalConfiguration()->userDataPath() + "/Scores";
 }
 
+io::path_t ScoresLibrary::exportsPath() const
+{
+    return globalConfiguration()->userDataPath() + "/Exports";
+}
+
 io::path_t ScoresLibrary::importedFilesPath() const
 {
     return QStandardPaths::writableLocation(QStandardPaths::CacheLocation) + "/Imported";

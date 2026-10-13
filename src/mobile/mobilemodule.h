@@ -23,6 +23,7 @@
 namespace mu::mobile {
 class BackNavigationController;
 class IncomingFilesController;
+class MobileLifecycleController;
 
 //! Services that VibeScore needs on mobile platforms (Android, iOS)
 class MobileModule : public muse::modularity::IModuleSetup
@@ -31,11 +32,13 @@ public:
     std::string moduleName() const override;
 
     void registerExports() override;
+    void resolveImports() override;
     void onInit(const muse::IApplication::RunMode& mode) override;
     void onDeinit() override;
 
 private:
     std::shared_ptr<IncomingFilesController> m_incomingFilesController;
     std::shared_ptr<BackNavigationController> m_backNavigationController;
+    std::shared_ptr<MobileLifecycleController> m_lifecycleController;
 };
 }

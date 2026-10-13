@@ -40,6 +40,9 @@ public:
     muse::io::path_t libraryPath() const;
     muse::io::path_t importedFilesPath() const;
 
+    //! Exported files (PDF, audio, MusicXML, ...), before they are shared
+    muse::io::path_t exportsPath() const;
+
     static bool isNativeScoreFile(const QString& fileName);
 
     //! Copies the file (a local path or a content:// URL on Android) into the library or the cache folder,

@@ -18,8 +18,17 @@
  */
 #include "mobileinteractive.h"
 
-#include <QFileDialog>
+#include <algorithm>
 
+#include <QDir>
+#include <QFileDialog>
+#include <QFileInfo>
+
+#ifdef Q_OS_ANDROID
+#include "platform/android/androidshare.h"
+#endif
+
+#include "translation.h"
 #include "log.h"
 
 using namespace mu::mobile;
@@ -28,6 +37,28 @@ using namespace muse;
 #if defined(Q_OS_ANDROID) || defined(Q_OS_IOS)
 #define VS_SYSTEM_DOCUMENT_PICKER
 #endif
+
+static const Uri SAVE_TO_LIBRARY_URI("musescore://mobile/savetolibrary");
+
+//! Unlike io::escapeFileName, keeps spaces: the name is shown in the Scores library
+static QString validFileName(const QString& name)
+{
+    static const QString INVALID_CHARACTERS = QStringLiteral("/\\:*?\"<>|");
+
+    QString result;
+    for (const QChar& ch : name.trimmed()) {
+        result += (INVALID_CHARACTERS.contains(ch) || ch.unicode() < 0x20) ? QChar('_') : ch;
+    }
+
+    return result;
+}
+
+static bool isScoreSaving(const std::vector<std::string>& filter)
+{
+    return std::any_of(filter.cbegin(), filter.cend(), [](const std::string& nameFilter) {
+        return nameFilter.find("*.mscz") != std::string::npos;
+    });
+}
 
 MobileInteractive::MobileInteractive(std::shared_ptr<IInteractive> origin)
     : m_origin(std::move(origin))
@@ -156,7 +187,82 @@ io::paths_t MobileInteractive::selectOpeningFilesSync(const std::string& title, 
 io::path_t MobileInteractive::selectSavingFileSync(const std::string& title, const io::path_t& path, const std::vector<std::string>& filter,
                                                    bool confirmOverwrite)
 {
+#ifdef VS_SYSTEM_DOCUMENT_PICKER
+    UNUSED(title);
+
+    if (isScoreSaving(filter)) {
+        return selectScorePathInLibrary(path, confirmOverwrite);
+    }
+
+    return makeExportPath(path);
+#else
     return m_origin->selectSavingFileSync(title, path, filter, confirmOverwrite);
+#endif
+}
+
+io::path_t MobileInteractive::selectScorePathInLibrary(const io::path_t& suggestedPath, bool confirmOverwrite)
+{
+    const io::path_t libraryPath = m_library.libraryPath();
+    QString name = io::completeBasename(suggestedPath).toQString();
+
+    for (;;) {
+        UriQuery query(SAVE_TO_LIBRARY_URI);
+        query.set("name", name.toStdString());
+        query.set("folderName", io::filename(libraryPath).toStdString());
+
+        const RetVal<Val> rv = m_origin->openSync(query);
+        if (!rv.ret) {
+            return io::path_t();
+        }
+
+        name = validFileName(rv.val.toQString());
+        if (name.isEmpty()) {
+            continue;
+        }
+
+        const io::path_t target = libraryPath + "/" + name + ".mscz";
+
+        if (!confirmOverwrite || !QFileInfo::exists(target.toQString())) {
+            return target;
+        }
+
+        const Result result = m_origin->questionSync(muse::trc("mobile", "A score with this name already exists"),
+                                                     muse::qtrc("mobile", "Do you want to replace “%1”?").arg(name).toStdString(),
+                                                     m_origin->buttonDataList({ Button::Cancel, Button::Yes }), int(Button::Cancel));
+        if (result.standardButton() == Button::Yes) {
+            return target;
+        }
+
+        // Ask for another name
+    }
+}
+
+io::path_t MobileInteractive::makeExportPath(const io::path_t& suggestedPath)
+{
+    // No dialog: exports go to the exports folder, then they are shared (see revealInFileBrowser)
+    const io::path_t exportsPath = m_library.exportsPath();
+    QDir().mkpath(exportsPath.toQString());
+
+    m_lastExportTime = QDateTime::currentDateTime();
+
+    return exportsPath + "/" + io::filename(suggestedPath);
+}
+
+QStringList MobileInteractive::lastExportedFiles(const io::path_t& exportPath) const
+{
+    // An export can write several files: one per page or part, named after the export path
+    const QFileInfo exportInfo(exportPath.toQString());
+    const QString pattern = exportInfo.completeBaseName() + "*." + exportInfo.suffix();
+
+    QStringList files;
+    const QFileInfoList candidates = QDir(exportInfo.absolutePath()).entryInfoList({ pattern }, QDir::Files, QDir::Name);
+    for (const QFileInfo& candidate : candidates) {
+        if (!m_lastExportTime.isValid() || candidate.lastModified() >= m_lastExportTime.addSecs(-1)) {
+            files << candidate.absoluteFilePath();
+        }
+    }
+
+    return files;
 }
 
 io::path_t MobileInteractive::selectDirectory(const std::string& title, const io::path_t& dir)
@@ -269,7 +375,25 @@ async::Promise<Ret> MobileInteractive::openApp(const UriQuery& uri) const
 
 Ret MobileInteractive::revealInFileBrowser(const io::path_t& filePath) const
 {
+#ifdef Q_OS_ANDROID
+    // There is no file browser to show files in: they are shared instead
+    QStringList files;
+    if (io::dirpath(filePath) == m_library.exportsPath()) {
+        files = lastExportedFiles(filePath);
+    } else if (QFileInfo(filePath.toQString()).isFile()) {
+        files << filePath.toQString();
+    }
+
+    if (files.isEmpty()) {
+        LOGE() << "Nothing to share for " << filePath;
+        return make_ret(Ret::Code::UnknownError);
+    }
+
+    android::shareFiles(files, muse::qtrc("mobile", "Share"));
+    return make_ok();
+#else
     return m_origin->revealInFileBrowser(filePath);
+#endif
 }
 
 IInteractive::Result MobileInteractive::questionSync(const std::string& contentTitle, const Text& text, const ButtonDatas& buttons,

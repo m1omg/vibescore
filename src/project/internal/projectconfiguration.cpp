@@ -123,7 +123,12 @@ void ProjectConfiguration::init()
 
     settings()->setDefaultValue(SHOW_CONVERT_FILE_PROCESSING_DIALOG, Val(true));
 
+#if defined(Q_OS_ANDROID) || defined(Q_OS_IOS)
+    // Exports are shared from mobile devices (see the mobile module)
+    settings()->setDefaultValue(SHOULD_DESTINATION_FOLDER_BE_OPENED_ON_EXPORT, Val(true));
+#else
     settings()->setDefaultValue(SHOULD_DESTINATION_FOLDER_BE_OPENED_ON_EXPORT, Val(false));
+#endif
     settings()->setDefaultValue(OPEN_DETAILED_PROJECT_UPLOADED_DIALOG, Val(true));
     settings()->setDefaultValue(HAS_ASKED_AUDIO_GENERATION_SETTINGS, Val(false));
     settings()->setDefaultValue(GENERATE_AUDIO_TIME_PERIOD_TYPE_KEY, Val(static_cast<int>(GenerateAudioTimePeriodType::Never)));

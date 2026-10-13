@@ -1910,7 +1910,7 @@ void ProjectActionsController::exportScore()
 void ProjectActionsController::printScore()
 {
     INotationPtr notation = globalContext()->currentNotation();
-    if (!notation) {
+    if (!notation || !printProvider()) {
         return;
     }
 

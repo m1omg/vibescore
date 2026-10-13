@@ -18,14 +18,17 @@
  */
 #pragma once
 
+#include <QDateTime>
+
 #include "global/iinteractive.h"
 
 #include "scoreslibrary.h"
 
 namespace mu::mobile {
-//! IInteractive for mobile platforms, on top of the default one:
-//! files are picked with the system document picker and imported as local copies (see ScoresLibrary),
-//! because the rest of the app works with local paths.
+//! IInteractive for mobile platforms, on top of the default one. The rest of the app works with local paths:
+//! - files are picked with the system document picker and imported as local copies (see ScoresLibrary)
+//! - scores are saved into the Scores library, under a name asked in the app
+//! - exports are written to the exports folder, and "revealing" them shares them (Android share sheet)
 class MobileInteractive : public muse::IInteractive
 {
 public:
@@ -116,7 +119,12 @@ public:
     muse::RetVal<muse::Val> openSync(const muse::UriQuery& uri) override;
 
 private:
+    muse::io::path_t selectScorePathInLibrary(const muse::io::path_t& suggestedPath, bool confirmOverwrite);
+    muse::io::path_t makeExportPath(const muse::io::path_t& suggestedPath);
+    QStringList lastExportedFiles(const muse::io::path_t& exportPath) const;
+
     std::shared_ptr<muse::IInteractive> m_origin;
     ScoresLibrary m_library;
+    QDateTime m_lastExportTime;
 };
 }

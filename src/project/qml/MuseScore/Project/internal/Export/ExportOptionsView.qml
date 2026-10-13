@@ -194,7 +194,10 @@ Column {
 
     CheckBox {
         width: parent.width
-        text: qsTrc("project/export", "Open destination folder on export")
+        // Mobile devices share the exported files instead (see the mobile module)
+        text: (Qt.platform.os === "android" || Qt.platform.os === "ios")
+              ? qsTrc("project/export", "Share after export")
+              : qsTrc("project/export", "Open destination folder on export")
 
         visible: root.isExportAvailable
 

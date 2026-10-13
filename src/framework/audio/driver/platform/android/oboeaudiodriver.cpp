@@ -21,6 +21,8 @@
 #include <algorithm>
 #include <cstring>
 
+#include <QGuiApplication>
+
 #include <oboe/Oboe.h>
 
 #include "translation.h"
@@ -81,6 +83,27 @@ OboeAudioDriver::~OboeAudioDriver()
 
 void OboeAudioDriver::init()
 {
+    QObject::connect(qGuiApp, &QGuiApplication::applicationStateChanged, &m_appStateReceiver, [this](Qt::ApplicationState state) {
+        setSuspended(state == Qt::ApplicationSuspended);
+    });
+}
+
+void OboeAudioDriver::setSuspended(bool suspended)
+{
+    std::lock_guard lock(m_streamMutex);
+
+    if (m_suspended == suspended) {
+        return;
+    }
+
+    m_suspended = suspended;
+
+    if (!m_stream) {
+        return;
+    }
+
+    const oboe::Result result = suspended ? m_stream->stream->requestPause() : m_stream->stream->requestStart();
+    LOGI() << (suspended ? "Paused" : "Resumed") << " the Oboe stream: " << oboe::convertToText(result);
 }
 
 std::string OboeAudioDriver::name() const
@@ -135,7 +158,8 @@ bool OboeAudioDriver::open(const Spec& spec, Spec* activeSpec)
     const int32_t block = static_cast<int32_t>(spec.output.samplesPerChannel);
     s->setBufferSizeInFrames(std::min(std::max(2 * block, 2 * burst), s->getBufferCapacityInFrames()));
 
-    result = s->requestStart();
+    // Opened in the background (e.g. after a change of the audio route): it starts when the app is back
+    result = m_suspended ? oboe::Result::OK : s->requestStart();
     if (result != oboe::Result::OK) {
         LOGE() << "Failed to start Oboe stream: " << oboe::convertToText(result);
         s->close();

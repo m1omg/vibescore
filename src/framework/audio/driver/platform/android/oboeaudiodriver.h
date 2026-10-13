@@ -22,6 +22,8 @@
 #include <memory>
 #include <mutex>
 
+#include <QObject>
+
 #include "iaudiodriver.h"
 
 namespace muse::audio {
@@ -59,12 +61,19 @@ private:
     void closeStream();
     void onStreamDisconnected();
 
+    //! While the app is in the background, the stream is paused, so that it does not keep
+    //! the audio device and the CPU busy
+    void setSuspended(bool suspended);
+
     std::unique_ptr<Stream> m_stream;
     mutable std::mutex m_streamMutex;
 
     //! "Opened" from the point of view of the audio subsystem; stays true when the stream
     //! is lost (e.g. headphones unplugged) so that the controller reopens it
     std::atomic<bool> m_opened = false;
+
+    bool m_suspended = false; // guarded by m_streamMutex
+    QObject m_appStateReceiver;
 
     Spec m_activeSpec;
     async::Channel<Spec> m_activeSpecChanged;

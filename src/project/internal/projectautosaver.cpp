@@ -21,6 +21,8 @@
  */
 #include "projectautosaver.h"
 
+#include <QGuiApplication>
+
 #include "engraving/infrastructure/mscio.h"
 
 #include "defer.h"
@@ -54,6 +56,15 @@ void ProjectAutoSaver::init()
     configuration()->autoSaveIntervalChanged().onReceive(this, [this](int minutes) {
         m_timer.setInterval(minutes * 60000);
     });
+
+#if defined(Q_OS_ANDROID) || defined(Q_OS_IOS)
+    // Mobile systems may close apps in the background without notice: save as soon as the app is left
+    QObject::connect(qApp, &QGuiApplication::applicationStateChanged, &m_timer, [this](Qt::ApplicationState state) {
+        if (state != Qt::ApplicationActive && configuration()->isAutoSaveEnabled()) {
+            onTrySave();
+        }
+    });
+#endif
 
     update();
 

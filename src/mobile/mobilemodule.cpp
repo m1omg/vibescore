@@ -19,10 +19,13 @@
 #include "mobilemodule.h"
 
 #include "modularity/ioc.h"
+#include "ui/iinteractiveuriregister.h"
 
 #include "internal/backnavigationcontroller.h"
 #include "internal/incomingfilescontroller.h"
 #include "internal/mobileinteractive.h"
+#include "internal/mobilelifecyclecontroller.h"
+#include "internal/mobileprintprovider.h"
 #include "internal/mobilewindowsprovider.h"
 
 using namespace mu::mobile;
@@ -38,15 +41,27 @@ void MobileModule::registerExports()
 {
     m_incomingFilesController = std::make_shared<IncomingFilesController>(iocContext());
     m_backNavigationController = std::make_shared<BackNavigationController>(iocContext());
+    m_lifecycleController = std::make_shared<MobileLifecycleController>(iocContext());
 
     // On top of the default IInteractive (registered by the global module): system document picker, Scores library
     std::shared_ptr<IInteractive> originInteractive = ioc()->resolve<IInteractive>(moduleName());
     ioc()->unregister<IInteractive>(moduleName());
     ioc()->registerExport<IInteractive>(moduleName(), std::make_shared<MobileInteractive>(originInteractive));
 
+    // The print module (Qt Print Support) is not available on mobile platforms
+    ioc()->registerExport<mu::print::IPrintProvider>(moduleName(), std::make_shared<MobilePrintProvider>(iocContext()));
+
     // Replaces the stub of the multiwindows module, which is registered before this module
     ioc()->unregister<muse::mi::IMultiWindowsProvider>(moduleName());
     ioc()->registerExport<muse::mi::IMultiWindowsProvider>(moduleName(), std::make_shared<MobileWindowsProvider>(iocContext()));
+}
+
+void MobileModule::resolveImports()
+{
+    auto ir = ioc()->resolve<muse::ui::IInteractiveUriRegister>(moduleName());
+    if (ir) {
+        ir->registerQmlUri(Uri("musescore://mobile/savetolibrary"), "MuseScore.Mobile", "SaveToLibraryDialog");
+    }
 }
 
 void MobileModule::onInit(const IApplication::RunMode& mode)
@@ -57,10 +72,12 @@ void MobileModule::onInit(const IApplication::RunMode& mode)
 
     m_incomingFilesController->init();
     m_backNavigationController->init();
+    m_lifecycleController->init();
 }
 
 void MobileModule::onDeinit()
 {
+    m_lifecycleController.reset();
     m_backNavigationController.reset();
     m_incomingFilesController.reset();
 }
