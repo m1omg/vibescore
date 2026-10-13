@@ -80,11 +80,14 @@ jobs:
       - name: Build
         run: |
           SDK="${{ inputs.sdk || 'iphoneos' }}"
+          set +e
           cmake --build build-ios --config ${BUILD_TYPE} --target MuseScoreStudio -- \
             -sdk "$SDK" -jobs "$(sysctl -n hw.ncpu)" \
             CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" \
-            2>&1 | tee build-ios.log | grep -E "error:|warning: unused|\*\* BUILD" || true
-          test "${PIPESTATUS[0]}" -eq 0
+            > build-ios.log 2>&1
+          STATUS=$?
+          grep -E "error:|\*\* BUILD" build-ios.log | head -300
+          exit $STATUS
 
       - name: Show errors
         if: failure()
@@ -93,8 +96,12 @@ jobs:
       - name: Package unsigned IPA
         if: success()
         run: |
-          APP="$(find build-ios -name 'VibeScore.app' -type d -path '*Release*' | head -1)"
+          SDK="${{ inputs.sdk || 'iphoneos' }}"
+          APP="build-ios/src/app/${BUILD_TYPE}-${SDK}/VibeScore.app"
           echo "App bundle: $APP"
+          # A complete bundle has its executable, Info.plist and the application data
+          test -f "$APP/Info.plist" && test -x "$APP/VibeScore" && test -f "$APP/share/sound/MS Basic.sf3" \
+            || { echo "Incomplete app bundle"; ls -la "$APP"; exit 1; }
           du -sh "$APP"
           mkdir -p ipa/Payload
           cp -R "$APP" ipa/Payload/

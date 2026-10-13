@@ -37,9 +37,12 @@ function(vs_setup_ios_packaging target)
 
     # Copy share/ (templates, instruments, styles, SoundFont, translations, ...) into the bundle
     add_custom_command(TARGET ${target} POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E rm -rf "${stage_dir}"
-        COMMAND ${CMAKE_COMMAND} --install "${CMAKE_BINARY_DIR}" --config $<CONFIG> --prefix "${stage_dir}"
-        COMMAND ${CMAKE_COMMAND} -E copy_directory "${stage_dir}/share" "$<TARGET_BUNDLE_DIR:${target}>/share"
+        COMMAND ${CMAKE_COMMAND}
+            -DBUILD_DIR=${CMAKE_BINARY_DIR}
+            -DCONFIG=$<CONFIG>
+            -DSTAGE_DIR=${stage_dir}
+            -DBUNDLE_DIR=$<TARGET_BUNDLE_DIR:${target}>
+            -P ${PROJECT_SOURCE_DIR}/buildscripts/cmake/CopyShareIntoBundle.cmake
         COMMENT "Copying application data into the app bundle"
         VERBATIM
     )
