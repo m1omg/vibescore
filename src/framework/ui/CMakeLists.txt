@@ -137,6 +137,11 @@ elseif(OS_IS_WIN)
     )
 
     target_link_libraries(muse_ui PRIVATE dwmapi)
+elseif(OS_IS_MOBILE)
+    target_sources(muse_ui PRIVATE
+        internal/platform/mobile/mobileplatformtheme.cpp
+        internal/platform/mobile/mobileplatformtheme.h
+    )
 elseif(OS_IS_LIN)
     target_sources(muse_ui PRIVATE
         internal/platform/linux/linuxplatformtheme.cpp

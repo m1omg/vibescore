@@ -36,7 +36,10 @@
 #include "internal/dragcontroller.h"
 #include "view/iconcodes.h"
 
-#ifdef Q_OS_MAC
+#if defined(Q_OS_ANDROID) || defined(Q_OS_IOS)
+#include "internal/platform/mobile/mobileplatformtheme.h"
+#include "internal/windowscontroller.h"
+#elif defined(Q_OS_MACOS)
 #include "internal/platform/macos/macosplatformtheme.h"
 #include "internal/windowscontroller.h"
 #elif defined(Q_OS_WIN)
@@ -77,7 +80,10 @@ void UiModule::registerExports()
     m_keyNavigationController = std::make_shared<NavigationController>(iocContext());
     m_keyNavigationUiActions = std::make_shared<NavigationUiActions>();
 
-    #ifdef Q_OS_MAC
+    #if defined(Q_OS_ANDROID) || defined(Q_OS_IOS)
+    m_platformTheme = std::make_shared<MobilePlatformTheme>();
+    m_windowsController = std::make_shared<WindowsController>();
+    #elif defined(Q_OS_MACOS)
     m_platformTheme = std::make_shared<MacOSPlatformTheme>();
     m_windowsController = std::make_shared<WindowsController>();
     #elif defined(Q_OS_WIN)
