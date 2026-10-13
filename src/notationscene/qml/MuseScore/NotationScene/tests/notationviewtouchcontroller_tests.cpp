@@ -56,6 +56,17 @@ using TouchPoints = NotationViewTouchController::TouchPoints;
 static const String TEST_SCORE_PATH(u"data/test.mscx");
 static constexpr int MOUSE_SELECTION_PROXIMITY = 6;
 
+class TouchModifiersStub : public muse::ui::ITouchModifiers
+{
+public:
+    Qt::KeyboardModifiers modifiers() const override { return m_modifiers; }
+    void setModifiers(Qt::KeyboardModifiers modifiers) override { m_modifiers = modifiers; }
+    async::Notification modifiersChanged() const override { return async::Notification(); }
+
+private:
+    Qt::KeyboardModifiers m_modifiers = Qt::NoModifier;
+};
+
 class NotationViewTouchControllerTests : public ::testing::Test
 {
 public:
@@ -97,6 +108,8 @@ public:
         m_inputController->dispatcher.set(m_dispatcher);
 
         m_touchController = new NotationViewTouchController(&m_view, m_inputController);
+        m_touchModifiers = std::make_shared<TouchModifiersStub>();
+        m_touchController->touchModifiers.set(m_touchModifiers);
     }
 
     void TearDown() override
@@ -156,6 +169,7 @@ public:
     std::shared_ptr<NotationConfigurationMock> m_configuration;
     std::shared_ptr<playback::PlaybackControllerMock> m_playbackController;
     std::shared_ptr<muse::actions::ActionsDispatcherMock> m_dispatcher;
+    std::shared_ptr<TouchModifiersStub> m_touchModifiers;
 
     INotationInteraction::HitElementContext m_hitContext;
     std::vector<EngravingItem*> m_selectedElements;
@@ -417,4 +431,51 @@ TEST_F(NotationViewTouchControllerTests, Drag_From_Selected_Note_Moves_It)
     m_touchController->touchBegin(finger(QPointF(100, 100)));
     m_touchController->touchUpdate(finger(QPointF(100, 60)));
     m_touchController->touchEnd(QPointF(100, 60));
+}
+
+/**
+ * @brief Tap_With_Shift_On_Selects_A_Range
+ * @details With the Shift toggle on, a tap is a Shift+click
+ */
+TEST_F(NotationViewTouchControllerTests, Tap_With_Shift_On_Selects_A_Range)
+{
+    //! [GIVEN] A note (not selected) under the finger
+    EngravingItem* note = selectedNote();
+    note->setSelected(false);
+    m_hitContext.element = note;
+    m_hitContext.staff = note->staff();
+
+    ON_CALL(*m_interaction, hitElement(_, _)).WillByDefault(Return(note));
+
+    //! [GIVEN] The Shift toggle is on
+    m_touchModifiers->setModifiers(Qt::ShiftModifier);
+
+    //! [THEN] The selection is extended to the note as a range
+    EXPECT_CALL(*m_interaction, select(std::vector<EngravingItem*> { note }, SelectType::RANGE, _)).Times(1);
+
+    //! [WHEN] The note is tapped
+    m_touchController->touchBegin(finger(QPointF(100, 100)));
+    m_touchController->touchEnd(QPointF(100, 100));
+}
+
+/**
+ * @brief Drag_With_Shift_On_Selects_With_A_Lasso
+ * @details With the Shift toggle on, a drag on an empty place draws a selection rectangle instead of panning
+ */
+TEST_F(NotationViewTouchControllerTests, Drag_With_Shift_On_Selects_With_A_Lasso)
+{
+    //! [GIVEN] The Shift toggle is on
+    m_touchModifiers->setModifiers(Qt::ShiftModifier);
+
+    //! [THEN] A lasso goes from where the finger went down to where it is
+    EXPECT_CALL(*m_interaction, startDrag(_, _, _)).Times(1);
+    EXPECT_CALL(*m_interaction, drag(PointF(100, 100), PointF(160, 140), DragMode::BothXY)).Times(1);
+
+    //! [THEN] The score does not move
+    EXPECT_CALL(m_view, moveCanvas(_, _)).Times(0);
+
+    //! [WHEN] The finger moves over an empty place
+    m_touchController->touchBegin(finger(QPointF(100, 100)));
+    m_touchController->touchUpdate(finger(QPointF(160, 140)));
+    m_touchController->touchEnd(QPointF(160, 140));
 }

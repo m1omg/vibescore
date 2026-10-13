@@ -166,7 +166,9 @@ void NotationViewTouchController::touchUpdate(const TouchPoints& points)
         if (QLineF(pos, m_startPos).length() > TAP_SLOP) {
             m_longPressTimer.stop();
 
-            if (!m_view->isNoteEnterMode() && m_input->isTouchDragTarget(m_startPos)) {
+            // Shift+drag selects a range (or what a lasso surrounds)
+            const bool isDragTarget = (modifiers() & Qt::ShiftModifier) || m_input->isTouchDragTarget(m_startPos);
+            if (!m_view->isNoteEnterMode() && isDragTarget) {
                 m_state = State::Dragging;
                 sendMouse(QEvent::MouseButtonPress, m_startPos, Qt::LeftButton, Qt::LeftButton);
                 sendMouse(QEvent::MouseMove, pos, Qt::NoButton, Qt::LeftButton);
@@ -367,13 +369,18 @@ void NotationViewTouchController::stopFling()
     m_flingTimer.stop();
 }
 
+Qt::KeyboardModifiers NotationViewTouchController::modifiers() const
+{
+    return touchModifiers() ? touchModifiers()->modifiers() : Qt::NoModifier;
+}
+
 void NotationViewTouchController::sendMouse(QEvent::Type type, const QPointF& pos, Qt::MouseButton button,
                                             Qt::MouseButtons buttons)
 {
     QQuickItem* item = m_view->asItem();
     const QPointF scenePos = item ? item->mapToScene(pos) : pos;
     const QPointF globalPos = item ? item->mapToGlobal(pos) : pos;
-    QMouseEvent event(type, pos, scenePos, globalPos, button, buttons, Qt::NoModifier);
+    QMouseEvent event(type, pos, scenePos, globalPos, button, buttons, modifiers());
 
     // Fingers are less precise than a mouse: hit testing is more tolerant for these events
     m_input->setTouchInput(true);

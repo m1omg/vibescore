@@ -26,6 +26,9 @@
 #include <QPointF>
 #include <QTimer>
 
+#include "modularity/ioc.h"
+#include "ui/itouchmodifiers.h"
+
 class QTouchEvent;
 
 namespace mu::notation {
@@ -39,10 +42,14 @@ class NotationViewInputController;
 //! - drag that starts on a selected element or a grip: drags it; any other drag pans the score, with momentum
 //! - long press: context menu; in note input mode, a preview of the note under the finger, placed on release
 //! - two fingers: zoom and pan
+//! The Shift and Ctrl toggles (ITouchModifiers) apply to the mouse events; with Shift on, a drag selects (as Shift+drag does).
 //! Stylus and mouse input are not handled here, so they keep their precise desktop behavior.
 class NotationViewTouchController : public QObject
 {
     Q_OBJECT
+
+public:
+    muse::GlobalInject<muse::ui::ITouchModifiers> touchModifiers;
 
 public:
     static constexpr int LONG_PRESS_INTERVAL_MS = 450;
@@ -95,6 +102,7 @@ private:
     void onFlingStep();
     void stopFling();
 
+    Qt::KeyboardModifiers modifiers() const;
     void sendMouse(QEvent::Type type, const QPointF& pos, Qt::MouseButton button, Qt::MouseButtons buttons);
     void sendHover(const QPointF& pos, const QPointF& oldPos);
     void sendHoverLeave(const QPointF& pos);

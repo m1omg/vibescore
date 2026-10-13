@@ -38,6 +38,7 @@ target_sources(muse_ui PRIVATE
     inavigationcontroller.h
     idragcontroller.h
     iwindowscontroller.h
+    itouchmodifiers.h
 
     graphicsapiprovider.cpp
     graphicsapiprovider.h
@@ -70,6 +71,8 @@ target_sources(muse_ui PRIVATE
     internal/uiarrangement.h
     internal/dragcontroller.cpp
     internal/dragcontroller.h
+    internal/touchmodifiers.cpp
+    internal/touchmodifiers.h
     internal/windowscontroller.cpp
     internal/windowscontroller.h
     internal/qmlnetworkaccessmanagerfactory.cpp
