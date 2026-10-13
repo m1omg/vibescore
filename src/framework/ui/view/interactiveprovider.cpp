@@ -34,6 +34,7 @@
 #include "diagnostics/diagnosticutils.h"
 
 #include "internal/widgetdialogadapter.h"
+#include "internal/mobilewidgetdialogframe.h"
 
 #include "muse_framework_config.h"
 
@@ -730,9 +731,17 @@ RetVal<InteractiveProvider::OpenData> InteractiveProvider::openWidgetDialog(cons
     });
 
     bool modal = params.value("modal", "true") == "true";
+#ifdef MUSE_CONFIGURATION_IS_MOBILE
+    // A single window on a touch screen: the dialog takes the whole window and scrolls when it does not fit
+    QWidget* frame = MobileWidgetDialogFrame::wrap(dialog);
+    frame->setWindowModality(modal ? Qt::ApplicationModal : Qt::NonModal);
+    frame->showMaximized();
+    frame->activateWindow();
+#else
     dialog->setWindowModality(modal ? Qt::ApplicationModal : Qt::NonModal);
     dialog->show();
     dialog->activateWindow();     // give keyboard focus to aid blind users
+#endif
 
     result.ret = make_ret(Ret::Code::Ok);
     result.val.objectId = objectId;

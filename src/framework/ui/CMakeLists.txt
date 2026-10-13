@@ -102,6 +102,8 @@ target_sources(muse_ui PRIVATE
 
     view/internal/widgetdialogadapter.cpp
     view/internal/widgetdialogadapter.h
+    view/internal/mobilewidgetdialogframe.cpp
+    view/internal/mobilewidgetdialogframe.h
 
     dev/testdialog.cpp
     dev/testdialog.h
