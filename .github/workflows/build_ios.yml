@@ -22,13 +22,19 @@ env:
 jobs:
   build_ios:
     name: build_ios (${{ matrix.sdk }})
-    runs-on: macos-15
+    runs-on: ${{ matrix.runner }}
     timeout-minutes: 340
     strategy:
       fail-fast: false
       matrix:
-        # iphoneos: unsigned IPA for sideloading; iphonesimulator: smoke test with screenshots
-        sdk: [ 'iphoneos', 'iphonesimulator' ]
+        include:
+          # Unsigned IPA for sideloading
+          - sdk: 'iphoneos'
+            runner: 'macos-15'
+          # Smoke test with screenshots. Qt's iOS package has simulator code for x86_64 only, which the
+          # simulators of Apple Silicon Macs do not launch: an Intel Mac runs it
+          - sdk: 'iphonesimulator'
+            runner: 'macos-15-intel'
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -84,7 +90,7 @@ jobs:
           set +e
           EXTRA_ARGS=""
           if [ "$SDK" = "iphonesimulator" ]; then
-            # Qt's iOS package has simulator code for x86_64 only; it runs under Rosetta on the Apple Silicon runners
+            # Qt's iOS package has simulator code for x86_64 only
             EXTRA_ARGS="ARCHS=x86_64 ONLY_ACTIVE_ARCH=NO"
           fi
           cmake --build build-ios --config ${BUILD_TYPE} --target MuseScoreStudio -- \
