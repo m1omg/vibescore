@@ -48,6 +48,10 @@ function(vs_setup_android_packaging target)
     # QML files are spread over all modules; androiddeployqt scans them to deploy the Qt QML plugins they import
     set_property(TARGET ${target} APPEND PROPERTY QT_QML_ROOT_PATH "${PROJECT_SOURCE_DIR}/src")
 
+    # HTTPS (Learn, language packs, plugins): Qt's TLS backend needs OpenSSL
+    include(SetupAndroidOpenSSL)
+    vs_add_android_openssl(${target})
+
     # Native libraries must be aligned to 16 KB pages for Android 15+ devices
     target_link_options(${target} PRIVATE "-Wl,-z,max-page-size=16384")
 
