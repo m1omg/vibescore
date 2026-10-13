@@ -33,8 +33,13 @@ BaseSection {
     property alias currentFontIndex: selectFontControl.currentIndex
     property alias bodyTextSize: bodyTextSizeControl.currentValue
 
+    property bool isUiScaleAvailable: false
+    property real uiScale: 1.0
+    property bool isUiScaleRestartRequired: false
+
     signal fontChangeRequested(var newFontIndex)
     signal bodyTextSizeChangeRequested(var newBodyTextSize)
+    signal uiScaleChangeRequested(var newUiScale)
 
     ComboBoxWithTitle {
         id: selectFontControl
@@ -71,5 +76,43 @@ BaseSection {
         onValueEdited: function(newValue) {
             root.bodyTextSizeChangeRequested(newValue)
         }
+    }
+
+    ComboBoxWithTitle {
+        id: uiScaleControl
+
+        visible: root.isUiScaleAvailable
+
+        title: qsTrc("preferences", "Interface scale")
+        columnWidth: root.columnWidth
+
+        model: [
+            { "text": "70%", "value": 0.7 },
+            { "text": "80%", "value": 0.8 },
+            { "text": "90%", "value": 0.9 },
+            { "text": "100%", "value": 1.0 },
+            { "text": "115%", "value": 1.15 },
+            { "text": "130%", "value": 1.3 },
+            { "text": "150%", "value": 1.5 }
+        ]
+
+        currentIndex: Math.max(0, indexOfValue(root.uiScale))
+
+        navigation.name: "UiScaleBox"
+        navigation.panel: root.navigation
+        navigation.row: 3
+
+        onValueEdited: function(newIndex, newValue) {
+            root.uiScaleChangeRequested(newValue)
+        }
+    }
+
+    StyledTextLabel {
+        width: parent.width
+
+        visible: root.isUiScaleAvailable && root.isUiScaleRestartRequired
+        text: qsTrc("preferences", "The new interface scale is used when the app starts again.")
+        horizontalAlignment: Text.AlignLeft
+        wrapMode: Text.WordWrap
     }
 }

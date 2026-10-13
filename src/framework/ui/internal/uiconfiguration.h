@@ -103,6 +103,9 @@ public:
 
     void setPhysicalDotsPerInch(std::optional<double> dpi) override;
 
+    double uiScale() const override;
+    void setUiScale(double scale) override;
+
     ValNt<QByteArray> pageState(const QString& pageName) const override;
     void setPageState(const QString& pageName, const QByteArray& state) override;
 

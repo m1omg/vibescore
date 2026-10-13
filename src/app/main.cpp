@@ -25,6 +25,7 @@
 #include <QApplication>
 #include <QStyleHints>
 #include <QQuickWindow>
+#include <QSettings>
 #include <QSslSocket>
 
 #include "appfactory.h"
@@ -135,6 +136,17 @@ int main(int argc, char** argv)
     QCoreApplication::setOrganizationDomain("musescore.org");
 #endif
     QCoreApplication::setApplicationVersion(MUSE_APP_VERSION);
+
+#ifdef MUE_CONFIGURATION_IS_APPMOBILE
+    // Preferences > Appearance > Interface scale (IUiConfiguration::uiScale): Qt applies it to the screens when it starts
+    if (!qEnvironmentVariableIsSet("QT_SCALE_FACTOR")) {
+        QSettings::setDefaultFormat(QSettings::IniFormat); // as muse::Settings
+        const double uiScale = QSettings().value("ui/application/scale", 1.0).toDouble();
+        if (uiScale >= 0.5 && uiScale <= 2.0 && !qFuzzyCompare(uiScale, 1.0)) {
+            qputenv("QT_SCALE_FACTOR", QByteArray::number(uiScale));
+        }
+    }
+#endif
 
 #if !defined(Q_OS_WIN) && !defined(Q_OS_DARWIN) && !defined(Q_OS_WASM) && !defined(Q_OS_ANDROID)
     // Any OS that uses Freedesktop.org Desktop Entry Specification (e.g. Linux, BSD)

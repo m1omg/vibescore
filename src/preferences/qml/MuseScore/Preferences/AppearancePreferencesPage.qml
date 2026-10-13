@@ -199,6 +199,9 @@ PreferencesPage {
             allFonts: appearanceModel.allFonts()
             currentFontIndex: appearanceModel.currentFontIndex
             bodyTextSize: appearanceModel.bodyTextSize
+            isUiScaleAvailable: appearanceModel.isUiScaleAvailable
+            uiScale: appearanceModel.uiScale
+            isUiScaleRestartRequired: appearanceModel.isUiScaleRestartRequired
 
             navigation.section: root.navigationSection
             navigation.order: root.navigationOrderStart + 6
@@ -209,6 +212,10 @@ PreferencesPage {
 
             onBodyTextSizeChangeRequested: function(newBodyTextSize) {
                 appearanceModel.bodyTextSize = newBodyTextSize
+            }
+
+            onUiScaleChangeRequested: function(newUiScale) {
+                appearanceModel.uiScale = newUiScale
             }
 
             onFocusChanged: {

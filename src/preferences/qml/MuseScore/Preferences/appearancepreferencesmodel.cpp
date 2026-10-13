@@ -227,6 +227,33 @@ int AppearancePreferencesModel::bodyTextSize() const
     return uiConfiguration()->fontSize(FontSizeType::BODY);
 }
 
+bool AppearancePreferencesModel::isUiScaleAvailable() const
+{
+    // Desktop platforms have their own setting for this
+#if defined(Q_OS_ANDROID) || defined(Q_OS_IOS)
+    return true;
+#else
+    return false;
+#endif
+}
+
+double AppearancePreferencesModel::uiScale() const
+{
+    return uiConfiguration()->uiScale();
+}
+
+bool AppearancePreferencesModel::isUiScaleRestartRequired() const
+{
+    // The scale the app runs with (see src/app/main.cpp)
+    bool ok = false;
+    double runningScale = qEnvironmentVariable("QT_SCALE_FACTOR").toDouble(&ok);
+    if (!ok) {
+        runningScale = 1.0;
+    }
+
+    return !qFuzzyCompare(uiScale(), runningScale);
+}
+
 bool AppearancePreferencesModel::backgroundUseColor() const
 {
     return notationConfiguration()->backgroundUseColor();
@@ -315,6 +342,16 @@ void AppearancePreferencesModel::setBodyTextSize(int size)
 
     uiConfiguration()->setBodyFontSize(size);
     emit bodyTextSizeChanged();
+}
+
+void AppearancePreferencesModel::setUiScale(double scale)
+{
+    if (qFuzzyCompare(scale, uiScale()) || scale <= 0) {
+        return;
+    }
+
+    uiConfiguration()->setUiScale(scale);
+    emit uiScaleChanged();
 }
 
 void AppearancePreferencesModel::setBackgroundUseColor(bool value)

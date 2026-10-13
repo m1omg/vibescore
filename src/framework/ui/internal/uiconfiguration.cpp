@@ -60,6 +60,8 @@ static const Settings::Key UI_MUSICAL_FONT_FAMILY_KEY("ui", "ui/theme/musicalFon
 static const Settings::Key UI_MUSICAL_FONT_SIZE_KEY("ui", "ui/theme/musicalFontSize");
 static const Settings::Key UI_MUSICAL_TEXT_FONT_FAMILY_KEY("ui", "ui/theme/musicalTextFontFamily");
 static const Settings::Key UI_MUSICAL_TEXT_FONT_SIZE_KEY("ui", "ui/theme/musicalTextFontSize");
+//! Also read by src/app/main.cpp, before the settings are loaded
+static const Settings::Key UI_SCALE_KEY("ui", "ui/application/scale");
 
 static const QString WINDOW_GEOMETRY_KEY("window");
 
@@ -100,6 +102,7 @@ void UiConfiguration::init()
     settings()->setDefaultValue(UI_MUSICAL_TEXT_FONT_FAMILY_KEY, Val("Leland Text"));
     settings()->setDefaultValue(UI_MUSICAL_TEXT_FONT_SIZE_KEY, Val(defaultFontSize()));
     settings()->setDefaultValue(UI_THEMES_KEY, Val(""));
+    settings()->setDefaultValue(UI_SCALE_KEY, Val(1.0));
 
     settings()->valueChanged(UI_THEMES_KEY).onReceive(this, [this](const Val&) {
         updateThemes();
@@ -683,6 +686,16 @@ double UiConfiguration::guiScaling() const
 void UiConfiguration::setPhysicalDotsPerInch(std::optional<double> dpi)
 {
     m_customDPI = dpi;
+}
+
+double UiConfiguration::uiScale() const
+{
+    return settings()->value(UI_SCALE_KEY).toDouble();
+}
+
+void UiConfiguration::setUiScale(double scale)
+{
+    settings()->setSharedValue(UI_SCALE_KEY, Val(scale));
 }
 
 double UiConfiguration::physicalDpi() const

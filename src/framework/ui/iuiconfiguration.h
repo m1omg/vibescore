@@ -99,6 +99,10 @@ public:
     //! NOTE Maybe set from command line
     virtual void setPhysicalDotsPerInch(std::optional<double> dpi) = 0;
 
+    //! Scales the whole interface (QT_SCALE_FACTOR, read by the app before it starts); takes effect after a restart
+    virtual double uiScale() const = 0;
+    virtual void setUiScale(double scale) = 0;
+
     virtual ValNt<QByteArray> pageState(const QString& pageName) const = 0;
     virtual void setPageState(const QString& pageName, const QByteArray& state) = 0;
 

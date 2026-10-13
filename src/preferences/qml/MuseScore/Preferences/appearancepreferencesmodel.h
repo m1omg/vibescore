@@ -50,6 +50,9 @@ class AppearancePreferencesModel : public QObject, public muse::Contextable, pub
 
     Q_PROPERTY(int currentFontIndex READ currentFontIndex WRITE setCurrentFontIndex NOTIFY currentFontIndexChanged)
     Q_PROPERTY(int bodyTextSize READ bodyTextSize WRITE setBodyTextSize NOTIFY bodyTextSizeChanged)
+    Q_PROPERTY(bool isUiScaleAvailable READ isUiScaleAvailable CONSTANT)
+    Q_PROPERTY(double uiScale READ uiScale WRITE setUiScale NOTIFY uiScaleChanged)
+    Q_PROPERTY(bool isUiScaleRestartRequired READ isUiScaleRestartRequired NOTIFY uiScaleChanged)
 
     Q_PROPERTY(bool backgroundUseColor READ backgroundUseColor WRITE setBackgroundUseColor NOTIFY backgroundUseColorChanged)
     Q_PROPERTY(QColor backgroundColor READ backgroundColor WRITE setBackgroundColor NOTIFY backgroundColorChanged)
@@ -96,6 +99,9 @@ public:
 
     int currentFontIndex() const;
     int bodyTextSize() const;
+    bool isUiScaleAvailable() const;
+    double uiScale() const;
+    bool isUiScaleRestartRequired() const;
 
     bool backgroundUseColor() const;
     QColor backgroundColor() const;
@@ -122,6 +128,7 @@ public slots:
     void setCurrentAccentColorIndex(int index);
     void setCurrentFontIndex(int index);
     void setBodyTextSize(int size);
+    void setUiScale(double scale);
     void setBackgroundUseColor(bool value);
     void setBackgroundColor(const QColor& color);
     void setBackgroundWallpaperPath(const QString& path);
@@ -136,6 +143,7 @@ signals:
     void themesChanged();
     void currentFontIndexChanged();
     void bodyTextSizeChanged();
+    void uiScaleChanged();
     void backgroundUseColorChanged();
     void backgroundColorChanged();
     void backgroundWallpaperPathChanged();

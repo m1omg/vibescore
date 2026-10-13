@@ -81,6 +81,9 @@ public:
 
     MOCK_METHOD(void, setPhysicalDotsPerInch, (std::optional<double>), (override));
 
+    MOCK_METHOD(double, uiScale, (), (const, override));
+    MOCK_METHOD(void, setUiScale, (double), (override));
+
     MOCK_METHOD(ValNt<QByteArray>, pageState, (const QString&), (const, override));
     MOCK_METHOD(void, setPageState, (const QString&, const QByteArray&), (override));
 
