@@ -334,6 +334,11 @@ void StartupScenario::openScore(const project::ProjectFile& file)
 
 void StartupScenario::restoreLastSession()
 {
+#if defined(Q_OS_ANDROID) || defined(Q_OS_IOS)
+    // Mobile systems end apps that are in the background instead of asking them to quit,
+    // so this is the usual way back to the app: continue where the user left off
+    sessionsManager()->restore();
+#else
     auto promise = interactive()->question(muse::trc("appshell", "The previous session quit unexpectedly."),
                                            muse::trc("appshell", "Do you want to restore the session?"),
                                            { IInteractive::Button::No, IInteractive::Button::Yes });
@@ -347,6 +352,7 @@ void StartupScenario::restoreLastSession()
             checkAndShowMuseSamplerUpdateIfNeed();
         }
     });
+#endif
 }
 
 void StartupScenario::removeProjectsUnsavedChanges(const io::paths_t& projectsPaths)
