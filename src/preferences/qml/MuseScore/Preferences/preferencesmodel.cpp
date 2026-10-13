@@ -301,6 +301,7 @@ QVariantList PreferencesModel::availablePages() const
             PreferencePageItem* child = item->childAtRow(i);
             QVariantMap childObj;
             childObj["id"] = child->id();
+            childObj["title"] = child->title();
             childObj["path"] = child->path();
             result << childObj;
 

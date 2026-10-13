@@ -32,6 +32,9 @@ Rectangle {
 
     property alias navigation: buttonBox.navigationPanel
 
+    //! Narrow (phones): shorter texts
+    property bool isCompact: false
+
     signal revertFactorySettingsRequested()
     signal applyRequested()
     signal rejectRequested()
@@ -47,7 +50,7 @@ Rectangle {
         buttons: [ ButtonBoxModel.Cancel, ButtonBoxModel.Ok ]
 
         FlatButton {
-            text: qsTrc("preferences", "Reset preferences")
+            text: root.isCompact ? qsTrc("preferences", "Reset all") : qsTrc("preferences", "Reset preferences")
             buttonRole: ButtonBoxModel.CustomRole
             buttonId: ButtonBoxModel.CustomButton + 1
             isLeftSide: true

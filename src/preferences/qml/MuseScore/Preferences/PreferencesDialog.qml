@@ -33,6 +33,11 @@ StyledDialogView {
 
     title: qsTrc("preferences", "Preferences")
 
+    //! Phones: the dialog takes the whole window, and the list of pages and the pages are shown one at a time
+    fillsCompactWindow: true
+    readonly property bool isCompact: (Qt.platform.os === "android" || Qt.platform.os === "ios")
+                                      && mainLayout.width > 0 && mainLayout.width < 600
+
     contentWidth: 880
     contentHeight: 640
     resizable: true
@@ -42,6 +47,19 @@ StyledDialogView {
 
     property QtObject prv: QtObject {
         property var pagesObjects: (new Map())
+
+        //! Compact layout: a page is shown (instead of the list of pages)
+        property bool isPageShown: false
+
+        function currentPageTitle() {
+            const pages = preferencesModel.availablePages()
+            for (const page of pages) {
+                if (page.id === preferencesModel.currentPageId) {
+                    return page.title
+                }
+            }
+            return ""
+        }
 
         function resolveStackCurrentIndex() {
             var keys = Object.keys(root.prv.pagesObjects)
@@ -59,6 +77,9 @@ StyledDialogView {
         initPagesObjects()
 
         prv.updateStackCurrentIndex()
+
+        // A page that was asked for is shown straight away
+        prv.isPageShown = root.currentPageId !== ""
     }
 
     function initPagesObjects() {
@@ -124,9 +145,47 @@ StyledDialogView {
     }
 
     ColumnLayout {
+        id: mainLayout
+
         anchors.fill: parent
 
         spacing: 0
+
+        // Compact layout: the title of the page, with the way back to the list of pages
+        RowLayout {
+            Layout.fillWidth: true
+            Layout.preferredHeight: 48
+
+            visible: root.isCompact && prv.isPageShown
+            spacing: 4
+
+            FlatButton {
+                Layout.leftMargin: 4
+
+                icon: IconCode.ARROW_LEFT
+                transparent: true
+                toolTipTitle: qsTrc("global", "Back")
+
+                navigation.panel: menu.navigation
+                navigation.row: -1
+
+                onClicked: {
+                    prv.isPageShown = false
+                }
+            }
+
+            StyledTextLabel {
+                Layout.fillWidth: true
+
+                horizontalAlignment: Text.AlignLeft
+                font: ui.theme.largeBodyBoldFont
+                text: prv.isPageShown ? prv.currentPageTitle() : ""
+            }
+        }
+
+        SeparatorLine {
+            visible: root.isCompact && prv.isPageShown
+        }
 
         RowLayout {
             Layout.fillWidth: true
@@ -138,18 +197,30 @@ StyledDialogView {
                 id: menu
 
                 Layout.fillHeight: true
+                Layout.fillWidth: root.isCompact
                 Layout.preferredWidth: 220
+
+                visible: !root.isCompact || !prv.isPageShown
 
                 navigation.section: root.navigationSection
                 navigation.order: 1
 
                 model: preferencesModel
+
+                onPageClicked: {
+                    prv.isPageShown = true
+                }
             }
 
-            SeparatorLine { orientation: Qt.Vertical }
+            SeparatorLine {
+                orientation: Qt.Vertical
+                visible: !root.isCompact
+            }
 
             StackLayout {
                 id: stack
+
+                visible: !root.isCompact || prv.isPageShown
             }
         }
 
@@ -160,6 +231,8 @@ StyledDialogView {
 
             Layout.fillWidth: true
             Layout.preferredHeight: 70
+
+            isCompact: root.isCompact
 
             navigation.section: root.navigationSection
             navigation.order: 100000

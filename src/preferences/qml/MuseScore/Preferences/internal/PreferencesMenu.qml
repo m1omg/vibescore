@@ -31,6 +31,9 @@ Item {
 
     property alias model: treeView.model
 
+    //! A page was clicked (also when it was the current page already)
+    signal pageClicked()
+
     property NavigationPanel navigation: NavigationPanel {
         name: "PreferencesMenuPanel"
         enabled: root.enabled && root.visible
@@ -145,6 +148,7 @@ Item {
 
             onClicked: {
                 treeView.model.selectRow(styleData.index)
+                root.pageClicked()
             }
         }
     }
