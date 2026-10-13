@@ -12,8 +12,12 @@ target_sources(mobile PRIVATE
     internal/backnavigationcontroller.h
     internal/incomingfilescontroller.cpp
     internal/incomingfilescontroller.h
+    internal/mobileinteractive.cpp
+    internal/mobileinteractive.h
     internal/mobilewindowsprovider.cpp
     internal/mobilewindowsprovider.h
+    internal/scoreslibrary.cpp
+    internal/scoreslibrary.h
 )
 
 target_link_libraries(mobile PRIVATE

@@ -39,7 +39,7 @@ IncomingFilesController::IncomingFilesController(const modularity::ContextPtr& i
 
 void IncomingFilesController::init()
 {
-    fileSystem()->makePath(libraryPath());
+    fileSystem()->makePath(m_library.libraryPath());
 
 #ifdef Q_OS_ANDROID
     android::startReceivingIncomingFiles([this](const QString& path) {
@@ -50,25 +50,6 @@ void IncomingFilesController::init()
 #endif
 }
 
-io::path_t IncomingFilesController::libraryPath() const
-{
-    return globalConfiguration()->userDataPath() + "/Scores";
-}
-
-io::path_t IncomingFilesController::uniqueLibraryPath(const QString& fileName) const
-{
-    const QFileInfo info(fileName);
-    const QString baseName = info.completeBaseName();
-    const QString suffix = info.suffix().isEmpty() ? QString() : "." + info.suffix();
-
-    io::path_t candidate = libraryPath() + "/" + fileName;
-    for (int i = 2; fileSystem()->exists(candidate); ++i) {
-        candidate = libraryPath() + "/" + QString("%1 (%2)%3").arg(baseName).arg(i).arg(suffix);
-    }
-
-    return candidate;
-}
-
 void IncomingFilesController::onIncomingFile(const QString& path)
 {
     const QFileInfo info(path);
@@ -77,11 +58,8 @@ void IncomingFilesController::onIncomingFile(const QString& path)
         return;
     }
 
-    // Keep the received copy in the library, where saving and autosave work like on desktop
-    const io::path_t target = uniqueLibraryPath(info.fileName());
-    Ret ret = fileSystem()->move(path, target);
-    if (!ret) {
-        LOGE() << "Failed to import " << path << " into the library: " << ret.toString();
+    const io::path_t target = m_library.importLocalFileByMoving(path);
+    if (target.empty()) {
         return;
     }
 

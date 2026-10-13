@@ -22,17 +22,17 @@
 #include <QString>
 
 #include "modularity/ioc.h"
-#include "global/iglobalconfiguration.h"
 #include "global/io/ifilesystem.h"
+
+#include "scoreslibrary.h"
 
 namespace mu::mobile {
 //! Documents opened from other apps (file managers, mail, share sheet) arrive as local copies.
-//! They are imported into the Scores library (so that saving works like on desktop) and opened.
+//! They are imported (see ScoresLibrary) and opened.
 class IncomingFilesController : public QObject, public muse::Contextable
 {
     Q_OBJECT
 
-    muse::GlobalInject<muse::IGlobalConfiguration> globalConfiguration;
     muse::GlobalInject<muse::io::IFileSystem> fileSystem;
 
 public:
@@ -43,9 +43,7 @@ public:
     //! Must be called on the main thread
     void onIncomingFile(const QString& path);
 
-    muse::io::path_t libraryPath() const;
-
 private:
-    muse::io::path_t uniqueLibraryPath(const QString& fileName) const;
+    ScoresLibrary m_library;
 };
 }

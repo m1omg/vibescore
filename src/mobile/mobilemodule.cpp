@@ -22,6 +22,7 @@
 
 #include "internal/backnavigationcontroller.h"
 #include "internal/incomingfilescontroller.h"
+#include "internal/mobileinteractive.h"
 #include "internal/mobilewindowsprovider.h"
 
 using namespace mu::mobile;
@@ -37,6 +38,11 @@ void MobileModule::registerExports()
 {
     m_incomingFilesController = std::make_shared<IncomingFilesController>(iocContext());
     m_backNavigationController = std::make_shared<BackNavigationController>(iocContext());
+
+    // On top of the default IInteractive (registered by the global module): system document picker, Scores library
+    std::shared_ptr<IInteractive> originInteractive = ioc()->resolve<IInteractive>(moduleName());
+    ioc()->unregister<IInteractive>(moduleName());
+    ioc()->registerExport<IInteractive>(moduleName(), std::make_shared<MobileInteractive>(originInteractive));
 
     // Replaces the stub of the multiwindows module, which is registered before this module
     ioc()->unregister<muse::mi::IMultiWindowsProvider>(moduleName());
