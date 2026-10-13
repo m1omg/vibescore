@@ -21,6 +21,10 @@
  */
 #include "globalmodule.h"
 
+#if defined(Q_OS_ANDROID) || defined(Q_OS_IOS)
+#include "internal/platform/mobile/platformlogdest.h"
+#endif
+
 #include "muse_framework_config.h"
 
 #include "modularity/ioc.h"
@@ -165,9 +169,14 @@ void GlobalModule::onPreInit(const IApplication::RunMode& mode)
     logger->clearDests();
 
     //! Console
+#if defined(Q_OS_ANDROID) || defined(Q_OS_IOS)
+    //! Standard output is not visible on mobile platforms; write to the system log instead
+    logger->addDest(new PlatformLogDest(LogLayout("${type|5} | ${thread|15} | ${tag|15} | ${message}")));
+#else
     if (mode == IApplication::RunMode::GuiApp || muse::runtime::isDebug()) {
         logger->addDest(new ConsoleLogDest(LogLayout("${time} | ${type|5} | ${thread|15} | ${tag|15} | ${message}")));
     }
+#endif
 
     //! Log file
     io::path_t logFilePath = "none";

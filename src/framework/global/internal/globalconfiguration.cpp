@@ -21,6 +21,10 @@
  */
 #include "globalconfiguration.h"
 
+#ifdef Q_OS_ANDROID
+#include "internal/platform/android/androidappdata.h"
+#endif
+
 #include <QString>
 #include <QStandardPaths>
 #include <QDir>
@@ -68,7 +72,14 @@ io::path_t GlobalConfiguration::appDataPath() const
 
 QString GlobalConfiguration::resolveAppDataPath() const
 {
-#ifdef Q_OS_WIN
+#if defined(Q_OS_ANDROID)
+    // Packaged in the APK assets and extracted to the app's private storage
+    return muse::android::extractAppDataFromAssets();
+#elif defined(Q_OS_IOS)
+    // The application bundle is flat: <bundle>/share
+    QDir dir(QCoreApplication::applicationDirPath() + QString("/share"));
+    return dir.absolutePath() + "/";
+#elif defined(Q_OS_WIN)
     QDir dir(QCoreApplication::applicationDirPath() + QString("/../"));
     return dir.absolutePath() + "/";
 #elif defined(Q_OS_MAC)

@@ -249,6 +249,21 @@ else()
         )
     endif()
 
+    if (OS_IS_MOBILE)
+        target_sources(muse_global PRIVATE
+            internal/platform/mobile/platformlogdest.cpp
+            internal/platform/mobile/platformlogdest.h
+        )
+    endif()
+
+    if (OS_IS_ANDROID)
+        target_sources(muse_global PRIVATE
+            internal/platform/android/androidappdata.cpp
+            internal/platform/android/androidappdata.h
+        )
+        target_link_libraries(muse_global PRIVATE log)
+    endif()
+
     if (OS_IS_MAC)
         target_sources(muse_global PRIVATE
             internal/platform/macos/macosinteractivehelper.mm
