@@ -24,6 +24,7 @@
 #include "modularity/ioc.h"
 
 #include "authorizationservicestub.h"
+#include "cloudservicesstub.h"
 
 using namespace muse;
 using namespace muse::cloud;
@@ -36,5 +37,8 @@ std::string CloudModule::moduleName() const
 
 void CloudModule::registerExports()
 {
-    ioc()->registerExport<IAuthorizationService>(moduleName(), new AuthorizationServiceStub());
+    auto authorization = std::make_shared<AuthorizationServiceStub>();
+    ioc()->registerExport<IAuthorizationService>(moduleName(), authorization);
+    ioc()->registerExport<IMuseScoreComService>(moduleName(), new MuseScoreComServiceStub(authorization));
+    ioc()->registerExport<IAudioComService>(moduleName(), new AudioComServiceStub(authorization));
 }

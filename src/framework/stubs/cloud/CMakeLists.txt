@@ -25,6 +25,8 @@ target_sources(muse_cloud PRIVATE
     cloudstubmodule.h
     authorizationservicestub.cpp
     authorizationservicestub.h
+    cloudservicesstub.cpp
+    cloudservicesstub.h
 )
 
 if (MUSE_MODULE_CLOUD_QML)
