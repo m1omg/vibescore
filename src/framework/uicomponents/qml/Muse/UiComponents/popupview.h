@@ -139,6 +139,7 @@ signals:
 
 protected:
     void initView() override;
+    void configureInWindowHost(QObject* host) override;
 
     void beforeOpen() override;
     void onHidden() override;

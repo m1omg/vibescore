@@ -119,7 +119,10 @@ Item {
         }
 
         obj.opened.connect(function() {
-            var window = Boolean(obj.contentItem) ? obj.contentItem.Window.window : obj.Window.window
+            //! NOTE: a dialog hosted inside the main window (single window platforms) is identified by
+            //! the dialog object itself, so that it is still recognized as a dialog (not the main window)
+            var window = Boolean(obj.isInWindow) ? obj
+                                                 : Boolean(obj.contentItem) ? obj.contentItem.Window.window : obj.Window.window
             root.provider.onOpen(ContainerType.QmlDialog, obj.objectId, window)
         })
 

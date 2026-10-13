@@ -65,6 +65,12 @@ void InteractiveProvider::raiseWindowInStack(QObject* newActiveWindow)
         return;
     }
 
+    // Views hosted inside a window (single window platforms) stay above it while they are open
+    const QObject* topObject = m_stack.top().window;
+    if (topObject && !topObject->isWidgetType() && !topObject->isWindowType()) {
+        return;
+    }
+
     for (int i = 0; i < m_stack.size(); ++i) {
         bool found = m_stack[i].window == newActiveWindow;
         if (m_stack[i].window && m_stack[i].window->isWidgetType()) {
@@ -552,6 +558,12 @@ QWindow* InteractiveProvider::topWindow() const
 
     if (last.window == mainWin) {
         return mainWin;
+    }
+
+    // A view hosted inside a window (single window platforms): use the window that hosts it
+    if (!last.window->isWidgetType() && !last.window->isWindowType()) {
+        QWindow* hostWindow = last.window->property("window").value<QWindow*>();
+        return hostWindow ? hostWindow : mainWin;
     }
 
     // TODO/HACK: last.window doesn't seem to have a parent when the top window is a widget....

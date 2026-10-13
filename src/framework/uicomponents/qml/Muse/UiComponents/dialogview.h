@@ -92,6 +92,7 @@ signals:
 
 private:
     void initView() override;
+    void configureInWindowHost(QObject* host) override;
 
     void beforeOpen() override;
     void afterShow() override;
@@ -102,6 +103,7 @@ private:
 
     QString m_objectId;
     QString m_title;
+    bool m_hasOwnTitle = false;
     bool m_modal = true;
     bool m_frameless = false;
     bool m_alwaysAboveApp = false;

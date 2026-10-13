@@ -74,12 +74,33 @@ PopupView::~PopupView()
 
 void PopupView::initView()
 {
+    if (m_isInWindow) {
+        WindowView::initView();
+        return;
+    }
+
     QQuickWindow::setDefaultAlphaBuffer(true);
 
     WindowView::initView();
 
     m_view->setFlags(resolveWindowFlags());
     m_view->setColor(Qt::transparent);
+}
+
+void PopupView::configureInWindowHost(QObject* host)
+{
+    // QtQuick.Templates Popup.ClosePolicy: a press outside both the popup and the item that opened it closes
+    // the popup; a press on that item is left to it, so that it can toggle the popup
+    static constexpr int NO_AUTO_CLOSE = 0x00;
+    static constexpr int CLOSE_ON_PRESS_OUTSIDE_PARENT = 0x02;
+
+    const bool autoClose = !m_closePolicies.testFlag(ClosePolicy::NoAutoClose)
+                           && m_closePolicies.testFlag(ClosePolicy::CloseOnPressOutsideParent);
+
+    host->setProperty("isDialog", false);
+    host->setProperty("modal", false);
+    host->setProperty("dim", false);
+    host->setProperty("closePolicy", autoClose ? CLOSE_ON_PRESS_OUTSIDE_PARENT : NO_AUTO_CLOSE);
 }
 
 void PopupView::initCloseController()
@@ -117,6 +138,11 @@ void PopupView::setParentItem(QQuickItem* parent)
 void PopupView::beforeOpen()
 {
     WindowView::beforeOpen();
+
+    if (m_isInWindow) {
+        // Closing on outside presses is done by the in-window host
+        return;
+    }
 
     if (!m_closeController) {
         initCloseController();
@@ -333,7 +359,11 @@ void PopupView::repositionWindowIfNeed()
 
     m_globalPos = QPointF();
     updateGeometry();
-    m_view->setPosition(m_globalPos.toPoint());
+    if (m_isInWindow) {
+        updateInWindowPosition();
+    } else {
+        m_view->setPosition(m_globalPos.toPoint());
+    }
     m_globalPos = QPoint();
 }
 

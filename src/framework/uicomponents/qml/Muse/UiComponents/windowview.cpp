@@ -22,13 +22,17 @@
 
 #include "windowview.h"
 
+#include <QQmlComponent>
 #include <QQmlEngine>
 #include <QQuickView>
+#include <QQuickWindow>
 #include <QScreen>
 #include <QTimer>
 #include <QUrl>
 
 #include "ui/inavigation.h"
+
+#include "muse_framework_config.h"
 
 #include "log.h"
 
@@ -37,6 +41,28 @@ using namespace muse::uicomponents;
 WindowView::WindowView(QQuickItem* parent)
     : QObject(parent), Contextable(muse::iocCtxForQmlObject(this))
 {
+    m_isInWindow = inWindowModeEnabled();
+}
+
+bool WindowView::inWindowModeEnabled()
+{
+    static const bool enabled = []() {
+        if (qEnvironmentVariableIsSet("MUSE_UI_INWINDOW_POPUPS")) {
+            return qEnvironmentVariableIntValue("MUSE_UI_INWINDOW_POPUPS") != 0;
+        }
+#ifdef MUSE_CONFIGURATION_IS_MOBILE
+        return true;
+#else
+        return false;
+#endif
+    }();
+
+    return enabled;
+}
+
+bool WindowView::isInWindow() const
+{
+    return m_isInWindow;
 }
 
 void WindowView::componentComplete()
@@ -79,6 +105,11 @@ void WindowView::init()
 
 void WindowView::initView()
 {
+    if (m_isInWindow) {
+        // The content is hosted inside the main window when the view is opened (see initInWindowHost)
+        return;
+    }
+
     //! NOTE: do not set the window when constructing the view
     //! This causes different bugs on different OS (e.g., no transparency for popups on windows)
     m_view = new QQuickView(engine(), nullptr);
@@ -150,6 +181,24 @@ void WindowView::doOpen()
 {
     if (isOpened()) {
         repositionWindowIfNeed();
+        return;
+    }
+
+    if (m_isInWindow) {
+        resolveParentWindow();
+        if (!initInWindowHost()) {
+            return;
+        }
+
+        updateGeometry();
+        beforeOpen();
+        resolveNavigationParentControl();
+        showInWindow();
+
+        m_globalPos = QPointF(); // invalidate
+
+        emit isOpenedChanged();
+        emit opened();
         return;
     }
 
@@ -226,6 +275,12 @@ void WindowView::close(bool force)
         return;
     }
 
+    if (m_isInWindow) {
+        m_forceClosed = force;
+        QMetaObject::invokeMethod(m_inWindowHost, "close");
+        return;
+    }
+
     IF_ASSERT_FAILED(m_view) {
         return;
     }
@@ -245,6 +300,10 @@ void WindowView::toggleOpened()
 
 bool WindowView::isOpened() const
 {
+    if (m_isInWindow) {
+        return m_inWindowHost ? m_inWindowHost->property("visible").toBool() : false;
+    }
+
     return m_view ? m_view->isVisible() : false;
 }
 
@@ -363,21 +422,47 @@ void WindowView::setContentHeight(int contentHeight)
 
 QWindow* WindowView::window() const
 {
+    if (m_isInWindow) {
+        return m_parentWindow;
+    }
+
     return m_view;
 }
 
 QRect WindowView::geometry() const
 {
+    if (m_isInWindow) {
+        const QQuickItem* hostParent = inWindowHostParent();
+        if (!m_inWindowHost || !hostParent) {
+            return QRect();
+        }
+
+        const QRectF local(m_inWindowHost->property("x").toReal(), m_inWindowHost->property("y").toReal(),
+                           m_inWindowHost->property("width").toReal(), m_inWindowHost->property("height").toReal());
+        return QRectF(hostParent->mapToGlobal(local.topLeft()), local.size()).toRect();
+    }
+
     return m_view ? m_view->geometry() : QRect();
 }
 
 bool WindowView::hasActiveFocus()
 {
+    if (m_isInWindow) {
+        return m_contentItem && m_contentItem->hasActiveFocus();
+    }
+
     return m_view && m_view->activeFocusItem() != nullptr;
 }
 
 void WindowView::forceActiveFocus()
 {
+    if (m_isInWindow) {
+        if (m_contentItem && !m_contentItem->hasActiveFocus()) {
+            m_contentItem->forceActiveFocus();
+        }
+        return;
+    }
+
     if (!m_view) {
         return;
     }
@@ -436,6 +521,11 @@ QScreen* WindowView::resolveScreen() const
 
 QRect WindowView::currentScreenGeometry() const
 {
+    if (m_isInWindow && m_parentWindow) {
+        // Views are kept inside the window that hosts them
+        return QRect(m_parentWindow->mapToGlobal(QPoint(0, 0)), m_parentWindow->size());
+    }
+
     QScreen* screen = resolveScreen();
 
     QRect geometry;
@@ -458,6 +548,7 @@ QRect WindowView::viewGeometry() const
 void WindowView::updateSize(const QSize& newSize)
 {
     if (!m_view) {
+        // In-window hosts size themselves to their content
         return;
     }
 
@@ -567,4 +658,122 @@ void WindowView::setIsContentReady(bool ready)
 
     m_isContentReady = ready;
     emit isContentReadyChanged();
+}
+
+// ---- In-window hosting ----
+
+QQuickItem* WindowView::inWindowHostParent() const
+{
+    auto window = qobject_cast<QQuickWindow*>(m_parentWindow);
+    if (!window) {
+        return nullptr;
+    }
+
+    // Popups are positioned relative to (and toggled by) the item that opens them
+    QQuickItem* parent = parentItem();
+    if (parent && parent->window() == window) {
+        return parent;
+    }
+
+    return window->contentItem();
+}
+
+bool WindowView::initInWindowHost()
+{
+    if (m_inWindowHost) {
+        return true;
+    }
+
+    if (!qobject_cast<QQuickWindow*>(m_parentWindow)) {
+        LOGE() << "[" << objectName() << "] no window to host the view";
+        return false;
+    }
+
+    QQmlComponent component(engine());
+    component.loadFromModule("Muse.UiComponents", "InWindowHost");
+    if (!component.isReady()) {
+        LOGE() << "[" << objectName() << "] failed to create the in-window host: " << component.errorString();
+        return false;
+    }
+
+    QObject* host = component.create(qmlContext(this));
+    if (!host) {
+        LOGE() << "[" << objectName() << "] failed to create the in-window host: " << component.errorString();
+        return false;
+    }
+
+    host->setParent(this);
+    QQmlEngine::setObjectOwnership(host, QQmlEngine::CppOwnership);
+
+    connect(host, SIGNAL(closed()), this, SLOT(onInWindowHostClosed()));
+    connect(host, SIGNAL(closeRequested()), this, SLOT(onInWindowHostCloseRequested()));
+
+    QMetaObject::invokeMethod(host, "attachContent", Q_ARG(QVariant, QVariant::fromValue(m_contentItem)));
+
+    m_inWindowHost = host;
+
+    emit windowChanged();
+
+    return true;
+}
+
+void WindowView::configureInWindowHost(QObject* host)
+{
+    UNUSED(host);
+}
+
+void WindowView::showInWindow()
+{
+    QQuickItem* hostParent = inWindowHostParent();
+    IF_ASSERT_FAILED(hostParent) {
+        return;
+    }
+
+    m_inWindowHost->setProperty("parent", QVariant::fromValue(hostParent));
+    m_inWindowHost->setProperty("maxContentWidth", m_parentWindow->width());
+    m_inWindowHost->setProperty("maxContentHeight", m_parentWindow->height());
+
+    configureInWindowHost(m_inWindowHost);
+    updateInWindowPosition();
+
+    QMetaObject::invokeMethod(m_inWindowHost, "open");
+    afterShow();
+
+    if (!(m_openPolicies & OpenPolicy::NoActivateFocus)) {
+        QTimer::singleShot(0, this, [this]() {
+            forceActiveFocus();
+        });
+    }
+}
+
+void WindowView::updateInWindowPosition()
+{
+    const QQuickItem* hostParent = inWindowHostParent();
+    if (!m_inWindowHost || !hostParent) {
+        return;
+    }
+
+    const QPointF local = hostParent->mapFromGlobal(m_globalPos);
+    m_inWindowHost->setProperty("x", local.x());
+    m_inWindowHost->setProperty("y", local.y());
+}
+
+void WindowView::onInWindowCloseRequested()
+{
+    InWindowCloseEvent closeEvent;
+    emit aboutToClose(&closeEvent);
+
+    if (closeEvent.accepted()) {
+        close();
+    }
+}
+
+void WindowView::onInWindowHostClosed()
+{
+    onHidden();
+}
+
+void WindowView::onInWindowHostCloseRequested()
+{
+    onInWindowCloseRequested();
 }

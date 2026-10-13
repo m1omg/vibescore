@@ -21,7 +21,7 @@ adb install -r -g "$APK"
 
 adb logcat -c
 if [ -n "$APP_ARGS" ]; then
-    adb shell am start -S -n "$APP_ID/org.qtproject.qt.android.bindings.QtActivity" --es applicationArguments "'$APP_ARGS'"
+    adb shell am start -S -n "$APP_ID/io.github.m1omg.vibescore.VibeScoreActivity" --es applicationArguments "'$APP_ARGS'"
 else
-    adb shell am start -S -n "$APP_ID/org.qtproject.qt.android.bindings.QtActivity"
+    adb shell am start -S -n "$APP_ID/io.github.m1omg.vibescore.VibeScoreActivity"
 fi

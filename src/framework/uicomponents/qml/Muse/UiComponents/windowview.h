@@ -46,6 +46,20 @@ class INavigationControl;
 }
 
 namespace muse::uicomponents {
+//! Passed to aboutToClose() when the view is hosted inside the main window (see WindowView::isInWindow);
+//! like QQuickCloseEvent, handlers can set accepted to false to keep the view open
+class InWindowCloseEvent : public QObject
+{
+    Q_OBJECT
+    Q_PROPERTY(bool accepted MEMBER m_accepted)
+
+public:
+    bool accepted() const { return m_accepted; }
+
+private:
+    bool m_accepted = true;
+};
+
 class WindowView : public QObject, public QQmlParserStatus, public Contextable, public async::Asyncable
 {
     Q_OBJECT
@@ -72,6 +86,9 @@ class WindowView : public QObject, public QQmlParserStatus, public Contextable, 
         bool activateParentOnClose READ activateParentOnClose WRITE setActivateParentOnClose NOTIFY activateParentOnCloseChanged)
 
     Q_PROPERTY(FocusPolicies focusPolicies READ focusPolicies WRITE setFocusPolicies NOTIFY focusPoliciesChanged)
+
+    //! True when the view is shown inside the main window instead of a separate window (single window platforms)
+    Q_PROPERTY(bool isInWindow READ isInWindow CONSTANT)
 
 protected:
     GlobalInject<ui::IUiConfiguration> uiConfiguration;
@@ -132,6 +149,11 @@ public:
 
     virtual void repositionWindowIfNeed() {}
 
+    bool isInWindow() const;
+
+    //! Views are shown inside the main window on mobile; MUSE_UI_INWINDOW_POPUPS=0|1 overrides the default
+    static bool inWindowModeEnabled();
+
 public slots:
     void setEngine(QQmlEngine* engine);
     virtual void setParentItem(QQuickItem* parent);
@@ -165,6 +187,10 @@ signals:
 
     void parentWindowChanged();
 
+private slots:
+    void onInWindowHostClosed();
+    void onInWindowHostCloseRequested();
+
 protected:
     void classBegin() override {}
     void componentComplete() override;
@@ -195,6 +221,17 @@ protected:
 
     void resolveNavigationParentControl();
     void activateNavigationParentControl();
+
+    // In-window hosting (see isInWindow)
+    bool initInWindowHost();
+    void showInWindow();
+    void updateInWindowPosition();
+    QQuickItem* inWindowHostParent() const;
+    virtual void configureInWindowHost(QObject* host);
+    virtual void onInWindowCloseRequested();
+
+    QObject* m_inWindowHost = nullptr;
+    bool m_isInWindow = false;
 
     QQmlEngine* m_engine = nullptr;
     QWindow* m_parentWindow = nullptr;

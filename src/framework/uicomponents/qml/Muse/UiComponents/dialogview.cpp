@@ -48,6 +48,11 @@ DialogView::DialogView(QQuickItem* parent)
 
 void DialogView::initView()
 {
+    if (m_isInWindow) {
+        WindowView::initView();
+        return;
+    }
+
     QQuickWindow::setDefaultAlphaBuffer(m_frameless);
 
     WindowView::initView();
@@ -75,13 +80,20 @@ void DialogView::initView()
 
 void DialogView::beforeOpen()
 {
-    IF_ASSERT_FAILED(m_view) {
+    //! NOTE Set default title
+    m_hasOwnTitle = !m_title.isEmpty();
+    if (m_title.isEmpty()) {
+        setTitle(application()->title());
+    }
+
+    if (m_isInWindow) {
+        //! NOTE ok will be if they call accept
+        setRetCode(Ret::Code::Cancel);
         return;
     }
 
-    //! NOTE Set default title
-    if (m_title.isEmpty()) {
-        setTitle(application()->title());
+    IF_ASSERT_FAILED(m_view) {
+        return;
     }
 
     m_view->setTitle(m_title);
@@ -103,7 +115,27 @@ void DialogView::onHidden()
 {
     WindowView::onHidden();
 
-    windowsController()->unregWindow(m_view->winId());
+    if (m_view) {
+        windowsController()->unregWindow(m_view->winId());
+    }
+}
+
+void DialogView::configureInWindowHost(QObject* host)
+{
+    static constexpr int NO_AUTO_CLOSE = 0x00;
+
+    host->setProperty("isDialog", true);
+    host->setProperty("frameless", m_frameless);
+    host->setProperty("title", m_hasOwnTitle ? m_title : QString());
+#ifdef MUSE_MODULE_UI_DISABLE_MODALITY
+    host->setProperty("modal", false);
+    host->setProperty("dim", false);
+#else
+    host->setProperty("modal", m_modal);
+    host->setProperty("dim", m_modal);
+#endif
+    // Dialogs close with their own buttons, Escape (keyboard navigation) or the title bar
+    host->setProperty("closePolicy", NO_AUTO_CLOSE);
 }
 
 void DialogView::afterShow()
@@ -189,7 +221,11 @@ void DialogView::setTitle(QString title)
     emit titleChanged(m_title);
 
     if (isOpened()) {
-        m_view->setTitle(title);
+        if (m_view) {
+            m_view->setTitle(title);
+        } else if (m_inWindowHost && m_hasOwnTitle) {
+            m_inWindowHost->setProperty("title", title);
+        }
     }
 }
 
@@ -252,7 +288,7 @@ void DialogView::setResizable(bool resizable)
     m_resizable = resizable;
     emit resizableChanged(m_resizable);
 
-    if (isOpened()) {
+    if (isOpened() && m_view) {
         updateSize(m_view->size());
     }
 }
