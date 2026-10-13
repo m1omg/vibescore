@@ -21,6 +21,8 @@
  */
 #include "networkconfiguration.h"
 
+#include "muse_framework_config.h"
+
 #include "global/configreader.h"
 
 using namespace muse;
@@ -53,6 +55,10 @@ QString NetworkConfiguration::makeUserAgent(const std::string& tplName) const
     osName = "Windows";
 #elif defined (Q_OS_MACOS)
     osName = "Mac";
+#elif defined (Q_OS_ANDROID)
+    osName = "Android";
+#elif defined (Q_OS_IOS)
+    osName = "iOS";
 #else
     osName = "Linux";
 #endif
@@ -71,6 +77,14 @@ QString NetworkConfiguration::makeUserAgent(const std::string& tplName) const
     result = result.replace("{os_name}", osName);
     result = result.replace("{os_version}", osVersion);
     result = result.replace("{cpu_arch}", cpuArchitecture);
+
+#ifdef MUSE_CONFIGURATION_IS_MOBILE
+    // Requests identify the app that sends them
+    static const QString DEFAULT_PRODUCT = "Musescore/";
+    if (result.startsWith(DEFAULT_PRODUCT)) {
+        result.replace(0, DEFAULT_PRODUCT.size(), QString(MUSE_APP_NAME_MACHINE_READABLE) + "/");
+    }
+#endif
 
     return result;
 }
