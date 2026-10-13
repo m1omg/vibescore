@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 108 108" width="108" height="108">
+  <!-- VibeScore: two beamed eighth notes on a wave (same artwork as the Android launcher icon) -->
+  <rect width="108" height="108" rx="24" fill="#4B2BD1"/>
+  <path fill="#6A4CFF" d="M0,74 C22,62 40,86 62,74 C78,66 92,72 108,66 L108,84 A24,24 0 0 1 84,108 L24,108 A24,24 0 0 1 0,84 Z"/>
+  <g fill="#FFFFFF">
+    <path d="M32.0,72.9 A8.5,6 -20 1,0 48.0,67.1 A8.5,6 -20 1,0 32.0,72.9 Z"/>
+    <path d="M60.0,66.9 A8.5,6 -20 1,0 76.0,61.1 A8.5,6 -20 1,0 60.0,66.9 Z"/>
+    <path d="M45.2,68 L45.2,38 L48.4,38 L48.4,68 Z"/>
+    <path d="M73.2,62 L73.2,32 L76.4,32 L76.4,62 Z"/>
+    <path d="M45.2,38 L76.4,31 L76.4,38.5 L45.2,45.5 Z"/>
+  </g>
+</svg>

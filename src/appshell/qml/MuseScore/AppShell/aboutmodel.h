@@ -62,6 +62,14 @@ public:
 
     Q_INVOKABLE void toggleDevMode();
 
+    //! A rebranded build (e.g. VibeScore) shows its own identity, its source and its relation to MuseScore Studio
+    Q_INVOKABLE bool isRebranded() const;
+    Q_INVOKABLE QString appName() const;
+    Q_INVOKABLE QString appVersion() const;
+    Q_INVOKABLE QString basedOnNotice() const;
+    Q_INVOKABLE QVariantMap sourceUrl() const;
+    Q_INVOKABLE QVariantMap supportUrl() const;
+
 private:
     QVariantMap makeUrl(const QUrl& url, bool showPath = true) const;
 };

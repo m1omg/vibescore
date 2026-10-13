@@ -33,7 +33,7 @@ StyledDialogView {
 
     title: qsTrc("appshell/about", "About MuseScore Studio")
 
-    contentHeight: 424
+    contentHeight: aboutModel.isRebranded() ? 600 : 424
     contentWidth: 480
 
     AboutModel {
@@ -59,7 +59,7 @@ StyledDialogView {
                 id: logo
                 Layout.alignment: Qt.AlignHCenter
 
-                source: "resources/mu_logo.svg"
+                source: aboutModel.isRebranded() ? "resources/vibescore_logo.svg" : "resources/mu_logo.svg"
                 sourceSize: Qt.size(100, 100)
 
                 MouseArea {
@@ -83,13 +83,14 @@ StyledDialogView {
 
                 StyledTextLabel {
                     anchors.horizontalCenter: parent.horizontalCenter
-                    text: qsTrc("appshell/about", "Version:") + " " + aboutModel.museScoreVersion()
+                    text: qsTrc("appshell/about", "Version:") + " " + aboutModel.appVersion()
                     font: ui.theme.bodyBoldFont
                 }
 
                 Row {
                     spacing: 4
                     anchors.horizontalCenter: parent.horizontalCenter
+                    visible: aboutModel.museScoreRevision() !== ""
 
                     StyledTextLabel {
                         anchors.verticalCenter: parent.verticalCenter
@@ -109,6 +110,36 @@ StyledDialogView {
 
             StyledTextLabel {
                 Layout.fillWidth: true
+                visible: aboutModel.isRebranded()
+                text: aboutModel.basedOnNotice()
+                wrapMode: Text.WordWrap
+                maximumLineCount: 4
+            }
+
+            StyledTextLabel {
+                Layout.fillWidth: true
+                visible: aboutModel.isRebranded()
+                text: {
+                    let sourceUrl = aboutModel.sourceUrl()
+
+                    //: %1 will be a link to the source code of the app
+                    let line1 = qsTrc("appshell/about", "Source code and new versions: %1")
+                                .arg(`<a href="${sourceUrl.url}">${sourceUrl.displayName}</a>`)
+
+                    let line2 = qsTrc("appshell/about", "<a href=\"%1\">Report a problem or ask for help</a>.")
+                                .arg(aboutModel.supportUrl().url)
+
+                    let line3 = qsTrc("appshell/about", "The app collects no data about you or your use of it.")
+
+                    return line1 + "<br>" + line2 + "<br>" + line3
+                }
+                wrapMode: Text.WordWrap
+                maximumLineCount: 5
+            }
+
+            StyledTextLabel {
+                Layout.fillWidth: true
+                visible: !aboutModel.isRebranded()
                 text: {
                     let museScoreUrl = aboutModel.museScoreUrl()
 
@@ -128,6 +159,7 @@ StyledDialogView {
 
             StyledTextLabel {
                 Layout.fillWidth: true
+                visible: !aboutModel.isRebranded()
 
                 text: qsTrc("appshell/about", "For privacy information, see our <a href=\"%1\">privacy policy</a>.")
                       .arg(aboutModel.museScorePrivacyPolicyUrl().url)
@@ -138,12 +170,22 @@ StyledDialogView {
 
             StyledTextLabel {
                 Layout.fillWidth: true
-                text: qsTrc("appshell/about", "Copyright © 1999-2026 MuseScore Limited and others.\nPublished under the <a href=\"%1\">GNU General Public License version 3</a>.")
-                      .arg("https://www.gnu.org/licenses/gpl-3.0.html")
-                      .replace("\n", "<br>")
+                text: {
+                    let copyright = qsTrc("appshell/about", "Copyright © 1999-2026 MuseScore Limited and others.\nPublished under the <a href=\"%1\">GNU General Public License version 3</a>.")
+                                    .arg("https://www.gnu.org/licenses/gpl-3.0.html")
+                                    .replace("\n", "<br>")
+
+                    if (aboutModel.isRebranded()) {
+                        //: %1 is the name of the app (a fork of MuseScore Studio)
+                        copyright += "<br>" + qsTrc("appshell/about", "Changes for mobile systems and the web © 2026 %1 contributors.")
+                                     .arg(aboutModel.appName())
+                    }
+
+                    return copyright
+                }
 
                 wrapMode: Text.WordWrap
-                maximumLineCount: 3
+                maximumLineCount: 4
             }
         }
 

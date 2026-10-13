@@ -23,6 +23,8 @@
 
 #include "translation.h"
 
+#include "app_config.h"
+
 #include <QApplication>
 #include <QClipboard>
 #include <QUrl>
@@ -100,6 +102,64 @@ void AboutModel::copyRevisionToClipboard() const
 void AboutModel::toggleDevMode()
 {
     globalConfiguration()->setDevModeEnabled(!globalConfiguration()->devModeEnabled());
+}
+
+bool AboutModel::isRebranded() const
+{
+#ifdef VS_BRAND_NAME
+    return true;
+#else
+    return false;
+#endif
+}
+
+QString AboutModel::appName() const
+{
+#ifdef VS_BRAND_NAME
+    return QString(VS_BRAND_NAME);
+#else
+    return QString("MuseScore Studio");
+#endif
+}
+
+QString AboutModel::appVersion() const
+{
+#ifdef VS_BRAND_VERSION
+    return QString(VS_BRAND_VERSION);
+#else
+    return museScoreVersion();
+#endif
+}
+
+QString AboutModel::basedOnNotice() const
+{
+#ifdef VS_BRAND_NAME
+    // The upstream name is an argument: translated texts get "MuseScore Studio" replaced with the app's name
+    //: %1 is the name of the app, %2 the name and version of the app it is based on (e.g. "MuseScore Studio 4.7.5")
+    return muse::qtrc("appshell/about", "%1 is based on %2. It is an independent project, "
+                                        "not affiliated with or endorsed by Muse Group or MuseScore Limited.")
+           .arg(QString(VS_BRAND_NAME), QStringLiteral("MuseScore Studio ") + application()->version().toString());
+#else
+    return QString();
+#endif
+}
+
+QVariantMap AboutModel::sourceUrl() const
+{
+#ifdef VS_BRAND_SOURCE_URL
+    return makeUrl(QUrl(QString(VS_BRAND_SOURCE_URL)));
+#else
+    return museScoreContributionUrl();
+#endif
+}
+
+QVariantMap AboutModel::supportUrl() const
+{
+#ifdef VS_BRAND_SUPPORT_URL
+    return makeUrl(QUrl(QString(VS_BRAND_SUPPORT_URL)));
+#else
+    return museScoreForumUrl();
+#endif
 }
 
 QVariantMap AboutModel::makeUrl(const QUrl& url, bool showPath) const
