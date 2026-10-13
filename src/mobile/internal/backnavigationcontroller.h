@@ -25,13 +25,16 @@
 #include "context/iglobalcontext.h"
 #include "global/iinteractive.h"
 #include "playback/iplaybackcontroller.h"
+#include "dockwindow/idockwindow.h"
+#include "dockwindow/idockwindowprovider.h"
 
 namespace mu::mobile {
 //! The Back key (Android): goes one step back, and never quits the app.
 //! 1. closes the topmost popup, menu or dialog, as Escape does;
-//! 2. on the score, leaves note input or text editing, or clears the selection (as Escape does);
-//! 3. from the other pages, returns to Home;
-//! 4. on Home, moves the app to the background, like the Home button.
+//! 2. closes the panel opened last when panels are shown over the score (phones);
+//! 3. on the score, leaves note input or text editing, or clears the selection (as Escape does);
+//! 4. from the other pages, returns to Home;
+//! 5. on Home, moves the app to the background, like the Home button.
 class BackNavigationController : public QObject, public muse::Contextable
 {
     Q_OBJECT
@@ -40,6 +43,7 @@ class BackNavigationController : public QObject, public muse::Contextable
     muse::ContextInject<muse::actions::IActionsDispatcher> dispatcher = { this };
     muse::ContextInject<context::IGlobalContext> globalContext = { this };
     muse::ContextInject<playback::IPlaybackController> playbackController = { this };
+    muse::ContextInject<muse::dock::IDockWindowProvider> dockWindowProvider = { this };
 
 public:
     explicit BackNavigationController(const muse::modularity::ContextPtr& iocCtx);
@@ -52,6 +56,7 @@ private:
     bool eventFilter(QObject* watched, QEvent* event) override;
 
     bool dismissTopView();
+    bool closeOverlayPanel();
     bool escapeScoreState();
     bool isHomeOpened() const;
     void moveAppToBackground();

@@ -76,6 +76,10 @@ void BackNavigationController::goBack()
         return;
     }
 
+    if (closeOverlayPanel()) {
+        return;
+    }
+
     if (escapeScoreState()) {
         return;
     }
@@ -114,6 +118,19 @@ bool BackNavigationController::dismissTopView()
     }
 
     return false;
+}
+
+bool BackNavigationController::closeOverlayPanel()
+{
+    // The mobile shell (MobileShellView) is the dock window
+    dock::IDockWindow* window = dockWindowProvider() ? dockWindowProvider()->window() : nullptr;
+    if (!window) {
+        return false;
+    }
+
+    bool closed = false;
+    QMetaObject::invokeMethod(&window->asItem(), "closeLastOpenedPanel", Q_RETURN_ARG(bool, closed));
+    return closed;
 }
 
 bool BackNavigationController::escapeScoreState()

@@ -376,6 +376,12 @@ muse::modularity::ContextPtr GuiApp::setupNewContext()
     QQmlApplicationEngine* engine = muse::modularity::globalIoc()->resolve<muse::ui::IUiEngine>("app")->qmlAppEngine();
 
     QString path = QString(":/qt/qml/MuseScore/AppShell/platform/%1/Main.qml").arg(platform);
+#ifdef MUE_CONFIGURATION_IS_APPMOBILE
+    // The touch-first shell of the mobile app; MUSE_DESKTOP_SHELL=1 loads the desktop one
+    if (qEnvironmentVariableIntValue("MUSE_DESKTOP_SHELL") == 0) {
+        path = ":/qt/qml/MuseScore/Mobile/Main.qml";
+    }
+#endif
     QQmlComponent component = QQmlComponent(engine, path);
     if (!component.isReady()) {
         LOGE() << "Failed to load main qml file, err: " << component.errorString();
