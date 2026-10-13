@@ -37,8 +37,14 @@ using namespace muse::audio;
 using namespace muse::audio::synth;
 
 static constexpr audioch_t AUDIO_CHANNELS = 2;
+#if defined(Q_OS_ANDROID) || defined(Q_OS_IOS)
+// Mobile devices run their audio hardware at 48 kHz; the engine renders exactly one block per device callback
+static constexpr samples_t DEFAULT_BUFFER_SIZE = 512;
+static constexpr sample_rate_t DEFAULT_SAMPLE_RATE = 48000;
+#else
 static constexpr samples_t DEFAULT_BUFFER_SIZE = 1024;
 static constexpr sample_rate_t DEFAULT_SAMPLE_RATE = 44100;
+#endif
 
 //TODO: add other setting: audio device etc
 static const Settings::Key AUDIO_API_KEY("audio", "io/audioApi");
@@ -61,6 +67,10 @@ void AudioConfiguration::init()
 
 #if defined(Q_OS_WIN)
     settings()->setDefaultValue(AUDIO_API_KEY, Val("WASAPI"));
+#elif defined(Q_OS_ANDROID)
+    settings()->setDefaultValue(AUDIO_API_KEY, Val("Oboe"));
+#elif defined(Q_OS_IOS)
+    settings()->setDefaultValue(AUDIO_API_KEY, Val("iOS"));
 #elif defined(Q_OS_LINUX) || defined(Q_OS_FREEBSD)
     settings()->setDefaultValue(AUDIO_API_KEY, Val("ALSA"));
 #elif defined(Q_OS_MACOS)

@@ -30,7 +30,7 @@
 #include "audio/driver/platform/jack/jackaudiodriver.h"
 #endif
 
-#if defined(Q_OS_LINUX) || defined(Q_OS_FREEBSD)
+#if (defined(Q_OS_LINUX) && !defined(Q_OS_ANDROID)) || defined(Q_OS_FREEBSD)
 #include <QtEnvironmentVariables>
 #include "audio/driver/platform/lin/alsaaudiodriver.h"
 #ifdef MUSE_MODULE_AUDIO_PIPEWIRE
@@ -51,6 +51,14 @@
 
 #ifdef Q_OS_WASM
 #include "audio/driver/platform/web/webaudiodriver.h"
+#endif
+
+#ifdef Q_OS_ANDROID
+#include "audio/driver/platform/android/oboeaudiodriver.h"
+#endif
+
+#ifdef Q_OS_IOS
+#include "audio/driver/platform/ios/iosaudiodriver.h"
 #endif
 
 #include "log.h"
@@ -79,7 +87,7 @@ IAudioDriverPtr AudioDriverController::createDriver(const std::string& name) con
     return std::shared_ptr<IAudioDriver>(new WasapiAudioDriver());
 #endif
 
-#if defined(Q_OS_LINUX) || defined(Q_OS_FREEBSD)
+#if (defined(Q_OS_LINUX) && !defined(Q_OS_ANDROID)) || defined(Q_OS_FREEBSD)
     if (qEnvironmentVariableIsSet("MUSESCORE_FORCE_ALSA")) {
         if (name != "ALSA") {
             LOGW() << "required: " << name << ", but is set MUSESCORE_FORCE_ALSA";
@@ -113,6 +121,16 @@ IAudioDriverPtr AudioDriverController::createDriver(const std::string& name) con
     UNUSED(name);
     return std::shared_ptr<IAudioDriver>(new WebAudioDriver());
 #endif
+
+#ifdef Q_OS_ANDROID
+    UNUSED(name);
+    return std::make_shared<OboeAudioDriver>();
+#endif
+
+#ifdef Q_OS_IOS
+    UNUSED(name);
+    return std::make_shared<IosAudioDriver>();
+#endif
 }
 
 std::vector<std::string> AudioDriverController::availableAudioApiList() const
@@ -132,7 +150,7 @@ std::vector<std::string> AudioDriverController::availableAudioApiList() const
     return names;
 #endif // Q_OS_WIN
 
-#if defined(Q_OS_LINUX) || defined(Q_OS_FREEBSD)
+#if (defined(Q_OS_LINUX) && !defined(Q_OS_ANDROID)) || defined(Q_OS_FREEBSD)
     names.push_back("ALSA");
     if (qEnvironmentVariableIsSet("MUSESCORE_FORCE_ALSA")) {
         return names;
@@ -152,6 +170,16 @@ std::vector<std::string> AudioDriverController::availableAudioApiList() const
 
 #ifdef Q_OS_WASM
     names.push_back("WASM");
+    return names;
+#endif
+
+#ifdef Q_OS_ANDROID
+    names.push_back("Oboe");
+    return names;
+#endif
+
+#ifdef Q_OS_IOS
+    names.push_back("iOS");
     return names;
 #endif
 }

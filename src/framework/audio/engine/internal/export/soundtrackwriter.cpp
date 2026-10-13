@@ -27,13 +27,17 @@
 
 #include "global/defer.h"
 
+#include "muse_framework_config.h"
+
 #include "audio/common/audioerrors.h"
 
 #include "mp3encoder.h"
 #include "oggencoder.h"
 #include "flacencoder.h"
 #include "wavencoder.h"
+#ifdef MUSE_MODULE_AUDIO_EXPORT_AAC
 #include "aacencoder.h"
+#endif
 
 #include "log.h"
 
@@ -49,7 +53,11 @@ static encode::AbstractAudioEncoderPtr createEncoder(const SoundTrackType type)
     case SoundTrackType::OGG: return std::make_unique<encode::OggEncoder>();
     case SoundTrackType::FLAC: return std::make_unique<encode::FlacEncoder>();
     case SoundTrackType::WAV: return std::make_unique<encode::WavEncoder>();
+#ifdef MUSE_MODULE_AUDIO_EXPORT_AAC
     case SoundTrackType::AAC: return std::make_unique<encode::AacEncoder>();
+#else
+    case SoundTrackType::AAC: break; // not available in this build
+#endif
     case SoundTrackType::Undefined: break;
     }
 

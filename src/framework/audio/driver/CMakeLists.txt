@@ -97,6 +97,30 @@ elseif(OS_IS_MAC)
     find_library(AudioToolbox NAMES AudioToolbox)
     find_library(CoreAudio NAMES CoreAudio)
     target_link_libraries(muse_audio_driver PRIVATE ${AudioToolbox} ${CoreAudio})
+elseif(OS_IS_IOS)
+    target_sources(muse_audio_driver PRIVATE
+        platform/ios/iosaudiodriver.mm
+        platform/ios/iosaudiodriver.h
+    )
+
+    set_source_files_properties(
+        platform/ios/iosaudiodriver.mm
+        PROPERTIES
+        SKIP_UNITY_BUILD_INCLUSION ON
+        SKIP_PRECOMPILE_HEADERS ON
+    )
+
+    find_library(AVFoundation NAMES AVFoundation)
+    find_library(AudioToolbox NAMES AudioToolbox)
+    target_link_libraries(muse_audio_driver PRIVATE ${AVFoundation} ${AudioToolbox})
+elseif(OS_IS_ANDROID)
+    target_sources(muse_audio_driver PRIVATE
+        platform/android/oboeaudiodriver.cpp
+        platform/android/oboeaudiodriver.h
+    )
+
+    include(${CMAKE_CURRENT_LIST_DIR}/../cmake/SetupOboe.cmake)
+    target_link_libraries(muse_audio_driver PRIVATE oboe)
 elseif(OS_IS_WASM)
     target_sources(muse_audio_driver PRIVATE
         platform/web/webaudiodriver.cpp
