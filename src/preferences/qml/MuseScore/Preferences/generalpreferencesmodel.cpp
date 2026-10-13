@@ -23,6 +23,9 @@
 
 #include "languages/languageserrors.h"
 
+#include "app_config.h"
+#include "muse_framework_config.h"
+
 #include "log.h"
 #include "translation.h"
 
@@ -266,6 +269,16 @@ void GeneralPreferencesModel::setShowWelcomeDialog(bool show)
 bool GeneralPreferencesModel::isAppUpdatable() const
 {
     return updateConfiguration()->isAppUpdatable();
+}
+
+bool GeneralPreferencesModel::isWelcomeDialogAvailable() const
+{
+    // See StartupScenario::shouldShowWelcomeDialog
+#if defined(MUSE_MODULE_CLOUD) || defined(MUE_BUILD_MUSESOUNDS_MODULE)
+    return true;
+#else
+    return false;
+#endif
 }
 
 bool GeneralPreferencesModel::needCheckForNewAppVersion() const

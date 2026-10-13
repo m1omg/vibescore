@@ -74,10 +74,14 @@ PreferencesPage {
             navigation.order: root.navigationOrderStart + 2
         }
 
-        SeparatorLine { }
+        SeparatorLine {
+            visible: preferencesModel.isWelcomeDialogAvailable()
+        }
 
         WelcomeDialogSection {
             model: preferencesModel
+
+            visible: preferencesModel.isWelcomeDialogAvailable()
 
             navigation.section: root.navigationSection
             navigation.order: root.navigationOrderStart + 3
@@ -120,9 +124,13 @@ PreferencesPage {
             }
         }*/
 
-        SeparatorLine { }
+        SeparatorLine {
+            visible: preferencesModel.isAppUpdatable()
+        }
 
         AutomaticUpdateSection {
+            visible: preferencesModel.isAppUpdatable()
+
             isAppUpdatable: preferencesModel.isAppUpdatable()
             needCheckForNewAppVersion: preferencesModel.needCheckForNewAppVersion
             museScorePrivacyPolicyUrl: preferencesModel.museScorePrivacyPolicyUrl()

@@ -97,6 +97,7 @@ public:
 
     bool needCheckForNewAppVersion() const;
     Q_INVOKABLE bool isAppUpdatable() const;
+    Q_INVOKABLE bool isWelcomeDialogAvailable() const;
     Q_INVOKABLE QString museScorePrivacyPolicyUrl() const;
 
 public slots:

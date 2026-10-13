@@ -21,6 +21,8 @@
  */
 #include "saveandpublishpreferencesmodel.h"
 
+#include "muse_framework_config.h"
+
 using namespace mu::preferences;
 
 SaveAndPublishPreferencesModel::SaveAndPublishPreferencesModel(QObject* parent)
@@ -41,6 +43,15 @@ void SaveAndPublishPreferencesModel::load()
     projectConfiguration()->alsoShareAudioComChanged().onReceive(this, [this](bool share) {
         emit alsoShareAudioComChanged(share);
     });
+}
+
+bool SaveAndPublishPreferencesModel::isCloudAvailable() const
+{
+#ifdef MUSE_MODULE_CLOUD
+    return true;
+#else
+    return false;
+#endif
 }
 
 bool SaveAndPublishPreferencesModel::isAutoSaveEnabled() const

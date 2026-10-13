@@ -24,6 +24,8 @@
 
 #include "uicomponents/qml/Muse/UiComponents/toolbaritem.h"
 
+#include "muse_framework_config.h"
+
 using namespace mu::appshell;
 using namespace muse::uicomponents;
 using namespace muse::actions;
@@ -45,8 +47,10 @@ void PublishToolBarModel::load()
     };
 
     addItem("print");
+#ifdef MUSE_MODULE_CLOUD
     addItem("file-publish", muse::TranslatableString("project/save", "Share this score and its audio on MuseScore.com"));
     addItem("file-share-audio", muse::TranslatableString("project/save", "Share the audio from this score on Audio.com"));
+#endif
     addItem("file-export");
 
     setItems(items);

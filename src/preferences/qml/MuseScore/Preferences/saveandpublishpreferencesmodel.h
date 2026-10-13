@@ -47,6 +47,9 @@ public:
 
     Q_INVOKABLE void load();
 
+    //! Saving to and publishing on MuseScore.com
+    Q_INVOKABLE bool isCloudAvailable() const;
+
     bool isAutoSaveEnabled() const;
     int autoSaveInterval() const;
     bool alsoShareAudioCom() const;

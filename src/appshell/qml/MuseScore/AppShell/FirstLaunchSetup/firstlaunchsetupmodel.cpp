@@ -22,6 +22,7 @@
 #include "firstlaunchsetupmodel.h"
 
 #include "translation.h"
+#include "app_config.h"
 #include "global/async/async.h"
 
 using namespace muse;
@@ -33,7 +34,10 @@ FirstLaunchSetupModel::FirstLaunchSetupModel(QObject* parent)
 {
     m_pages = {
         Page { "ThemesPage.qml", "musescore://notation" },
+#ifdef MUE_BUILD_MUSESOUNDS_MODULE
+        // Presents the Muse Sounds libraries
         Page { "PlaybackPage.qml", "musescore://notation" },
+#endif
         Page { "TutorialsPage.qml", "musescore://home?section=learn" }
     };
 }

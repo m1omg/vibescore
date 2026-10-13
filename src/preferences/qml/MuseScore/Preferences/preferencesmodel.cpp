@@ -26,6 +26,7 @@
 #include "translation.h"
 #include "ui/view/iconcodes.h"
 
+#include "app_config.h"
 #include "muse_framework_config.h"
 
 using namespace mu::preferences;
@@ -163,8 +164,13 @@ void PreferencesModel::load(const QString& currentPageId)
         makeItem("canvas", QT_TRANSLATE_NOOP("preferences", "Canvas"), IconCode::Code::NEW_FILE,
                  "Preferences/CanvasPreferencesPage.qml"),
 
+#ifdef MUSE_MODULE_CLOUD
         makeItem("cloud", QT_TRANSLATE_NOOP("preferences", "Save & publish"), IconCode::Code::CLOUD_FILE,
                  "Preferences/SaveAndPublishPreferencesPage.qml"),
+#else
+        makeItem("cloud", QT_TRANSLATE_NOOP("preferences", "Save"), IconCode::Code::SAVE,
+                 "Preferences/SaveAndPublishPreferencesPage.qml"),
+#endif
 
         makeItem("note-input", QT_TRANSLATE_NOOP("preferences", "Note input"), IconCode::Code::EDIT,
                  "Preferences/NoteInputPreferencesPage.qml"),
@@ -180,8 +186,10 @@ void PreferencesModel::load(const QString& currentPageId)
                  "Preferences/MidiDeviceMappingPreferencesPage.qml"),
 #endif
 
+#ifdef MUE_BUILD_IMPEXP_VIDEOEXPORT_MODULE
         makeItem("video", QT_TRANSLATE_NOOP("preferences", "Video"), IconCode::Code::VIDEO,
                  "Preferences/VideoPreferencesPage.qml"),
+#endif
 
         makeItem("percussion", QT_TRANSLATE_NOOP("preferences", "Percussion"), IconCode::Code::PERCUSSION,
                  "Preferences/PercussionPreferencesPage.qml"),
@@ -192,14 +200,19 @@ void PreferencesModel::load(const QString& currentPageId)
         makeItem("shortcuts", QT_TRANSLATE_NOOP("preferences", "Shortcuts"), IconCode::Code::SHORTCUTS,
                  "Preferences/ShortcutsPreferencesPage.qml"),
 
+#ifndef MUSE_CONFIGURATION_IS_MOBILE
+        // Mobile apps keep their files in their own storage (see the mobile module)
         makeItem("general-folders", QT_TRANSLATE_NOOP("preferences", "Folders"), IconCode::Code::OPEN_FILE,
                  "Preferences/FoldersPreferencesPage.qml"),
+#endif
 
         makeItem("advanced", QT_TRANSLATE_NOOP("preferences", "Advanced"), IconCode::Code::CONFIGURE,
                  "Preferences/AdvancedPreferencesPage.qml"),
 
+#ifdef MUE_BUILD_BRAILLE_MODULE
         makeItem("braille", QT_TRANSLATE_NOOP("preferences", "Braille"), IconCode::Code::BRAILLE,
-                 "Preferences/BraillePreferencesPage.qml")
+                 "Preferences/BraillePreferencesPage.qml"),
+#endif
     };
 
     for (PreferencePageItem* item: items) {

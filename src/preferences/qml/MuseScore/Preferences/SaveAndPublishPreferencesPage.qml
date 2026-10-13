@@ -57,16 +57,24 @@ PreferencesPage {
             }
         }
 
-        SeparatorLine { }
+        SeparatorLine {
+            visible: preferencesModel.isCloudAvailable()
+        }
 
         SaveToCloudSection {
+            visible: preferencesModel.isCloudAvailable()
+
             navigation.section: root.navigationSection
             navigation.order: root.navigationOrderStart + 2
         }
 
-        SeparatorLine { }
+        SeparatorLine {
+            visible: preferencesModel.isCloudAvailable()
+        }
 
         PublishMuseScoreComSection {
+            visible: preferencesModel.isCloudAvailable()
+
             alsoShareAudioCom: preferencesModel.alsoShareAudioCom
 
             navigation.section: root.navigationSection

@@ -76,6 +76,9 @@ Page {
             text: qsTrc("appshell/gettingstarted", "In order to protect your privacy, MuseScore Studio does not collect any personal information. See our <a href=\"%1\">Privacy Policy</a> for more info.")
                   .arg(tutorialsModel.museScorePrivacyPolicyUrl())
 
+            // The policy of Muse Group's services, which builds without them do not have
+            visible: tutorialsModel.museScorePrivacyPolicyUrl().toString() !== ""
+
             wrapMode: Text.WordWrap
         }
     }

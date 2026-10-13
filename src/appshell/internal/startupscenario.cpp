@@ -27,6 +27,7 @@
 #include "async/async.h"
 #include "translation.h"
 
+#include "app_config.h"
 #include "muse_framework_config.h"
 
 #include "log.h"
@@ -297,6 +298,11 @@ void StartupScenario::showStartupDialogsIfNeed(StartupModeType modeType)
 
 bool StartupScenario::shouldShowWelcomeDialog(StartupModeType modeType) const
 {
+#if !defined(MUSE_MODULE_CLOUD) && !defined(MUE_BUILD_MUSESOUNDS_MODULE)
+    // The welcome dialog presents services of Muse Group (MuseScore.com, Muse Sounds), which this build does not have
+    UNUSED(modeType);
+    return false;
+#else
     if (!configuration()->welcomeDialogShowOnStartup()) {
         return false;
     }
@@ -311,6 +317,7 @@ bool StartupScenario::shouldShowWelcomeDialog(StartupModeType modeType) const
 
     const Uri& startupUri = startupPageUri(modeType);
     return interactive()->currentUri().val == startupUri;
+#endif
 }
 
 void StartupScenario::checkAndShowMuseSamplerUpdateIfNeed()

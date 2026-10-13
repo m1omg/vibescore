@@ -16,6 +16,7 @@ set(VS_BRAND_URL_SCHEME "vibescore")                 # Custom URL scheme
 set(VS_BRAND_ORGANIZATION "VibeScore")               # Used for settings locations
 set(VS_BRAND_DOMAIN "m1omg.github.io")
 set(VS_BRAND_SOURCE_URL "https://github.com/m1omg/vibescore")
+set(VS_BRAND_SUPPORT_URL "${VS_BRAND_SOURCE_URL}/issues")  # "Ask for help"
 set(VS_BRAND_UPSTREAM_NAME "MuseScore Studio")
 set(VS_BRAND_UPSTREAM_URL "https://github.com/musescore/MuseScore")
 

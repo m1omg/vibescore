@@ -26,6 +26,8 @@
 
 #include "settings.h"
 
+#include "app_config.h"
+
 #include "multiwindows/resourcelockguard.h"
 
 #include "log.h"
@@ -189,6 +191,10 @@ std::string AppShellConfiguration::handbookUrl() const
 
 std::string AppShellConfiguration::askForHelpUrl() const
 {
+#ifdef VS_BRAND_SUPPORT_URL
+    // Questions about this app are for its developers, not for the MuseScore forums
+    return VS_BRAND_SUPPORT_URL;
+#else
     std::string languageCode = currentLanguageCode();
 
     QStringList params = {
@@ -196,6 +202,7 @@ std::string AppShellConfiguration::askForHelpUrl() const
     };
 
     return museScoreUrl() + MUSESCORE_ASK_FOR_HELP_URL_PATH + "?" + params.join("&").toStdString();
+#endif
 }
 
 std::string AppShellConfiguration::accessibilityStatementUrl() const
