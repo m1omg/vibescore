@@ -183,7 +183,9 @@ MenuItemList AppMenuModel::makeChordAndFretboardDiagramsItems()
 MenuItem* AppMenuModel::makeMenuItem(const ActionCode& actionCode, MenuItemRole menuRole)
 {
     MenuItem* item = makeMenuItem(actionCode);
-    item->setRole(menuRole);
+    if (item) {
+        item->setRole(menuRole);
+    }
     return item;
 }
 

@@ -131,12 +131,25 @@ const MenuItemList& AbstractMenuModel::items() const
     return m_items;
 }
 
+//! makeMenuItem() returns null for actions that this build does not have (their modules are disabled)
+static MenuItemList withoutUnavailableItems(const MenuItemList& items)
+{
+    MenuItemList result;
+    for (MenuItem* item : items) {
+        if (item) {
+            result << item;
+        }
+    }
+
+    return result;
+}
+
 void AbstractMenuModel::setItems(const MenuItemList& items)
 {
     TRACEFUNC;
 
     beginResetModel();
-    m_items = items;
+    m_items = withoutUnavailableItems(items);
     updateShortcutsAll();
     endResetModel();
 
@@ -205,7 +218,7 @@ MenuItem* AbstractMenuModel::makeMenu(const TranslatableString& title, const Men
 {
     MenuItem* item = new MenuItem(this);
     item->setId(menuId);
-    item->setSubitems(items);
+    item->setSubitems(withoutUnavailableItems(items));
 
     UiAction action;
     action.title = title;
