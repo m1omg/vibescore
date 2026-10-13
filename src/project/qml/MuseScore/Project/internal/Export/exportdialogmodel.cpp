@@ -29,6 +29,7 @@
 #include "media/mediatypes.h"
 
 #include "app_config.h"
+#include "muse_framework_config.h"
 
 #include "async/async.h"
 #include "translation.h"
@@ -94,10 +95,12 @@ ExportDialogModel::ExportDialogModel(QObject* parent)
                                      muse::qtrc("project/export", "FLAC audio"),
                                      muse::qtrc("project/export", "FLAC audio files"),
                                      "FlacSettingsPage.qml"),
+#ifdef MUSE_MODULE_AUDIO_EXPORT_AAC
         ExportType::makeWithSuffixes({ "aac" },
                                      muse::qtrc("project/export", "AAC audio"),
                                      muse::qtrc("project/export", "AAC audio files"),
                                      "AacSettingsPage.qml"),
+#endif
 #ifdef MUE_BUILD_IMPEXP_VIDEOEXPORT_MODULE
         ExportType::makeWithSuffixes({ "mp4" },
                                      muse::qtrc("project/export", "MP4 video"),
@@ -110,12 +113,14 @@ ExportDialogModel::ExportDialogModel(QObject* parent)
                                      "MidiSettingsPage.qml"),
         ExportType::makeWithSubtypes(musicXmlTypes,
                                      muse::qtrc("project/export", "MusicXML")),
+#ifdef MUE_BUILD_BRAILLE_MODULE
         ExportType::makeWithSuffixes({ "brf" },
                                      //: Meaning like "measure-over-measure", but called "bar-over-bar"
                                      //: even in US English. Not to be confused with "bar-by-bar" format.
                                      //: See https://handbook.musescore.org/file-management/file-export#braille
                                      muse::qtrc("project/export", "Braille (basic bar-over-bar)"),
                                      muse::qtrc("project/export", "Braille files")),
+#endif
         ExportType::makeWithSuffixes({ "mei" },
                                      muse::qtrc("project/export", "MEI"),
                                      muse::qtrc("project/export", "MEI files"),
