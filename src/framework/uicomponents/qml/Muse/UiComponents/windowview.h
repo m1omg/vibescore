@@ -98,6 +98,7 @@ protected:
 
 public:
     explicit WindowView(QQuickItem* parent = nullptr);
+    ~WindowView() override;
 
     enum class OpenPolicy {
         Default = 0x00000000,
@@ -153,6 +154,13 @@ public:
 
     //! Views are shown inside the main window on mobile; MUSE_UI_INWINDOW_POPUPS=0|1 overrides the default
     static bool inWindowModeEnabled();
+
+    //! The open views that are shown inside the main window, from the bottom to the top
+    static const QList<WindowView*>& openInWindowViews();
+
+    //! Closes the view as Escape does (used for the Back key on Android).
+    //! Returns false if the view cannot be dismissed this way (e.g. a progress dialog)
+    virtual bool dismiss();
 
 public slots:
     void setEngine(QQmlEngine* engine);

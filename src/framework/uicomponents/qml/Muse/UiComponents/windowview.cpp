@@ -38,10 +38,34 @@
 
 using namespace muse::uicomponents;
 
+static QList<WindowView*> s_openInWindowViews;
+
 WindowView::WindowView(QQuickItem* parent)
     : QObject(parent), Contextable(muse::iocCtxForQmlObject(this))
 {
     m_isInWindow = inWindowModeEnabled();
+}
+
+WindowView::~WindowView()
+{
+    s_openInWindowViews.removeAll(this);
+}
+
+const QList<WindowView*>& WindowView::openInWindowViews()
+{
+    return s_openInWindowViews;
+}
+
+bool WindowView::dismiss()
+{
+    // StyledDialogView and StyledPopupView define it (true by default)
+    const QVariant closeOnEscape = property("closeOnEscape");
+    if (closeOnEscape.isValid() && !closeOnEscape.toBool()) {
+        return false;
+    }
+
+    close();
+    return true;
 }
 
 bool WindowView::inWindowModeEnabled()
@@ -737,6 +761,8 @@ void WindowView::showInWindow()
     updateInWindowPosition();
 
     QMetaObject::invokeMethod(m_inWindowHost, "open");
+    s_openInWindowViews.removeAll(this);
+    s_openInWindowViews.append(this);
     afterShow();
 
     if (!(m_openPolicies & OpenPolicy::NoActivateFocus)) {
@@ -770,6 +796,7 @@ void WindowView::onInWindowCloseRequested()
 
 void WindowView::onInWindowHostClosed()
 {
+    s_openInWindowViews.removeAll(this);
     onHidden();
 }
 

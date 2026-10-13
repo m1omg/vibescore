@@ -49,6 +49,10 @@ public:
     explicit MenuView(QQuickItem* parent = nullptr);
     ~MenuView() override = default;
 
+    //! StyledMenu handles Escape itself (closeOnEscape is false); the Back key always closes the menu.
+    //! An open submenu is a menu on top of its parent, so it closes first
+    bool dismiss() override;
+
     bool isSearchable() const;
     void setIsSearchable(bool isSearchable);
 

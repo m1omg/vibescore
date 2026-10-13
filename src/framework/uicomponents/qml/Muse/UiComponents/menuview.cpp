@@ -41,6 +41,12 @@ MenuView::MenuView(QQuickItem* parent)
     setPadding(8);
 }
 
+bool MenuView::dismiss()
+{
+    close();
+    return true;
+}
+
 bool MenuView::isSearchable() const
 {
     return m_isSearchable;

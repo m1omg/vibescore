@@ -20,6 +20,7 @@
 
 #include "modularity/ioc.h"
 
+#include "internal/backnavigationcontroller.h"
 #include "internal/incomingfilescontroller.h"
 
 using namespace mu::mobile;
@@ -34,6 +35,7 @@ std::string MobileModule::moduleName() const
 void MobileModule::registerExports()
 {
     m_incomingFilesController = std::make_shared<IncomingFilesController>(iocContext());
+    m_backNavigationController = std::make_shared<BackNavigationController>(iocContext());
 }
 
 void MobileModule::onInit(const IApplication::RunMode& mode)
@@ -43,9 +45,11 @@ void MobileModule::onInit(const IApplication::RunMode& mode)
     }
 
     m_incomingFilesController->init();
+    m_backNavigationController->init();
 }
 
 void MobileModule::onDeinit()
 {
+    m_backNavigationController.reset();
     m_incomingFilesController.reset();
 }

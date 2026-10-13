@@ -21,6 +21,7 @@
 #include "modularity/imodulesetup.h"
 
 namespace mu::mobile {
+class BackNavigationController;
 class IncomingFilesController;
 
 //! Services that VibeScore needs on mobile platforms (Android, iOS)
@@ -35,5 +36,6 @@ public:
 
 private:
     std::shared_ptr<IncomingFilesController> m_incomingFilesController;
+    std::shared_ptr<BackNavigationController> m_backNavigationController;
 };
 }
