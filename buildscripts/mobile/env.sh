@@ -11,3 +11,5 @@ export QT_HOST_PATH="$VS_TOOLCHAIN/Qt/$QT_VERSION_VS/gcc_64"
 export QT_ANDROID_X86_64="$VS_TOOLCHAIN/Qt/$QT_VERSION_VS/android_x86_64"
 export QT_ANDROID_ARM64="$VS_TOOLCHAIN/Qt/$QT_VERSION_VS/android_arm64_v8a"
 export PATH="$VS_TOOLCHAIN/venv/bin:$ANDROID_SDK_ROOT/platform-tools:$ANDROID_SDK_ROOT/emulator:$ANDROID_SDK_ROOT/cmdline-tools/latest/bin:$PATH"
+# Release signing key (kept outside the repository), see buildscripts/cmake/SetupAndroidPackaging.cmake
+[ -f "$VS_TOOLCHAIN/keys/keystore.env" ] && . "$VS_TOOLCHAIN/keys/keystore.env"

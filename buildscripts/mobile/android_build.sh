@@ -5,8 +5,6 @@ set -euo pipefail
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$HERE/env.sh"
-# Release signing key (kept outside the repository), see buildscripts/cmake/SetupAndroidPackaging.cmake
-[ -f "$VS_TOOLCHAIN/keys/keystore.env" ] && source "$VS_TOOLCHAIN/keys/keystore.env"
 
 ABI="${1:-x86_64}"
 BUILD_TYPE="${2:-Release}"
