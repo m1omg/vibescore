@@ -40,6 +40,20 @@ T.Popup {
     property real maxContentWidth: parent ? parent.width : 0
     property real maxContentHeight: parent ? parent.height : 0
 
+    //! The parts of the window that system bars and display cut-outs cover (edge-to-edge windows on mobile)
+    readonly property real safeTop: parent ? parent.SafeArea.margins.top : 0
+    readonly property real safeBottom: parent ? parent.SafeArea.margins.bottom : 0
+    readonly property real safeLeft: parent ? parent.SafeArea.margins.left : 0
+    readonly property real safeRight: parent ? parent.SafeArea.margins.right : 0
+
+    readonly property real spaceWidth: maxContentWidth - safeLeft - safeRight
+    readonly property real spaceHeight: maxContentHeight - safeTop - safeBottom
+
+    //! Dialogs that are made for it (a "fillsCompactWindow" property on their content that is true)
+    //! take the whole of a narrow window (phones)
+    readonly property bool fillsWindow: isDialog && Boolean(viewContent) && Boolean(viewContent.fillsCompactWindow)
+                                        && spaceWidth < 600
+
     //! The close button of a dialog was pressed; the view decides whether to close
     signal closeRequested()
 
@@ -52,8 +66,10 @@ T.Popup {
 
             // Like the window this host replaces, which resizes its content to the content's implicit size
             // (the content's own size bindings may depend on that size, e.g. StyledDialogView)
-            item.width = Qt.binding(function() { return item.implicitWidth })
-            item.height = Qt.binding(function() { return item.implicitHeight })
+            item.width = Qt.binding(function() { return root.fillsWindow ? root.spaceWidth : item.implicitWidth })
+            item.height = Qt.binding(function() {
+                return root.fillsWindow ? root.spaceHeight - titleBar.height : item.implicitHeight
+            })
         }
     }
 
@@ -64,7 +80,10 @@ T.Popup {
                              implicitContentHeight + topPadding + bottomPadding)
 
     padding: 0
-    margins: 0
+    topMargin: root.isDialog ? root.safeTop : 0
+    bottomMargin: root.isDialog ? root.safeBottom : 0
+    leftMargin: root.isDialog ? root.safeLeft : 0
+    rightMargin: root.isDialog ? root.safeRight : 0
     background: null
     focus: true
 
@@ -82,8 +101,8 @@ T.Popup {
     contentItem: Item {
         id: container
 
-        implicitWidth: Math.min(column.implicitWidth, root.maxContentWidth)
-        implicitHeight: Math.min(column.implicitHeight, root.maxContentHeight)
+        implicitWidth: Math.min(column.implicitWidth, root.isDialog ? root.spaceWidth : root.maxContentWidth)
+        implicitHeight: Math.min(column.implicitHeight, root.isDialog ? root.spaceHeight : root.maxContentHeight)
 
         Rectangle {
             anchors.fill: parent
@@ -151,8 +170,8 @@ T.Popup {
 
                 y: titleBar.height
 
-                width: Math.min(contentWidth, root.maxContentWidth)
-                height: Math.min(contentHeight, root.maxContentHeight - titleBar.height)
+                width: Math.min(contentWidth, root.isDialog ? root.spaceWidth : root.maxContentWidth)
+                height: Math.min(contentHeight, (root.isDialog ? root.spaceHeight : root.maxContentHeight) - titleBar.height)
 
                 contentWidth: root.viewContent ? root.viewContent.width : 0
                 contentHeight: root.viewContent ? root.viewContent.height : 0

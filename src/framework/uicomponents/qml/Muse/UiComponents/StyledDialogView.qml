@@ -41,6 +41,10 @@ DialogView {
 
     property bool closeOnEscape : true
 
+    //! In a narrow single window (phones), the dialog takes the whole window (see InWindowHost.qml);
+    //! for dialogs whose layout adapts to the width
+    property bool fillsCompactWindow: false
+
     contentWidth: 240
     contentHeight: contentBody.childrenRect.height
 
@@ -64,6 +68,8 @@ DialogView {
 
     contentItem: FocusScope {
         id: rootContainer
+
+        readonly property bool fillsCompactWindow: root.fillsCompactWindow
         width: contentBody.width + root.margins * 2
         height: contentBody.height + root.margins * 2
 

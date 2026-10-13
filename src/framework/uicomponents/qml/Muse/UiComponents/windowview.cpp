@@ -757,6 +757,10 @@ void WindowView::showInWindow()
     m_inWindowHost->setProperty("maxContentWidth", m_parentWindow->width());
     m_inWindowHost->setProperty("maxContentHeight", m_parentWindow->height());
 
+    // Views that must not take the focus (e.g. the text style popup while text is typed) leave it where it is
+    const bool takesFocus = !(m_openPolicies & OpenPolicy::NoActivateFocus);
+    m_inWindowHost->setProperty("focus", takesFocus);
+
     configureInWindowHost(m_inWindowHost);
     updateInWindowPosition();
 
