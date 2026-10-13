@@ -17,7 +17,7 @@ on:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: false # a running build finishes; only the newest pending push is kept
 
 env:
   QT_VERSION: '6.10.2'
