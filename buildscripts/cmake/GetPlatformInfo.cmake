@@ -24,6 +24,14 @@ endif()
 
 if(${CMAKE_CXX_COMPILER} MATCHES "/em\\+\\+(-[a-zA-Z0-9.])?$")
     set(OS_IS_WASM 1)
+# Mobile targets are always cross-compiled, so they are detected by the
+# target system name (the host checks below would report the build machine)
+elseif(CMAKE_SYSTEM_NAME STREQUAL "Android")
+    set(OS_IS_ANDROID 1)
+    set(OS_IS_MOBILE 1)
+elseif(CMAKE_SYSTEM_NAME STREQUAL "iOS")
+    set(OS_IS_IOS 1)
+    set(OS_IS_MOBILE 1)
 elseif(${CMAKE_HOST_SYSTEM_NAME} MATCHES "Windows")
     set(OS_IS_WIN 1)
 elseif(${CMAKE_HOST_SYSTEM_NAME} MATCHES "Linux")
@@ -57,31 +65,53 @@ set(archdetect_c_code "
     #error cmake_ARCH unknown
     ")
 
-if(CMAKE_C_COMPILER_LOADED)
-    set(TA_EXTENSION "c")
-elseif(CMAKE_CXX_COMPILER_LOADED)
-    set(TA_EXTENSION "cpp")
-elseif(CMAKE_FORTRAN_COMPILER_LOADED)
-    set(TA_EXTENSION "F90")
+if (OS_IS_ANDROID)
+    # The NDK toolchain tells us the ABI directly
+    if (ANDROID_ABI STREQUAL "arm64-v8a")
+        set(ARCH "aarch64")
+    elseif (ANDROID_ABI STREQUAL "armeabi-v7a")
+        set(ARCH "armv7l")
+    elseif (ANDROID_ABI STREQUAL "x86_64")
+        set(ARCH "x86_64")
+    else()
+        set(ARCH "unknown")
+    endif()
+    message(STATUS "Android ABI: ${ANDROID_ABI}, CPU Architecture: ${ARCH}")
+elseif (OS_IS_IOS)
+    # Devices and Apple Silicon simulators are arm64; Intel simulators are x86_64
+    if (CMAKE_OSX_ARCHITECTURES MATCHES "x86_64")
+        set(ARCH "x86_64")
+    else()
+        set(ARCH "aarch64")
+    endif()
+    message(STATUS "iOS CPU Architecture: ${ARCH}")
 else()
-    message(FATAL_ERROR "You must enable a C, CXX, or Fortran compiler to use TargetArch.cmake")
+    if(CMAKE_C_COMPILER_LOADED)
+        set(TA_EXTENSION "c")
+    elseif(CMAKE_CXX_COMPILER_LOADED)
+        set(TA_EXTENSION "cpp")
+    elseif(CMAKE_FORTRAN_COMPILER_LOADED)
+        set(TA_EXTENSION "F90")
+    else()
+        message(FATAL_ERROR "You must enable a C, CXX, or Fortran compiler to use TargetArch.cmake")
+    endif()
+
+    file(WRITE "${CMAKE_BINARY_DIR}/arch.${TA_EXTENSION}" "${archdetect_c_code}")
+
+    try_run(
+        run_result_unused
+        compile_result_unused
+        "${CMAKE_BINARY_DIR}"
+        "${CMAKE_BINARY_DIR}/arch.${TA_EXTENSION}"
+        COMPILE_OUTPUT_VARIABLE ARCH
+        CMAKE_FLAGS ${TA_CMAKE_FLAGS}
+    )
+
+    string(REGEX MATCH "cmake_ARCH ([a-zA-Z0-9_]+)" ARCH "${ARCH}")
+
+    string(REPLACE "cmake_ARCH " "" ARCH "${ARCH}")
+    message(STATUS "Detected CPU Architecture: ${ARCH}")
 endif()
-
-file(WRITE "${CMAKE_BINARY_DIR}/arch.${TA_EXTENSION}" "${archdetect_c_code}")
-
-try_run(
-    run_result_unused
-    compile_result_unused
-    "${CMAKE_BINARY_DIR}"
-    "${CMAKE_BINARY_DIR}/arch.${TA_EXTENSION}"
-    COMPILE_OUTPUT_VARIABLE ARCH
-    CMAKE_FLAGS ${TA_CMAKE_FLAGS}
-)
-
-string(REGEX MATCH "cmake_ARCH ([a-zA-Z0-9_]+)" ARCH "${ARCH}")
-
-string(REPLACE "cmake_ARCH " "" ARCH "${ARCH}")
-message(STATUS "Detected CPU Architecture: ${ARCH}")
 
 if(${ARCH} MATCHES "armv7l")
     set(ARCH_IS_ARMV7L 1)
