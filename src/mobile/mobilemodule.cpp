@@ -22,6 +22,7 @@
 
 #include "internal/backnavigationcontroller.h"
 #include "internal/incomingfilescontroller.h"
+#include "internal/mobilewindowsprovider.h"
 
 using namespace mu::mobile;
 using namespace muse;
@@ -36,6 +37,10 @@ void MobileModule::registerExports()
 {
     m_incomingFilesController = std::make_shared<IncomingFilesController>(iocContext());
     m_backNavigationController = std::make_shared<BackNavigationController>(iocContext());
+
+    // Replaces the stub of the multiwindows module, which is registered before this module
+    ioc()->unregister<muse::mi::IMultiWindowsProvider>(moduleName());
+    ioc()->registerExport<muse::mi::IMultiWindowsProvider>(moduleName(), std::make_shared<MobileWindowsProvider>(iocContext()));
 }
 
 void MobileModule::onInit(const IApplication::RunMode& mode)
