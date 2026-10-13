@@ -81,6 +81,15 @@ elseif(OS_IS_WASM)
 
     set(EXECUTABLE_NAME MuseScoreStudio)
 
+elseif(OS_IS_ANDROID)
+
+    # Built as lib${EXECUTABLE_NAME}_${ANDROID_ABI}.so and loaded by the Qt activity
+    set(EXECUTABLE_NAME ${VS_BRAND_NAME_MACHINE})
+
+elseif(OS_IS_IOS)
+
+    set(EXECUTABLE_NAME ${VS_BRAND_NAME_MACHINE})
+
 elseif(OS_IS_FBSD)
     set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -L /usr/local/lib -lasound -lpthread")
 
@@ -273,6 +282,14 @@ if (CC_IS_MSVC)
     target_link_options(MuseScoreStudio PRIVATE /SUBSYSTEM:WINDOWS /ENTRY:mainCRTStartup)
 endif(CC_IS_MSVC)
 
+if (OS_IS_ANDROID)
+    include(SetupAndroidPackaging)
+    vs_setup_android_packaging(MuseScoreStudio)
+elseif (OS_IS_IOS)
+    include(SetupIOSPackaging)
+    vs_setup_ios_packaging(MuseScoreStudio)
+endif()
+
 ###########################################
 # Includes
 ###########################################
@@ -311,10 +328,12 @@ endif()
 # INSTALL
 ###########################################
 
-install(TARGETS MuseScoreStudio
-    BUNDLE  DESTINATION .
-    RUNTIME DESTINATION bin
-)
+if (NOT OS_IS_MOBILE)
+    install(TARGETS MuseScoreStudio
+        BUNDLE  DESTINATION .
+        RUNTIME DESTINATION bin
+    )
+endif()
 
 ###########################################
 # Windows
@@ -422,6 +441,9 @@ elseif(OS_IS_WASM)
         WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
         COMMENT "Install js api..."
     )
+
+elseif(OS_IS_MOBILE)
+    # Packaged by androiddeployqt (Android) or as an app bundle (iOS), see above
 
 else()
     message(FATAL_ERROR "Unsupported Platform: ${CMAKE_HOST_SYSTEM_NAME}")
