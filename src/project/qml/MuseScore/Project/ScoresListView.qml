@@ -37,6 +37,8 @@ Item {
     property alias showNewScoreItem: newScoreItem.visible
     property string searchText
     property bool allowRemoveFromRecentFiles: false
+    //! More actions in the menu of the scores: [{ id, title }], see scoreActionRequested
+    property var extraScoreActions: []
 
     property color backgroundColor: ui.theme.backgroundSecondaryColor
     property real sideMargin: 46
@@ -50,6 +52,7 @@ Item {
     signal revealInFileBrowserRequested(var scorePath)
     signal viewOnlineRequested(var scoreId)
     signal removeFromRecentFilesRequested(var scorePath)
+    signal scoreActionRequested(string actionId, var scorePath)
     signal retryRequested()
     signal cancelRequested(int convertType, int convertId)
 
@@ -222,6 +225,7 @@ Item {
                         implicitHeight: view.rowHeight
                         columnSpacing: view.columnSpacing
                         showRemoveFromRecentFiles: root.allowRemoveFromRecentFiles
+                        extraActions: root.extraScoreActions
 
                         mouseArea.enabled: !item.isProcessing
 
@@ -245,6 +249,10 @@ Item {
 
                         onRemoveFromRecentFilesRequested: function(scorePath) {
                             root.removeFromRecentFilesRequested(scorePath)
+                        }
+
+                        onExtraActionRequested: function(actionId, scorePath) {
+                            root.scoreActionRequested(actionId, scorePath)
                         }
 
                         onRetryRequested: root.retryRequested()

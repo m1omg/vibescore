@@ -94,8 +94,17 @@ void ScoresPageModel::openScoreManager()
 
 int ScoresPageModel::tabIndex() const
 {
-    // Without the cloud, there is only the tab of local scores
-    return isCloudAvailable() ? configuration()->homeScoresPageTabIndex() : 0;
+    // Without the cloud (and the library), there is only the tab of recent scores
+    return isCloudAvailable() || isLibraryAvailable() ? configuration()->homeScoresPageTabIndex() : 0;
+}
+
+bool ScoresPageModel::isLibraryAvailable() const
+{
+#if defined(Q_OS_ANDROID) || defined(Q_OS_IOS)
+    return !isCloudAvailable(); // the second tab
+#else
+    return false;
+#endif
 }
 
 bool ScoresPageModel::isCloudAvailable() const

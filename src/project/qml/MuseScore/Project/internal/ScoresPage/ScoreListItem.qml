@@ -39,10 +39,12 @@ ListItemBlank {
     property real columnSpacing: 44
     property alias showBottomBorder: bottomBorder.visible
     property bool showRemoveFromRecentFiles: false
+    property var extraActions: []
 
     signal revealInFileBrowserRequested(string scorePath)
     signal viewOnlineRequested(int scoreId)
     signal removeFromRecentFilesRequested(string scorePath)
+    signal extraActionRequested(string actionId, string scorePath)
     signal retryRequested()
     signal cancelRequested(int convertType, int convertId)
 
@@ -271,6 +273,7 @@ ListItemBlank {
         isNoResultsFound: root.score.isNoResultsFound ?? false
         isCloud: root.score.isCloud ?? false
         showRemoveFromRecentFiles: root.showRemoveFromRecentFiles
+        extraActions: root.extraActions
 
         readonly property bool isHovered: root.mouseArea.containsMouse
                                            || contextMenu.mouseArea.containsMouse
@@ -278,7 +281,7 @@ ListItemBlank {
                                            || contextMenu.navigation.active
                                            || contextMenu.isMenuOpenedByButton
 
-        visible: !root.isProcessing && contextMenu.isHovered
+        visible: !root.isProcessing && (contextMenu.isHovered || Qt.platform.os === "android" || Qt.platform.os === "ios")
 
         navigation.panel: root.navigation.panel
         navigation.row: root.navigation.row
@@ -288,6 +291,20 @@ ListItemBlank {
         onViewOnlineRequested: root.viewOnlineRequested(root.score.scoreId ?? 0)
         onRevealInFileBrowserRequested: root.revealInFileBrowserRequested(root.score.path ?? "")
         onRemoveFromRecentFilesRequested: root.removeFromRecentFilesRequested(root.score.path ?? "")
+        onExtraActionRequested: function(actionId) {
+            root.extraActionRequested(actionId, root.score.path ?? "")
+        }
+
+        // Touch screens: the menu of the score (there is no hover to show its button)
+        Connections {
+            target: root.mouseArea
+
+            function onPressAndHold(mouse) {
+                if (contextMenu.menuModel.length > 0 && !root.isProcessing) {
+                    contextMenu.show(Qt.point(mouse.x, mouse.y), root.mouseArea)
+                }
+            }
+        }
 
         Connections {
             target: root.ListView.view

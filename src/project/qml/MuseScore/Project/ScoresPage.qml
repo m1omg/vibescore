@@ -37,7 +37,8 @@ FocusScope {
     QtObject {
         id: prv
 
-        readonly property int sideMargin: 46
+        // Narrow screens (phones) need the room for the scores
+        readonly property int sideMargin: root.width < 600 ? 16 : 46
     }
 
     onSubSectionChanged: applySubSection()
@@ -45,7 +46,8 @@ FocusScope {
     function applySubSection() {
         switch (root.subSection) {
         case "newAndRecent": scoresPageModel.tabIndex = 0; break
-        case "myOnlineScores": scoresPageModel.tabIndex = 1; break
+        case "myOnlineScores":
+        case "library": scoresPageModel.tabIndex = 1; break
         }
     }
 
@@ -116,7 +118,7 @@ FocusScope {
         SearchField {
             id: searchField
 
-            Layout.preferredWidth: 220
+            Layout.preferredWidth: Math.min(220, root.width / 2)
 
             navigation.name: "Scores Search"
             navigation.panel: navSearchPanel
@@ -145,8 +147,9 @@ FocusScope {
             Layout.fillWidth: true
 
             // "New & recent" alone needs no tab bar
-            opacity: scoresPageModel.isCloudAvailable ? 1 : 0
-            enabled: scoresPageModel.isCloudAvailable
+            readonly property bool hasSecondTab: scoresPageModel.isCloudAvailable || scoresPageModel.isLibraryAvailable
+            opacity: hasSecondTab ? 1 : 0
+            enabled: hasSecondTab
 
             onCurrentIndexChanged: {
                 if (completed) {
@@ -179,9 +182,9 @@ FocusScope {
             }
 
             StyledTabButton {
-                text: qsTrc("project", "My online scores")
+                text: scoresPageModel.isCloudAvailable ? qsTrc("project", "My online scores") : qsTrc("project", "Library")
 
-                navigation.name: "MyOnlineScores"
+                navigation.name: scoresPageModel.isCloudAvailable ? "MyOnlineScores" : "Library"
                 navigation.panel: navTabPanel
                 navigation.column: 2
             }
@@ -200,7 +203,7 @@ FocusScope {
         FlatButton {
             id: refreshButton
 
-            visible: tabBar.currentIndex === 1
+            visible: tabBar.currentIndex === 1 && scoresPageModel.isCloudAvailable
 
             navigation.panel: viewButtonsNavPanel
             navigation.order: 1
@@ -258,7 +261,7 @@ FocusScope {
                 return null
             }
 
-            return [newAndRecentComp, onlineScoresComp][tabBar.currentIndex]
+            return [newAndRecentComp, scoresPageModel.isCloudAvailable ? onlineScoresComp : libraryComp][tabBar.currentIndex]
         }
     }
 
@@ -291,6 +294,34 @@ FocusScope {
 
             onViewOnlineRequested: function(scoreId) {
                 Qt.callLater(scoresPageModel.viewOnline, scoreId)
+            }
+        }
+    }
+
+    Component {
+        id: libraryComp
+
+        LibraryScoresView {
+            anchors.fill: parent
+
+            viewType: scoresPageModel.viewType
+            searchText: searchField.searchText
+            backgroundColor: background.color
+            sideMargin: prv.sideMargin
+
+            navigationSection: navSec
+            navigationOrder: 4
+
+            onCreateNewScoreRequested: {
+                scoresPageModel.createNewScore()
+            }
+
+            onOpenScoreRequested: function(scorePath, displayName) {
+                Qt.callLater(scoresPageModel.openScore, scorePath, displayName)
+            }
+
+            onRevealInFileBrowserRequested: function(scorePath) {
+                Qt.callLater(scoresPageModel.revealInFileBrowser, scorePath)
             }
         }
     }
@@ -342,7 +373,7 @@ FocusScope {
 
         anchors.bottom: parent.bottom
 
-        height: 100
+        height: root.width < 600 ? 72 : 100
         width: parent.width
 
         color: ui.theme.backgroundSecondaryColor

@@ -31,6 +31,8 @@ FlatButton {
     property bool isNoResultsFound: false
     property bool isCloud: false
     property bool showRemoveFromRecentFiles: false
+    //! More actions for the score: [{ id, title }], see extraActionRequested
+    property var extraActions: []
     property alias isMenuOpened: menuLoader.isMenuOpened
     property bool isMenuOpenedByButton: menuLoader.isMenuOpened && menuLoader.parent === root
     property alias menuAnchorItem: menuLoader.menuAnchorItem
@@ -41,6 +43,7 @@ FlatButton {
     signal revealInFileBrowserRequested()
     signal viewOnlineRequested()
     signal removeFromRecentFilesRequested()
+    signal extraActionRequested(string actionId)
 
     function show(position, item) {
         let target = item ? item : root
@@ -66,6 +69,9 @@ FlatButton {
         switch (Qt.platform.os) {
         case "windows": return qsTrc("project", "Show in Explorer")
         case "osx": return qsTrc("project", "Show in Finder")
+        // Mobile systems have no file manager to show the file in: it is shared (see IInteractive::revealInFileBrowser)
+        case "android":
+        case "ios": return qsTrc("project", "Share…")
         default: return qsTrc("project", "Show in File Manager")
         }
     }
@@ -88,6 +94,11 @@ FlatButton {
         if (root.showRemoveFromRecentFiles) {
             result.push({}) // separator
             result.push({ id: "remove-from-recent-files", title: qsTrc("project", "Remove from recent files list") })
+        }
+
+        if (!root.isCloud && root.extraActions.length > 0) {
+            result.push({}) // separator
+            result = result.concat(root.extraActions)
         }
 
         return result
@@ -119,6 +130,9 @@ FlatButton {
                 break
             case "remove-from-recent-files":
                 root.removeFromRecentFilesRequested()
+                break
+            default:
+                root.extraActionRequested(itemId)
                 break
             }
         }

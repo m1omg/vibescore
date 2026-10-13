@@ -36,6 +36,8 @@ Item {
 
     property bool isNoResultsMessageAllowed: true
     property bool allowRemoveFromRecentFiles: false
+    //! More actions in the menu of the scores: [{ id, title }], see scoreActionRequested
+    property var extraScoreActions: []
 
     property color backgroundColor: ui.theme.backgroundSecondaryColor
     property real sideMargin: 46
@@ -49,6 +51,7 @@ Item {
     signal revealInFileBrowserRequested(var scorePath)
     signal viewOnlineRequested(var scoreId)
     signal removeFromRecentFilesRequested(var scorePath)
+    signal scoreActionRequested(string actionId, var scorePath)
     signal retryRequested()
     signal cancelRequested(int convertType, int convertId)
 
@@ -183,6 +186,7 @@ Item {
                 cloudScoreId: score.scoreId ?? 0
                 timeSinceModified: score.timeSinceModified ?? ""
                 showRemoveFromRecentFiles: root.allowRemoveFromRecentFiles
+                extraActions: root.extraScoreActions
 
                 onClicked: {
                     if (item.isCreateNew) {
@@ -202,6 +206,10 @@ Item {
 
                 onRemoveFromRecentFilesRequested: function(scorePath) {
                     root.removeFromRecentFilesRequested(scorePath)
+                }
+
+                onExtraActionRequested: function(actionId, scorePath) {
+                    root.scoreActionRequested(actionId, scorePath)
                 }
 
                 onRetryRequested: root.retryRequested()

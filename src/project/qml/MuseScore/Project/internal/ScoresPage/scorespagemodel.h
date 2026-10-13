@@ -43,6 +43,8 @@ class ScoresPageModel : public QObject, public muse::Contextable
 
     //! Online scores, the score manager and file conversion are services of MuseScore.com
     Q_PROPERTY(bool isCloudAvailable READ isCloudAvailable CONSTANT)
+    //! A tab with all the scores of the scores folder (mobile: no file manager shows it)
+    Q_PROPERTY(bool isLibraryAvailable READ isLibraryAvailable CONSTANT)
 
     QML_ELEMENT
 
@@ -66,6 +68,7 @@ public:
     void setViewType(ViewType type);
 
     bool isCloudAvailable() const;
+    bool isLibraryAvailable() const;
 
     Q_INVOKABLE void createNewScore();
     Q_INVOKABLE void convertFileToScore();

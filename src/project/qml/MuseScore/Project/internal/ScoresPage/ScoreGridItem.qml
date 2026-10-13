@@ -44,6 +44,7 @@ FocusScope {
     property bool isCloud: false
     property int cloudScoreId: 0
     property bool showRemoveFromRecentFiles: false
+    property var extraActions: []
 
     property alias navigation: navCtrl
 
@@ -51,6 +52,7 @@ FocusScope {
     signal revealInFileBrowserRequested(string scorePath)
     signal viewOnlineRequested(int scoreId)
     signal removeFromRecentFilesRequested(string scorePath)
+    signal extraActionRequested(string actionId, string scorePath)
     signal retryRequested()
     signal cancelRequested(int convertType, int convertId)
 
@@ -99,6 +101,13 @@ FocusScope {
             navCtrl.requestActiveByInteraction()
 
             root.clicked()
+        }
+
+        // Touch screens: the menu of the score (there is no hover to show its button)
+        onPressAndHold: function(mouse) {
+            if (contextMenu.menuModel.length > 0 && !root.isProcessing) {
+                contextMenu.show(Qt.point(mouse.x, mouse.y), rootMouseArea)
+            }
         }
     }
 
@@ -220,13 +229,15 @@ FocusScope {
                                                    || contextMenu.navigation.active
                                                    || contextMenu.isMenuOpenedByButton
 
-                visible: contextMenu.menuModel.length > 0 && !root.isProcessing && contextMenu.isHovered
+                visible: contextMenu.menuModel.length > 0 && !root.isProcessing
+                         && (contextMenu.isHovered || Qt.platform.os === "android" || Qt.platform.os === "ios")
                 transparent: !contextMenu.isMenuOpenedByButton && !rootMouseArea.containsMouse
 
                 isCreateNew: root.isCreateNew
                 isNoResultsFound: root.isNoResultsFound
                 isCloud: root.isCloud
                 showRemoveFromRecentFiles: root.showRemoveFromRecentFiles
+                extraActions: root.extraActions
 
                 navigation.panel: root.navigation.panel
                 navigation.row: root.navigation.row
@@ -236,6 +247,9 @@ FocusScope {
                 onViewOnlineRequested: root.viewOnlineRequested(root.cloudScoreId)
                 onRevealInFileBrowserRequested: root.revealInFileBrowserRequested(root.path)
                 onRemoveFromRecentFilesRequested: root.removeFromRecentFilesRequested(root.path)
+                onExtraActionRequested: function(actionId) {
+                    root.extraActionRequested(actionId, root.path)
+                }
             }
 
             Loader {
