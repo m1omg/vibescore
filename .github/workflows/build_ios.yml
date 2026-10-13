@@ -1,0 +1,118 @@
+# VibeScore: iOS / iPadOS build (unsigned) on GitHub-hosted macOS runners
+name: 'Build: iOS'
+
+on:
+  workflow_dispatch:
+    inputs:
+      sdk:
+        description: 'SDK: iphoneos (device, unsigned IPA) or iphonesimulator'
+        required: false
+        default: 'iphoneos'
+  push:
+    branches:
+      - vibescore
+    paths-ignore:
+      - '**.md'
+      - 'share/locale/**'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  QT_VERSION: '6.10.2'
+  QT_MODULES: 'qt5compat qtshadertools'
+  BUILD_TYPE: 'Release'
+
+jobs:
+  build_ios:
+    runs-on: macos-15
+    timeout-minutes: 340
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Qt (macOS host tools)
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: ${{ env.QT_VERSION }}
+          host: 'mac'
+          target: 'desktop'
+          arch: 'clang_64'
+          modules: ${{ env.QT_MODULES }}
+          dir: ${{ runner.temp }}/qt-host
+          cache: true
+          cache-key-prefix: 'qt-host'
+
+      - name: Remember host Qt
+        run: echo "VS_QT_HOST_PATH=$QT_ROOT_DIR" >> "$GITHUB_ENV"
+
+      - name: Install Qt (iOS)
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: ${{ env.QT_VERSION }}
+          host: 'mac'
+          target: 'ios'
+          arch: 'ios'
+          modules: ${{ env.QT_MODULES }}
+          dir: ${{ runner.temp }}/qt-ios
+          cache: true
+          cache-key-prefix: 'qt-ios'
+
+      - name: Set up ccache
+        uses: hendrikmuhs/ccache-action@v1.2
+        with:
+          key: ios-${{ inputs.sdk || 'iphoneos' }}
+          max-size: 4G
+
+      - name: Configure
+        run: |
+          SDK="${{ inputs.sdk || 'iphoneos' }}"
+          "$QT_ROOT_DIR/bin/qt-cmake" -S . -B build-ios -G Xcode \
+            -DMUSESCORE_BUILD_CONFIGURATION=app-mobile \
+            -DCMAKE_BUILD_TYPE=${BUILD_TYPE} \
+            -DQT_HOST_PATH="$VS_QT_HOST_PATH" \
+            -DCMAKE_OSX_SYSROOT="$SDK" \
+            -DCMAKE_C_COMPILER_LAUNCHER=ccache \
+            -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
+            -DMUSE_COMPILE_USE_COMPILER_CACHE=OFF
+
+      - name: Build
+        run: |
+          SDK="${{ inputs.sdk || 'iphoneos' }}"
+          cmake --build build-ios --config ${BUILD_TYPE} --target MuseScoreStudio -- \
+            -sdk "$SDK" -jobs "$(sysctl -n hw.ncpu)" \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" \
+            2>&1 | tee build-ios.log | grep -E "error:|warning: unused|\*\* BUILD" || true
+          test "${PIPESTATUS[0]}" -eq 0
+
+      - name: Show errors
+        if: failure()
+        run: grep -E "error:" -A3 build-ios.log | head -300 || true
+
+      - name: Package unsigned IPA
+        if: success()
+        run: |
+          APP="$(find build-ios -name 'VibeScore.app' -type d -path '*Release*' | head -1)"
+          echo "App bundle: $APP"
+          du -sh "$APP"
+          mkdir -p ipa/Payload
+          cp -R "$APP" ipa/Payload/
+          (cd ipa && zip -qry ../VibeScore-unsigned.ipa Payload)
+          ls -la VibeScore-unsigned.ipa
+
+      - name: Upload IPA
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: VibeScore-iOS-${{ inputs.sdk || 'iphoneos' }}
+          path: VibeScore-unsigned.ipa
+          retention-days: 14
+
+      - name: Upload build log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-ios-log
+          path: build-ios.log
+          retention-days: 7
