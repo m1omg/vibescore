@@ -84,7 +84,8 @@ jobs:
           set +e
           EXTRA_ARGS=""
           if [ "$SDK" = "iphonesimulator" ]; then
-            EXTRA_ARGS="ARCHS=arm64 ONLY_ACTIVE_ARCH=YES" # the runners are Apple Silicon Macs
+            # Qt's iOS package has simulator code for x86_64 only; it runs under Rosetta on the Apple Silicon runners
+            EXTRA_ARGS="ARCHS=x86_64 ONLY_ACTIVE_ARCH=NO"
           fi
           cmake --build build-ios --config ${BUILD_TYPE} --target MuseScoreStudio -- \
             -sdk "$SDK" -jobs "$(sysctl -n hw.ncpu)" $EXTRA_ARGS \
