@@ -21,8 +21,14 @@
  */
 #include "coremidioutport.h"
 
+#include <TargetConditionals.h>
+#if TARGET_OS_IPHONE
+#include <CoreFoundation/CoreFoundation.h>
+#include <mach/mach_time.h>
+#else
 #include <CoreAudio/HostTime.h>
 #include <CoreServices/CoreServices.h>
+#endif
 #include <CoreMIDI/CoreMIDI.h>
 
 #include "translation.h"
@@ -284,7 +290,11 @@ Ret CoreMidiOutPort::sendEvent(const Event& e)
     }
 
     OSStatus result = noErr;
+#if TARGET_OS_IPHONE
+    MIDITimeStamp timeStamp = mach_absolute_time();
+#else
     MIDITimeStamp timeStamp = AudioGetCurrentHostTime();
+#endif
 
     // Note: there could be three cases: MIDI2+MIDIEventList, MIDI1+MIDIEventList, MIDI1+MIDIPacketList.
     //       But we only maintain 2 code paths and may drop configuration()->useMIDI20Output() and MIDIPacketList later.

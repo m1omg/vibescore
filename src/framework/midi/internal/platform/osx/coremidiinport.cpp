@@ -21,8 +21,14 @@
  */
 #include "coremidiinport.h"
 
+#include <TargetConditionals.h>
+#if TARGET_OS_IPHONE
+#include <CoreFoundation/CoreFoundation.h>
+#include <mach/mach_time.h>
+#else
 #include <CoreAudio/HostTime.h>
 #include <CoreServices/CoreServices.h>
+#endif
 #include <CoreMIDI/CoreMIDI.h>
 
 #include "translation.h"

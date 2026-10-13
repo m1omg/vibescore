@@ -41,7 +41,7 @@ target_sources(muse_midi PRIVATE
 )
 
 include(GetPlatformInfo)
-if (OS_IS_MAC)
+if (OS_IS_MAC OR OS_IS_IOS)
     target_sources(muse_midi PRIVATE
         internal/platform/osx/coremidioutport.cpp
         internal/platform/osx/coremidioutport.h
@@ -50,8 +50,11 @@ if (OS_IS_MAC)
     )
 
     find_library(CoreMIDI NAMES CoreMIDI)
-    find_library(CoreAudio NAMES CoreAudio)
-    target_link_libraries(muse_midi PRIVATE ${CoreMIDI} ${CoreAudio})
+    target_link_libraries(muse_midi PRIVATE ${CoreMIDI})
+    if (OS_IS_MAC)
+        find_library(CoreAudio NAMES CoreAudio)
+        target_link_libraries(muse_midi PRIVATE ${CoreAudio})
+    endif()
 elseif (OS_IS_WIN)
     target_sources(muse_midi PRIVATE 
         internal/platform/win/winmidioutport.cpp

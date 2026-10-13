@@ -25,11 +25,12 @@
 #include "../imidioutport.h"
 
 namespace muse::midi {
+//! Used on platforms without MIDI support: offers no devices
 class DummyMidiOutPort : public IMidiOutPort
 {
 public:
-
     void init();
+    void deinit();
 
     MidiDeviceList availableDevices() const override;
     async::Notification availableDevicesChanged() const override;
@@ -37,7 +38,9 @@ public:
     Ret connect(const MidiDeviceID& deviceID) override;
     void disconnect() override;
     bool isConnected() const override;
+
     MidiDeviceID deviceID() const override;
+    async::Notification deviceChanged() const override;
 
     bool supportsMIDI20Output() const override;
 
@@ -45,6 +48,8 @@ public:
 
 private:
     MidiDeviceID m_connectedDeviceID;
+    async::Notification m_availableDevicesChanged;
+    async::Notification m_deviceChanged;
 };
 }
 

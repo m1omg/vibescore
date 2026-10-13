@@ -21,7 +21,6 @@
  */
 #include "dummymidioutport.h"
 
-#include "log.h"
 #include "midierrors.h"
 
 using namespace muse;
@@ -31,30 +30,31 @@ void DummyMidiOutPort::init()
 {
 }
 
-MidiDeviceList DummyMidiOutPort::availableDevices() const
+void DummyMidiOutPort::deinit()
 {
-    MidiDevice d;
-    d.id = "dummy";
-    d.name = "Dummy";
-    return { d };
 }
 
-async::Notification DummyMidiOutPort::availableDevicesChanged() const
+MidiDeviceList DummyMidiOutPort::availableDevices() const
 {
     return {};
 }
 
+async::Notification DummyMidiOutPort::availableDevicesChanged() const
+{
+    return m_availableDevicesChanged;
+}
+
 Ret DummyMidiOutPort::connect(const MidiDeviceID& deviceID)
 {
-    LOGI() << "deviceID: " << deviceID;
     m_connectedDeviceID = deviceID;
+    m_deviceChanged.notify();
     return Ret(true);
 }
 
 void DummyMidiOutPort::disconnect()
 {
-    LOGI() << "disconnect";
     m_connectedDeviceID.clear();
+    m_deviceChanged.notify();
 }
 
 bool DummyMidiOutPort::isConnected() const
@@ -67,16 +67,21 @@ MidiDeviceID DummyMidiOutPort::deviceID() const
     return m_connectedDeviceID;
 }
 
+async::Notification DummyMidiOutPort::deviceChanged() const
+{
+    return m_deviceChanged;
+}
+
 bool DummyMidiOutPort::supportsMIDI20Output() const
 {
     return false;
 }
 
-Ret DummyMidiOutPort::sendEvent(const Event& e)
+Ret DummyMidiOutPort::sendEvent(const Event&)
 {
     if (!isConnected()) {
         return make_ret(Err::MidiNotConnected);
     }
-    LOGI() << e.to_string();
+
     return Ret(true);
 }

@@ -25,23 +25,29 @@
 #include "imidiinport.h"
 
 namespace muse::midi {
+//! Used on platforms without MIDI support: offers no devices
 class DummyMidiInPort : public IMidiInPort
 {
 public:
-
     void init();
+    void deinit();
 
-    std::vector<MidiDevice> availableDevices() const override;
+    MidiDeviceList availableDevices() const override;
+    async::Notification availableDevicesChanged() const override;
 
     Ret connect(const MidiDeviceID& deviceID) override;
     void disconnect() override;
     bool isConnected() const override;
+
     MidiDeviceID deviceID() const override;
+    async::Notification deviceChanged() const override;
 
     async::Channel<tick_t, Event> eventReceived() const override;
 
 private:
     MidiDeviceID m_deviceID;
+    async::Notification m_availableDevicesChanged;
+    async::Notification m_deviceChanged;
     async::Channel<tick_t, Event> m_eventReceived;
 };
 }

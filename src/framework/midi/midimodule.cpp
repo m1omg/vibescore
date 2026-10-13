@@ -24,13 +24,16 @@
 
 #include "internal/midiconfiguration.h"
 
-#if defined(Q_OS_LINUX) || defined(Q_OS_FREEBSD)
+#if defined(Q_OS_ANDROID)
+#include "internal/dummymidioutport.h"
+#include "internal/dummymidiinport.h"
+#elif defined(Q_OS_LINUX) || defined(Q_OS_FREEBSD)
 #include "internal/platform/lin/alsamidioutport.h"
 #include "internal/platform/lin/alsamidiinport.h"
 #elif defined(Q_OS_WIN)
 #include "internal/platform/win/winmidioutport.h"
 #include "internal/platform/win/winmidiinport.h"
-#elif defined(Q_OS_MACOS)
+#elif defined(Q_OS_MACOS) || defined(Q_OS_IOS)
 #include "internal/platform/osx/coremidioutport.h"
 #include "internal/platform/osx/coremidiinport.h"
 #else
@@ -49,13 +52,16 @@ void MidiModule::registerExports()
 {
     m_configuration = std::make_shared<MidiConfiguration>();
 
-    #if defined(Q_OS_LINUX) || defined(Q_OS_FREEBSD)
+    #if defined(Q_OS_ANDROID)
+    m_midiOutPort = std::make_shared<DummyMidiOutPort>();
+    m_midiInPort = std::make_shared<DummyMidiInPort>();
+    #elif defined(Q_OS_LINUX) || defined(Q_OS_FREEBSD)
     m_midiOutPort = std::make_shared<AlsaMidiOutPort>();
     m_midiInPort = std::make_shared<AlsaMidiInPort>();
     #elif defined(Q_OS_WIN)
     m_midiOutPort = std::make_shared<WinMidiOutPort>();
     m_midiInPort = std::make_shared<WinMidiInPort>();
-    #elif defined(Q_OS_MACOS)
+    #elif defined(Q_OS_MACOS) || defined(Q_OS_IOS)
     m_midiOutPort = std::make_shared<CoreMidiOutPort>();
     m_midiInPort = std::make_shared<CoreMidiInPort>();
     #else
