@@ -28,7 +28,7 @@
         android:fullBackupOnly="false"
         android:largeHeap="true">
         <activity
-            android:name="org.qtproject.qt.android.bindings.QtActivity"
+            android:name="io.github.m1omg.vibescore.VibeScoreActivity"
             android:configChanges="orientation|uiMode|screenLayout|screenSize|smallestScreenSize|layoutDirection|locale|fontScale|keyboard|keyboardHidden|navigation|mcc|mnc|density"
             android:label="-- %%INSERT_APP_NAME%% --"
             android:launchMode="singleTask"
@@ -39,6 +39,76 @@
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+
+            <!-- Scores and interchange formats opened from file managers and other apps -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <action android:name="android.intent.action.EDIT" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="content" />
+                <data android:scheme="file" />
+                <data android:mimeType="application/x-musescore" />
+                <data android:mimeType="application/x-musescore+xml" />
+                <data android:mimeType="application/vnd.recordare.musicxml" />
+                <data android:mimeType="application/vnd.recordare.musicxml+xml" />
+                <data android:mimeType="audio/midi" />
+                <data android:mimeType="audio/x-midi" />
+                <data android:mimeType="audio/mid" />
+                <data android:mimeType="application/x-guitar-pro" />
+            </intent-filter>
+
+            <!-- Providers often report unknown types as octet-stream: match file paths by extension -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="content" />
+                <data android:scheme="file" />
+                <data android:host="*" />
+                <data android:mimeType="application/octet-stream" />
+                <data android:pathPattern=".*\\.mscz" />
+                <data android:pathPattern=".*\\.mscx" />
+                <data android:pathPattern=".*\\.mxl" />
+                <data android:pathPattern=".*\\.musicxml" />
+                <data android:pathPattern=".*\\.xml" />
+                <data android:pathPattern=".*\\.mid" />
+                <data android:pathPattern=".*\\.midi" />
+                <data android:pathPattern=".*\\.kar" />
+                <data android:pathPattern=".*\\.gp" />
+                <data android:pathPattern=".*\\.gpx" />
+                <data android:pathPattern=".*\\.gp3" />
+                <data android:pathPattern=".*\\.gp4" />
+                <data android:pathPattern=".*\\.gp5" />
+                <data android:pathPattern=".*\\.ptb" />
+                <data android:pathPattern=".*\\.cap" />
+                <data android:pathPattern=".*\\.capx" />
+                <data android:pathPattern=".*\\.bww" />
+                <data android:pathPattern=".*\\.ove" />
+                <data android:pathPattern=".*\\.scw" />
+                <data android:pathPattern=".*\\.mei" />
+                <data android:pathPattern=".*\\.mnx" />
+                <data android:pathPattern=".*\\.tef" />
+                <data android:pathPattern=".*\\.md" />
+                <data android:pathPattern=".*\\.mgu" />
+                <data android:pathPattern=".*\\.sgu" />
+                <data android:pathPattern=".*\\.sf2" />
+                <data android:pathPattern=".*\\.sf3" />
+            </intent-filter>
+
+            <!-- "Share to VibeScore" -->
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+                <action android:name="android.intent.action.SEND_MULTIPLE" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="application/x-musescore" />
+                <data android:mimeType="application/x-musescore+xml" />
+                <data android:mimeType="application/vnd.recordare.musicxml" />
+                <data android:mimeType="application/vnd.recordare.musicxml+xml" />
+                <data android:mimeType="audio/midi" />
+                <data android:mimeType="audio/x-midi" />
+                <data android:mimeType="application/octet-stream" />
             </intent-filter>
 
             <meta-data

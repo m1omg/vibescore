@@ -100,6 +100,10 @@ if (MUE_BUILD_APPSHELL_MODULE)
     endif()
 endif()
 
+if (MUE_CONFIGURATION_IS_APPMOBILE)
+    add_subdirectory(mobile)
+endif()
+
 # App (main)
 add_subdirectory(app)
 if (MUE_CONFIGURATION_IS_APPWEB)

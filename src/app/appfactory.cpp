@@ -263,6 +263,10 @@
 #include "print/printmodule.h"
 #endif
 
+#ifdef MUE_CONFIGURATION_IS_APPMOBILE
+#include "mobile/mobilemodule.h"
+#endif
+
 #ifdef MUE_BUILD_PROJECT_MODULE
 #include "project/projectmodule.h"
 #else
@@ -423,6 +427,10 @@ std::shared_ptr<muse::IApplication> AppFactory::newGuiApp(const CmdOptions& opti
 
 #ifdef MUE_CONFIGURATION_IS_APPWEB
     app->addModule(new mu::appjs::AppJsModule());
+#endif
+
+#ifdef MUE_CONFIGURATION_IS_APPMOBILE
+    app->addModule(new mu::mobile::MobileModule());
 #endif
 
     return app;
