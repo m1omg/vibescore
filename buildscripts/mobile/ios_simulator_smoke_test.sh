@@ -9,6 +9,9 @@ OUT="$2"
 mkdir -p "$OUT"
 
 BUNDLE_ID="$(/usr/libexec/PlistBuddy -c "Print CFBundleIdentifier" "$APP/Info.plist")"
+
+# Built without signing: sign it to run locally, as Xcode does for simulators
+codesign --force --sign - --timestamp=none "$APP"
 SCORE="share/templates/02-Choral/07-Voice_+_Piano/07-Voice_+_Piano.mscx"
 STARTUP_SECONDS=90
 
@@ -47,8 +50,14 @@ run_on() {
     xcrun simctl install "$udid" "$APP"
 
     # 1. Start: Home page
-    xcrun simctl launch --terminate-running-process --stdout="$OUT/$label-1-home.log" --stderr="$OUT/$label-1-home.log" \
-        "$udid" "$BUNDLE_ID"
+    if ! xcrun simctl launch --terminate-running-process --stdout="$OUT/$label-1-home.log" --stderr="$OUT/$label-1-home.log" \
+        "$udid" "$BUNDLE_ID"; then
+        echo "::error::$label: the app could not be started"
+        xcrun simctl spawn "$udid" log show --last 5m --style compact --predicate 'process == "SpringBoard" OR process CONTAINS "VibeScore"' \
+            > "$OUT/$label-system.log" 2>&1 || true
+        failed=1
+        return
+    fi
     sleep "$STARTUP_SECONDS"
     xcrun simctl io "$udid" screenshot "$OUT/$label-1-home.png"
     if ! is_running "$udid"; then
