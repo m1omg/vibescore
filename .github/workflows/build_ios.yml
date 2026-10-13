@@ -3,11 +3,6 @@ name: 'Build: iOS'
 
 on:
   workflow_dispatch:
-    inputs:
-      sdk:
-        description: 'SDK: iphoneos (device, unsigned IPA) or iphonesimulator'
-        required: false
-        default: 'iphoneos'
   push:
     branches:
       - vibescore
@@ -26,8 +21,14 @@ env:
 
 jobs:
   build_ios:
+    name: build_ios (${{ matrix.sdk }})
     runs-on: macos-15
     timeout-minutes: 340
+    strategy:
+      fail-fast: false
+      matrix:
+        # iphoneos: unsigned IPA for sideloading; iphonesimulator: smoke test with screenshots
+        sdk: [ 'iphoneos', 'iphonesimulator' ]
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -62,12 +63,12 @@ jobs:
       - name: Set up ccache
         uses: hendrikmuhs/ccache-action@v1.2
         with:
-          key: ios-${{ inputs.sdk || 'iphoneos' }}
+          key: ios-${{ matrix.sdk }}
           max-size: 4G
 
       - name: Configure
         run: |
-          SDK="${{ inputs.sdk || 'iphoneos' }}"
+          SDK="${{ matrix.sdk }}"
           "$QT_ROOT_DIR/bin/qt-cmake" -S . -B build-ios -G Xcode \
             -DMUSESCORE_BUILD_CONFIGURATION=app-mobile \
             -DCMAKE_BUILD_TYPE=${BUILD_TYPE} \
@@ -79,10 +80,14 @@ jobs:
 
       - name: Build
         run: |
-          SDK="${{ inputs.sdk || 'iphoneos' }}"
+          SDK="${{ matrix.sdk }}"
           set +e
+          EXTRA_ARGS=""
+          if [ "$SDK" = "iphonesimulator" ]; then
+            EXTRA_ARGS="ARCHS=arm64 ONLY_ACTIVE_ARCH=YES" # the runners are Apple Silicon Macs
+          fi
           cmake --build build-ios --config ${BUILD_TYPE} --target MuseScoreStudio -- \
-            -sdk "$SDK" -jobs "$(sysctl -n hw.ncpu)" \
+            -sdk "$SDK" -jobs "$(sysctl -n hw.ncpu)" $EXTRA_ARGS \
             CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" \
             > build-ios.log 2>&1
           STATUS=$?
@@ -94,9 +99,9 @@ jobs:
         run: grep -E "error:" -A3 build-ios.log | head -300 || true
 
       - name: Package unsigned IPA
-        if: success()
+        if: success() && matrix.sdk == 'iphoneos'
         run: |
-          SDK="${{ inputs.sdk || 'iphoneos' }}"
+          SDK="${{ matrix.sdk }}"
           APP="build-ios/src/app/${BUILD_TYPE}-${SDK}/VibeScore.app"
           echo "App bundle: $APP"
           # A complete bundle has its executable, Info.plist and the application data
@@ -109,17 +114,30 @@ jobs:
           ls -la VibeScore-unsigned.ipa
 
       - name: Upload IPA
-        if: success()
+        if: success() && matrix.sdk == 'iphoneos'
         uses: actions/upload-artifact@v4
         with:
-          name: VibeScore-iOS-${{ inputs.sdk || 'iphoneos' }}
+          name: VibeScore-iOS-${{ matrix.sdk }}
           path: VibeScore-unsigned.ipa
+          retention-days: 14
+
+      - name: Simulator smoke test
+        if: success() && matrix.sdk == 'iphonesimulator'
+        run: |
+          buildscripts/mobile/ios_simulator_smoke_test.sh "build-ios/src/app/${BUILD_TYPE}-iphonesimulator/VibeScore.app" smoke-test
+
+      - name: Upload smoke test screenshots and logs
+        if: always() && matrix.sdk == 'iphonesimulator'
+        uses: actions/upload-artifact@v4
+        with:
+          name: VibeScore-iOS-simulator-smoke-test
+          path: smoke-test
           retention-days: 14
 
       - name: Upload build log
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: build-ios-log
+          name: build-ios-log-${{ matrix.sdk }}
           path: build-ios.log
           retention-days: 7
