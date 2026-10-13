@@ -214,7 +214,8 @@ Item {
             currentIndex: root.currentIndex
 
             itemWidth: mainItem.width
-            itemHeight: mainItem.height
+            // Touch screens: rows tall enough to tap (as menus, see StyledMenuItem)
+            itemHeight: Qt.platform.os === "android" || Qt.platform.os === "ios" ? Math.max(mainItem.height, 44) : mainItem.height
 
             visibleItemsCount: root.popupItemsCount
 

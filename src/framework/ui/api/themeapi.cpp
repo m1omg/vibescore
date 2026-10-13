@@ -449,7 +449,12 @@ void ThemeApi::setupMusicTextFont()
 
 void ThemeApi::calculateDefaultButtonSize()
 {
+#if defined(Q_OS_ANDROID) || defined(Q_OS_IOS)
+    // Big enough to hit with a finger
+    constexpr qreal MINIMUM_BUTTON_SIZE = 40.0;
+#else
     constexpr qreal MINIMUM_BUTTON_SIZE = 30.0;
+#endif
     constexpr qreal BUTTON_PADDING = 8.0;
 
     QFontMetricsF bodyFontMetrics(m_bodyFont);
@@ -807,7 +812,11 @@ int ProxyStyle::pixelMetric(QStyle::PixelMetric metric, const QStyleOption* opti
     case PM_IndicatorHeight:
     case PM_ExclusiveIndicatorWidth: // Radio button
     case PM_ExclusiveIndicatorHeight:
+#if defined(Q_OS_ANDROID) || defined(Q_OS_IOS)
+        return 24; // touch screens
+#else
         return 20;
+#endif
     case PM_CheckBoxLabelSpacing: // Checkbox
     case PM_RadioButtonLabelSpacing: // Radio button
         return 6;
@@ -822,6 +831,40 @@ int ProxyStyle::pixelMetric(QStyle::PixelMetric metric, const QStyleOption* opti
 
 QSize ProxyStyle::sizeFromContents(QStyle::ContentsType type, const QStyleOption* option, const QSize& contentsSize,
                                    const QWidget* widget) const
+{
+#if defined(Q_OS_ANDROID) || defined(Q_OS_IOS)
+    // Touch screens: controls big enough for a finger, as in QML (see ThemeApi::calculateDefaultButtonSize)
+    static constexpr int MIN_CONTROL_HEIGHT = 40;
+    switch (type) {
+    case CT_PushButton: {
+        // As wide as the text needs: dialogs are narrow on phones
+        return QSize(contentsSize.width() + 24, std::max(contentsSize.height() + 14, MIN_CONTROL_HEIGHT));
+    }
+    case CT_ToolButton:
+    case CT_ComboBox:
+    case CT_LineEdit:
+    case CT_SpinBox:
+    case CT_ItemViewItem:
+    case CT_MenuItem:
+    case CT_CheckBox:
+    case CT_RadioButton: {
+        QSize size = defaultSizeFromContents(type, option, contentsSize, widget);
+        if (type == CT_MenuItem && size.height() <= 1) {
+            return size; // separators
+        }
+        size.setHeight(std::max(size.height(), MIN_CONTROL_HEIGHT));
+        return size;
+    }
+    default:
+        break;
+    }
+#endif
+
+    return defaultSizeFromContents(type, option, contentsSize, widget);
+}
+
+QSize ProxyStyle::defaultSizeFromContents(QStyle::ContentsType type, const QStyleOption* option, const QSize& contentsSize,
+                                          const QWidget* widget) const
 {
     QSize commonStyleSize = QCommonStyle::sizeFromContents(type, option, contentsSize, widget);
     QSize proxyStyleSize = QProxyStyle::sizeFromContents(type, option, contentsSize, widget);

@@ -59,7 +59,8 @@ ListItemBlank {
 
     signal requestParentItemActive()
 
-    implicitHeight: 32
+    // Touch screens: rows tall enough to tap
+    implicitHeight: Qt.platform.os === "android" || Qt.platform.os === "ios" ? 44 : 32
 
     hoverHitColor: ui.theme.accentColor
     enabled: (Boolean(modelData) && modelData.enabled !== undefined) ? Boolean(modelData.enabled) : true // default true

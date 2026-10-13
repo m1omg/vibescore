@@ -657,7 +657,12 @@ std::string UiConfiguration::defaultFontFamily() const
 
 int UiConfiguration::defaultFontSize() const
 {
+#if defined(Q_OS_ANDROID) || defined(Q_OS_IOS)
+    // The body text size of the mobile platforms (14sp/dp)
+    return 14;
+#else
     return 12;
+#endif
 }
 
 void UiConfiguration::resetFonts()
