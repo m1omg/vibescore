@@ -55,6 +55,15 @@ if (OS_IS_MAC OR OS_IS_IOS)
         find_library(CoreAudio NAMES CoreAudio)
         target_link_libraries(muse_midi PRIVATE ${CoreAudio})
     endif()
+elseif (OS_IS_ANDROID)
+    target_sources(muse_midi PRIVATE
+        internal/platform/android/androidmidibridge.cpp
+        internal/platform/android/androidmidibridge.h
+        internal/platform/android/androidmidiinport.cpp
+        internal/platform/android/androidmidiinport.h
+        internal/platform/android/androidmidioutport.cpp
+        internal/platform/android/androidmidioutport.h
+    )
 elseif (OS_IS_WIN)
     target_sources(muse_midi PRIVATE 
         internal/platform/win/winmidioutport.cpp

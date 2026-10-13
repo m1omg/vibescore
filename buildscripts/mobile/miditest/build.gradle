@@ -1,0 +1,30 @@
+buildscript {
+    repositories {
+        google()
+        mavenCentral()
+    }
+    dependencies {
+        // The versions that Qt's Android build uses (and that are already in the Gradle cache)
+        classpath 'com.android.tools.build:gradle:8.10.1'
+    }
+}
+
+apply plugin: 'com.android.application'
+
+repositories {
+    google()
+    mavenCentral()
+}
+
+android {
+    namespace 'io.github.m1omg.vibescore.miditest'
+    compileSdk 35
+
+    defaultConfig {
+        applicationId 'io.github.m1omg.vibescore.miditest'
+        minSdk 28
+        targetSdk 35
+        versionCode 1
+        versionName '1.0'
+    }
+}

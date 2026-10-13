@@ -25,8 +25,8 @@
 #include "internal/midiconfiguration.h"
 
 #if defined(Q_OS_ANDROID)
-#include "internal/dummymidioutport.h"
-#include "internal/dummymidiinport.h"
+#include "internal/platform/android/androidmidioutport.h"
+#include "internal/platform/android/androidmidiinport.h"
 #elif defined(Q_OS_LINUX) || defined(Q_OS_FREEBSD)
 #include "internal/platform/lin/alsamidioutport.h"
 #include "internal/platform/lin/alsamidiinport.h"
@@ -53,8 +53,8 @@ void MidiModule::registerExports()
     m_configuration = std::make_shared<MidiConfiguration>();
 
     #if defined(Q_OS_ANDROID)
-    m_midiOutPort = std::make_shared<DummyMidiOutPort>();
-    m_midiInPort = std::make_shared<DummyMidiInPort>();
+    m_midiOutPort = std::make_shared<AndroidMidiOutPort>();
+    m_midiInPort = std::make_shared<AndroidMidiInPort>();
     #elif defined(Q_OS_LINUX) || defined(Q_OS_FREEBSD)
     m_midiOutPort = std::make_shared<AlsaMidiOutPort>();
     m_midiInPort = std::make_shared<AlsaMidiInPort>();

@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <uses-feature android:name="android.software.midi" android:required="true" />
+
+    <application android:label="VibeScore MIDI test">
+        <service
+            android:name=".TestKeyboardService"
+            android:exported="true"
+            android:permission="android.permission.BIND_MIDI_DEVICE_SERVICE">
+            <intent-filter>
+                <action android:name="android.media.midi.MidiDeviceService" />
+            </intent-filter>
+            <meta-data
+                android:name="android.media.midi.MidiDeviceService"
+                android:resource="@xml/device_info" />
+        </service>
+
+        <receiver android:name=".PlayReceiver" android:exported="true" />
+    </application>
+</manifest>
