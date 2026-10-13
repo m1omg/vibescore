@@ -24,8 +24,10 @@
 #include <QFileDialog>
 #include <QFileInfo>
 
-#ifdef Q_OS_ANDROID
+#if defined(Q_OS_ANDROID)
 #include "platform/android/androidshare.h"
+#elif defined(Q_OS_IOS)
+#include "platform/ios/iosplatform.h"
 #endif
 
 #include "translation.h"
@@ -375,7 +377,7 @@ async::Promise<Ret> MobileInteractive::openApp(const UriQuery& uri) const
 
 Ret MobileInteractive::revealInFileBrowser(const io::path_t& filePath) const
 {
-#ifdef Q_OS_ANDROID
+#ifdef VS_SYSTEM_DOCUMENT_PICKER
     // There is no file browser to show files in: they are shared instead
     QStringList files;
     if (io::dirpath(filePath) == m_library.exportsPath()) {
@@ -389,7 +391,11 @@ Ret MobileInteractive::revealInFileBrowser(const io::path_t& filePath) const
         return make_ret(Ret::Code::UnknownError);
     }
 
+#ifdef Q_OS_ANDROID
     android::shareFiles(files, muse::qtrc("mobile", "Share"));
+#else
+    ios::shareFiles(files);
+#endif
     return make_ok();
 #else
     return m_origin->revealInFileBrowser(filePath);

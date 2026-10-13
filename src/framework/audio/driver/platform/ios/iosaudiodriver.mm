@@ -24,6 +24,8 @@
 #import <AVFoundation/AVFoundation.h>
 #include <AudioToolbox/AudioToolbox.h>
 
+#include <QGuiApplication>
+
 #include "translation.h"
 #include "log.h"
 
@@ -82,6 +84,30 @@ IosAudioDriver::~IosAudioDriver()
 
 void IosAudioDriver::init()
 {
+    QObject::connect(qGuiApp, &QGuiApplication::applicationStateChanged, &m_appStateReceiver, [this](Qt::ApplicationState state) {
+        setSuspended(state == Qt::ApplicationSuspended);
+    });
+}
+
+void IosAudioDriver::setSuspended(bool suspended)
+{
+    if (m_suspended == suspended) {
+        return;
+    }
+
+    m_suspended = suspended;
+
+    if (!m_opened || !m_data->audioUnit) {
+        return;
+    }
+
+    if (suspended) {
+        AudioOutputUnitStop(m_data->audioUnit);
+        LOGI() << "Stopped the audio unit";
+    } else {
+        restartAfterInterruption();
+        LOGI() << "Restarted the audio unit";
+    }
 }
 
 std::string IosAudioDriver::name() const

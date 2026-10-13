@@ -23,8 +23,10 @@
 
 #include "io/file.h"
 
-#ifdef Q_OS_ANDROID
+#if defined(Q_OS_ANDROID)
 #include "platform/android/androidprint.h"
+#elif defined(Q_OS_IOS)
+#include "platform/ios/iosplatform.h"
 #endif
 
 #include "log.h"
@@ -73,8 +75,10 @@ Ret MobilePrintProvider::printNotation(notation::INotationPtr notation)
         return ret;
     }
 
-#ifdef Q_OS_ANDROID
+#if defined(Q_OS_ANDROID)
     android::printPdf(pdfPath.toQString(), jobName);
+#elif defined(Q_OS_IOS)
+    ios::printPdf(pdfPath.toQString(), jobName);
 #endif
 
     return ret;

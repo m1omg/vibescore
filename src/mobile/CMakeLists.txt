@@ -40,4 +40,21 @@ if (OS_IS_ANDROID)
     )
 endif()
 
+if (OS_IS_IOS)
+    target_sources(mobile PRIVATE
+        internal/platform/ios/iosplatform.h
+        internal/platform/ios/iosplatform.mm
+    )
+
+    set_source_files_properties(
+        internal/platform/ios/iosplatform.mm
+        PROPERTIES
+        SKIP_UNITY_BUILD_INCLUSION ON
+        SKIP_PRECOMPILE_HEADERS ON
+    )
+
+    find_library(UIKit NAMES UIKit)
+    target_link_libraries(mobile PRIVATE ${UIKit})
+endif()
+
 add_subdirectory(qml/MuseScore/Mobile)

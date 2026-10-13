@@ -20,6 +20,7 @@
 
 #include <QObject>
 #include <QString>
+#include <QUrl>
 
 #include "modularity/ioc.h"
 #include "global/io/ifilesystem.h"
@@ -42,6 +43,9 @@ public:
 
     //! Must be called on the main thread
     void onIncomingFile(const QString& path);
+
+    //! iOS: documents opened in the app from others ("Open in", Files), copied into Documents/Inbox by the system
+    Q_INVOKABLE void onFileUrlOpened(const QUrl& url);
 
 private:
     ScoresLibrary m_library;

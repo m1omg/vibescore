@@ -21,6 +21,8 @@
 #include <atomic>
 #include <memory>
 
+#include <QObject>
+
 #include "iaudiodriver.h"
 
 namespace muse::audio {
@@ -58,8 +60,13 @@ private:
     void removeSessionObservers();
     void restartAfterInterruption();
 
+    //! In the background, the audio unit is stopped (the app does not play in the background)
+    void setSuspended(bool suspended);
+
     std::unique_ptr<Data> m_data;
     std::atomic<bool> m_opened = false;
+    bool m_suspended = false;
+    QObject m_appStateReceiver;
 
     Spec m_activeSpec;
     async::Channel<Spec> m_activeSpecChanged;

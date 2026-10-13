@@ -19,6 +19,7 @@
 #include "incomingfilescontroller.h"
 
 #include <QCoreApplication>
+#include <QDesktopServices>
 #include <QFileInfo>
 #include <QFileOpenEvent>
 #include <QUrl>
@@ -41,13 +42,25 @@ void IncomingFilesController::init()
 {
     fileSystem()->makePath(m_library.libraryPath());
 
-#ifdef Q_OS_ANDROID
+#if defined(Q_OS_ANDROID)
     android::startReceivingIncomingFiles([this](const QString& path) {
         QMetaObject::invokeMethod(this, [this, path]() {
             onIncomingFile(path);
         }, Qt::QueuedConnection);
     });
+#elif defined(Q_OS_IOS)
+    // Qt's iOS application delegate passes the URLs of opened documents to the URL handlers
+    QDesktopServices::setUrlHandler("file", this, "onFileUrlOpened");
 #endif
+}
+
+void IncomingFilesController::onFileUrlOpened(const QUrl& url)
+{
+    if (!url.isLocalFile()) {
+        return;
+    }
+
+    onIncomingFile(url.toLocalFile());
 }
 
 void IncomingFilesController::onIncomingFile(const QString& path)
