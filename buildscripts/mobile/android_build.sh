@@ -21,6 +21,7 @@ if [ ! -f "$BUILD/build.ninja" ]; then
     vs_lowprio "$QT_ANDROID/bin/qt-cmake" -S "$SRC" -B "$BUILD" -G Ninja \
         -DCMAKE_BUILD_TYPE="$BUILD_TYPE" \
         -DMUSESCORE_BUILD_CONFIGURATION=app-mobile \
+        -DCMAKE_AUTOGEN_PARALLEL="$VS_JOBS" \
         -DQT_HOST_PATH="$QT_HOST_PATH" \
         -DANDROID_SDK_ROOT="$ANDROID_SDK_ROOT" \
         -DANDROID_NDK_ROOT="$ANDROID_NDK_ROOT"
