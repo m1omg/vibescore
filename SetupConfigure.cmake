@@ -74,6 +74,10 @@ endif()
 if (OS_IS_MAC)
     set(Mscore_INSTALL_NAME    "Contents/Resources/")
     set(Mscore_SHARE_NAME      "mscore.app/")
+elseif (OS_IS_MOBILE)
+    # Staged into the APK assets / iOS app bundle as "share/"
+    set(Mscore_INSTALL_NAME  "")
+    set(Mscore_SHARE_NAME    "share/")
 elseif (OS_IS_WIN)
     set(Mscore_INSTALL_NAME  "")
     set(Mscore_SHARE_NAME    "./")
@@ -107,6 +111,13 @@ endif()
 if (OS_IS_FBSD)
     message(WARNING "Not building unsupported chrashpad client on FreeBSD")
     set(MUSE_MODULE_DIAGNOSTICS_CRASHPAD_CLIENT OFF)
+endif()
+
+###########################################
+# CONFIGURE: Mobile App (VibeScore)
+###########################################
+if(BUILD_CONFIGURATION STREQUAL "APP-MOBILE")
+    include(SetupConfigureMobile)
 endif()
 
 ###########################################

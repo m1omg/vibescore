@@ -29,6 +29,7 @@ if (OS_IS_LIN OR OS_IS_FBSD)
 endif()
 
 option(MUSE_MODULE_AUDIO_EXPORT "Enable audio export" ON)
+option(MUSE_MODULE_AUDIO_EXPORT_AAC "Enable AAC audio export (uses fdk-aac)" ON)
 
 # 1 - worker
 # 2 - driver callback
@@ -96,6 +97,7 @@ declare_muse_module_opt(WORKSPACE ON)
 option(MUSE_QT_SUPPORT "Build with Qt support" ON)
 option(MUSE_THREADS_SUPPORT "Build with threads support" ON)
 option(MUSE_CONFIGURATION_IS_WEB "Configuration is web" OFF)
+option(MUSE_CONFIGURATION_IS_MOBILE "Configuration is mobile (touch-first, single window)" OFF)
 option(MUSE_COMPILE_BUILD_64 "Build 64 bit version" ON)
 option(MUSE_COMPILE_ASAN "Enable Address Sanitizer" OFF)
 option(MUSE_COMPILE_USE_PCH "Use precompiled headers." ON)

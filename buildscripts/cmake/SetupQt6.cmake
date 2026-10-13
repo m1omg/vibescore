@@ -18,7 +18,8 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-if (OS_IS_WASM)
+if (OS_IS_WASM OR OS_IS_IOS)
+    # Qt for WebAssembly and Qt for iOS are static builds
     set(QT_IS_STATIC ON)
 endif()
 
@@ -53,13 +54,17 @@ set(QT_LIBRARIES
     Qt::Core5Compat
 )
 
-if(NOT OS_IS_WASM)
+if(NOT OS_IS_WASM AND NOT OS_IS_MOBILE)
 
     list(APPEND qt_components NetworkAuth)
     list(APPEND QT_LIBRARIES Qt::NetworkAuth)
 
     list(APPEND qt_components PrintSupport)
     list(APPEND QT_LIBRARIES Qt::PrintSupport)
+elseif(OS_IS_MOBILE AND MUSE_MODULE_CLOUD)
+    # Printing has no Qt backend on mobile; NetworkAuth is only needed for cloud sign-in
+    list(APPEND qt_components NetworkAuth)
+    list(APPEND QT_LIBRARIES Qt::NetworkAuth)
 endif()
 
 if(OS_IS_LIN)

@@ -123,7 +123,8 @@ elseif(OS_IS_WIN)
             platform/win/AppTitleBar.qml
             platform/win/Main.qml
     )
-elseif(OS_IS_LIN OR OS_IS_FREEBSD)
+elseif(OS_IS_LIN OR OS_IS_FBSD OR OS_IS_MOBILE)
+    # Mobile: the desktop shell is used until the touch shell (src/mobile) replaces it
     qt_target_qml_sources(appshell_qml 
         QML_FILES
             platform/linux/Main.qml
