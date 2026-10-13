@@ -18,7 +18,7 @@ SRC="$VS_ROOT/MuseScore"
 BUILD="$VS_ROOT/build/android-$ABI"
 
 if [ ! -f "$BUILD/build.ninja" ]; then
-    "$QT_ANDROID/bin/qt-cmake" -S "$SRC" -B "$BUILD" -G Ninja \
+    vs_lowprio "$QT_ANDROID/bin/qt-cmake" -S "$SRC" -B "$BUILD" -G Ninja \
         -DCMAKE_BUILD_TYPE="$BUILD_TYPE" \
         -DMUSESCORE_BUILD_CONFIGURATION=app-mobile \
         -DQT_HOST_PATH="$QT_HOST_PATH" \
@@ -26,7 +26,8 @@ if [ ! -f "$BUILD/build.ninja" ]; then
         -DANDROID_NDK_ROOT="$ANDROID_NDK_ROOT"
 fi
 
-cmake --build "$BUILD" -j"$(nproc)"
-cmake --build "$BUILD" --target apk
+# Low priority, VS_JOBS parallel jobs (see env.sh)
+vs_lowprio cmake --build "$BUILD" -j"$VS_JOBS"
+vs_lowprio cmake --build "$BUILD" -j"$VS_JOBS" --target apk
 
 find "$BUILD" -name "*.apk" -path "*outputs*" -newer "$BUILD/build.ninja" -print

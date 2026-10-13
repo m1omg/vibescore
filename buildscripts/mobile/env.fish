@@ -17,3 +17,9 @@ if test -f $VS_TOOLCHAIN/keys/keystore.env
         set -gx (string split -m 1 '=' $kv)
     end
 end
+# Builds share the computer with the user: few parallel jobs, idle CPU and I/O priority (see env.sh)
+set -q VS_JOBS; or set -gx VS_JOBS 4
+set -q GRADLE_OPTS; or set -gx GRADLE_OPTS "-Dorg.gradle.daemon=false -Dorg.gradle.workers.max=2"
+function vs_lowprio
+    chrt -i 0 nice -n 39 ionice -c 3 $argv
+end

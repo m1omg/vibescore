@@ -13,3 +13,12 @@ export QT_ANDROID_ARM64="$VS_TOOLCHAIN/Qt/$QT_VERSION_VS/android_arm64_v8a"
 export PATH="$VS_TOOLCHAIN/venv/bin:$ANDROID_SDK_ROOT/platform-tools:$ANDROID_SDK_ROOT/emulator:$ANDROID_SDK_ROOT/cmdline-tools/latest/bin:$PATH"
 # Release signing key (kept outside the repository), see buildscripts/cmake/SetupAndroidPackaging.cmake
 [ -f "$VS_TOOLCHAIN/keys/keystore.env" ] && . "$VS_TOOLCHAIN/keys/keystore.env"
+
+# Builds share the computer with the user: few parallel jobs, idle CPU and I/O priority.
+# VS_JOBS=N overrides the number of parallel jobs.
+export VS_JOBS="${VS_JOBS:-4}"
+# Gradle (APK/AAB packaging) must not leave a daemon behind
+export GRADLE_OPTS="${GRADLE_OPTS:--Dorg.gradle.daemon=false -Dorg.gradle.workers.max=2}"
+vs_lowprio() {
+    chrt -i 0 nice -n 39 ionice -c 3 "$@"
+}
