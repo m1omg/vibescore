@@ -66,6 +66,9 @@ class AbstractNotationPaintView : public muse::uicomponents::QuickPaintedView, p
     Q_PROPERTY(qreal verticalScrollbarSize READ verticalScrollbarSize NOTIFY verticalScrollChanged)
 
     Q_PROPERTY(QVariant matrix READ matrix NOTIFY matrixChanged)
+
+    //! Qt for Android sends the software keyboard's input only to focus objects with this property (like text fields)
+    Q_PROPERTY(int inputMethodHints READ inputMethodHints)
     Q_PROPERTY(QRectF viewport READ viewport_property NOTIFY viewportChanged)
 
     Q_PROPERTY(bool publishMode READ publishMode WRITE setPublishMode NOTIFY publishModeChanged)
@@ -255,6 +258,7 @@ private:
     void dropEvent(QDropEvent* event) override;
     void inputMethodEvent(QInputMethodEvent* event) override;
     QVariant inputMethodQuery(Qt::InputMethodQuery query) const override;
+    int inputMethodHints() const;
 
     bool ensureViewportInsideScrollableArea();
 

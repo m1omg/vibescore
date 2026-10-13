@@ -22,6 +22,8 @@
 #include "abstractnotationpaintview.h"
 
 #include <QCursor>
+#include <QGuiApplication>
+#include <QInputMethod>
 #include <QPainter>
 #include <QMimeData>
 
@@ -306,12 +308,28 @@ void AbstractNotationPaintView::onLoadNotation(INotationPtr)
         setFlag(ItemAcceptsInputMethod, true);
         setFocus(false); // Remove focus once so that the IME reloads the state
         forceFocusIn();
+
+        // Touch screens: the software keyboard (it does not show up when a hardware keyboard is used)
+        if (m_touchController) {
+            QGuiApplication::inputMethod()->show();
+        }
+    });
+
+    interaction->textEditingChanged().onNotify(this, [this]() {
+        // The input method sees the text around the cursor (see NotationViewInputController::inputMethodQuery)
+        if (flags().testFlag(ItemAcceptsInputMethod) && hasActiveFocus()) {
+            QGuiApplication::inputMethod()->update(Qt::ImQueryInput | Qt::ImHints);
+        }
     });
 
     interaction->textEditingEnded().onReceive(this, [this](const engraving::TextBase*) {
         setFlag(ItemAcceptsInputMethod, false);
         setFocus(false); // Remove focus once so that the IME reloads the state
         forceFocusIn();
+
+        if (m_touchController) {
+            QGuiApplication::inputMethod()->hide();
+        }
     });
 
     interaction->dropChanged().onNotify(this, [this]() {
@@ -1403,6 +1421,11 @@ void AbstractNotationPaintView::inputMethodEvent(QInputMethodEvent* event)
     if (isInited()) {
         m_inputController->inputMethodEvent(event);
     }
+}
+
+int AbstractNotationPaintView::inputMethodHints() const
+{
+    return inputMethodQuery(Qt::ImHints).toInt();
 }
 
 QVariant AbstractNotationPaintView::inputMethodQuery(Qt::InputMethodQuery query) const

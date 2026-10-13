@@ -22,12 +22,19 @@
 #include <gmock/gmock.h>
 
 #include "mocks/controlledviewmock.h"
+#include "actions/tests/mocks/actionsdispatchermock.h"
 #include "notation/tests/mocks/notationconfigurationmock.h"
 #include "notation/tests/mocks/notationinteractionmock.h"
 #include "notation/tests/mocks/notationselectionmock.h"
 #include "notation/tests/mocks/notationselectionrangemock.h"
 #include "playback/tests/mocks/playbackcontrollermock.h"
 
+#include "engraving/dom/chord.h"
+#include "engraving/dom/factory.h"
+#include "engraving/dom/lyrics.h"
+#include "engraving/dom/measure.h"
+#include "engraving/dom/segment.h"
+#include "engraving/dom/stafftext.h"
 #include "engraving/tests/utils/scorerw.h"
 
 #include "notationscene/qml/MuseScore/NotationScene/notationviewinputcontroller.h"
@@ -41,6 +48,8 @@ using ::testing::InSequence;
 using namespace mu;
 using namespace mu::notation;
 using namespace muse;
+
+using muse::actions::ActionCode;
 
 static const String TEST_SCORE_PATH(u"data/test.mscx");
 static constexpr bool FLUSH_SOUND = true;
@@ -942,4 +951,219 @@ TEST_F(NotationViewInputControllerTests, Mouse_Press_On_Range_Context_Menu_New_S
 
     //! [WHEN] User pressed right mouse button with NoModifier on the selected measure
     m_controller->mousePressEvent(make_mousePressEvent(Qt::RightButton, Qt::NoModifier, QPointF(100, 100)));
+}
+
+class NotationViewInputControllerTextInputTests : public NotationViewInputControllerTests
+{
+public:
+    void SetUp() override
+    {
+        NotationViewInputControllerTests::SetUp();
+
+        m_dispatcher = std::make_shared<NiceMock<muse::actions::ActionsDispatcherMock> >();
+        m_controller->dispatcher.set(m_dispatcher);
+
+        m_score = engraving::ScoreRW::readScore(TEST_SCORE_PATH);
+        ON_CALL(*m_interaction, isTextEditingStarted()).WillByDefault(Return(true));
+    }
+
+    void TearDown() override
+    {
+        delete m_text;
+        delete m_score;
+        NotationViewInputControllerTests::TearDown();
+    }
+
+    //! A syllable on the first note of the test score, being edited
+    void editLyrics(const String& text)
+    {
+        engraving::Segment* segment = m_score->firstMeasure()->first(engraving::SegmentType::ChordRest);
+        engraving::ChordRest* chordRest = engraving::toChordRest(segment->element(0));
+        setEditedText(engraving::Factory::createLyrics(chordRest), text);
+    }
+
+    //! Staff text on the first note of the test score, being edited
+    void editStaffText(const String& text)
+    {
+        engraving::Segment* segment = m_score->firstMeasure()->first(engraving::SegmentType::ChordRest);
+        setEditedText(engraving::Factory::createStaffText(segment), text);
+    }
+
+    void setEditedText(engraving::TextBase* text, const String& content)
+    {
+        m_text = text;
+        m_text->setPlainText(content);
+        m_score->renderer()->layoutText1(m_text);
+        m_text->cursor()->moveCursorToEnd();
+
+        ON_CALL(*m_interaction, editedText()).WillByDefault(Return(m_text));
+    }
+
+    //! The software keyboard sends text
+    void commit(const QString& text)
+    {
+        QInputMethodEvent event;
+        event.setCommitString(text);
+        m_controller->inputMethodEvent(&event);
+    }
+
+    std::shared_ptr<muse::actions::ActionsDispatcherMock> m_dispatcher;
+    engraving::MasterScore* m_score = nullptr;
+    engraving::TextBase* m_text = nullptr;
+};
+
+/**
+ * @brief Space_From_Software_Keyboard_In_Lyrics_Goes_To_Next_Word
+ * @details Software keyboards send a space as text; in lyrics, it moves on as the Space key does
+ */
+TEST_F(NotationViewInputControllerTextInputTests, Space_From_Software_Keyboard_In_Lyrics_Goes_To_Next_Word)
+{
+    //! [GIVEN] A syllable is edited
+    editLyrics(u"hel");
+
+    //! [THEN] The space is not put into the syllable: the next syllable is edited
+    EXPECT_CALL(*m_interaction, editText(_)).Times(0);
+    EXPECT_CALL(*m_dispatcher, dispatch(ActionCode("next-word"))).Times(1);
+
+    //! [WHEN] The keyboard sends a space
+    commit(" ");
+}
+
+/**
+ * @brief Space_Shown_Before_It_Is_Sent_Is_Removed_From_The_Syllable
+ * @details Qt for Android shows a typed character as composed text first, then sends it: the composed space must
+ * not stay in the syllable
+ */
+TEST_F(NotationViewInputControllerTextInputTests, Space_Shown_Before_It_Is_Sent_Is_Removed_From_The_Syllable)
+{
+    //! [GIVEN] A syllable is edited, and the keyboard shows a space being composed
+    editLyrics(u"hel");
+
+    QInputMethodEvent composing(QString(" "), {});
+    m_controller->inputMethodEvent(&composing);
+
+    //! [THEN] The composed space is removed (an empty composition), then the next syllable is edited
+    {
+        InSequence seq;
+        EXPECT_CALL(*m_interaction, editText(_)).WillOnce([](QInputMethodEvent* event) {
+            EXPECT_TRUE(event->commitString().isEmpty());
+            EXPECT_TRUE(event->preeditString().isEmpty());
+        });
+        EXPECT_CALL(*m_dispatcher, dispatch(ActionCode("next-word"))).Times(1);
+    }
+
+    //! [WHEN] The keyboard sends the space
+    commit(" ");
+}
+
+/**
+ * @brief Hyphen_After_Text_In_Lyrics_Ends_The_Syllable
+ * @details When a keyboard sends a hyphen together with the rest of the syllable, the text is put in first
+ */
+TEST_F(NotationViewInputControllerTextInputTests, Hyphen_After_Text_In_Lyrics_Ends_The_Syllable)
+{
+    //! [GIVEN] A syllable is edited
+    editLyrics(u"hel");
+
+    //! [THEN] "lo" is put into the syllable, then the next syllable is edited (with a hyphen between them)
+    {
+        InSequence seq;
+        EXPECT_CALL(*m_interaction, editText(_)).WillOnce([](QInputMethodEvent* event) {
+            EXPECT_EQ(event->commitString(), QString("lo"));
+        });
+        EXPECT_CALL(*m_dispatcher, dispatch(ActionCode("next-syllable"))).Times(1);
+    }
+
+    //! [WHEN] The keyboard sends "lo-"
+    commit("lo-");
+}
+
+/**
+ * @brief Space_In_Staff_Text_Is_Text
+ * @details Other text keeps the spaces typed on a software keyboard
+ */
+TEST_F(NotationViewInputControllerTextInputTests, Space_In_Staff_Text_Is_Text)
+{
+    //! [GIVEN] Staff text is edited
+    editStaffText(u"dolce");
+
+    //! [THEN] The space is put into the text, and nothing else happens
+    EXPECT_CALL(*m_interaction, editText(_)).WillOnce([](QInputMethodEvent* event) {
+        EXPECT_EQ(event->commitString(), QString(" "));
+    });
+    EXPECT_CALL(*m_dispatcher, dispatch(::testing::An<const ActionCode&>())).Times(0);
+
+    //! [WHEN] The keyboard sends a space
+    commit(" ");
+}
+
+/**
+ * @brief Input_Method_Sees_The_Text_Around_The_Cursor
+ * @details Software keyboards need the text before the cursor for suggestions, corrections and deleting
+ */
+TEST_F(NotationViewInputControllerTextInputTests, Input_Method_Sees_The_Text_Around_The_Cursor)
+{
+    //! [GIVEN] Staff text is edited, with the cursor after "dol"
+    editStaffText(u"dolce");
+    m_text->cursor()->setColumn(3);
+    m_text->cursor()->setSelectColumn(3);
+
+    //! [THEN] The input method gets the text of the line and the cursor position in it
+    EXPECT_TRUE(m_controller->canHandleInputMethodQuery(Qt::ImSurroundingText));
+    EXPECT_EQ(m_controller->inputMethodQuery(Qt::ImSurroundingText).toString(), QString("dolce"));
+    EXPECT_EQ(m_controller->inputMethodQuery(Qt::ImCursorPosition).toInt(), 3);
+    EXPECT_EQ(m_controller->inputMethodQuery(Qt::ImAnchorPosition).toInt(), 3);
+}
+
+/**
+ * @brief Input_Method_Does_Not_See_The_Text_It_Composes
+ * @details The text being composed (preedit) is shown in the text, but input methods see it as separate from it
+ */
+TEST_F(NotationViewInputControllerTextInputTests, Input_Method_Does_Not_See_The_Text_It_Composes)
+{
+    //! [GIVEN] Staff text is edited, and shows "wal" being composed at its end
+    editStaffText(u"dolce wal");
+
+    QInputMethodEvent event(QString("wal"), {});
+    m_controller->inputMethodEvent(&event);
+
+    //! [THEN] The input method sees the text and the cursor without "wal"
+    EXPECT_EQ(m_controller->inputMethodQuery(Qt::ImSurroundingText).toString(), QString("dolce "));
+    EXPECT_EQ(m_controller->inputMethodQuery(Qt::ImCursorPosition).toInt(), 6);
+    EXPECT_EQ(m_controller->inputMethodQuery(Qt::ImAnchorPosition).toInt(), 6);
+
+    //! [WHEN] The composition is committed
+    commit("wal");
+
+    //! [THEN] All of the text is text
+    EXPECT_EQ(m_controller->inputMethodQuery(Qt::ImSurroundingText).toString(), QString("dolce wal"));
+    EXPECT_EQ(m_controller->inputMethodQuery(Qt::ImCursorPosition).toInt(), 9);
+}
+
+/**
+ * @brief Musical_Text_Gets_No_Corrections
+ * @details Keyboards should not correct or capitalize syllables, chord symbols and the like; other text is language
+ */
+TEST_F(NotationViewInputControllerTextInputTests, Musical_Text_Gets_No_Corrections)
+{
+    editLyrics(u"hel");
+    EXPECT_EQ(m_controller->inputMethodQuery(Qt::ImHints).toInt(), int(Qt::ImhNoPredictiveText | Qt::ImhNoAutoUppercase));
+
+    delete m_text;
+    m_text = nullptr;
+    editStaffText(u"dolce");
+    EXPECT_EQ(m_controller->inputMethodQuery(Qt::ImHints).toInt(), int(Qt::ImhNone));
+}
+
+/**
+ * @brief Line_Positions_Count_Surrogate_Pairs
+ * @details Text columns count a character outside the BMP as one; input methods count UTF-16 units
+ */
+TEST_F(NotationViewInputControllerTextInputTests, Line_Positions_Count_Surrogate_Pairs)
+{
+    const QString line = QString("a") + QString::fromUcs4(U"\U0001F3B5") + QString("b");
+    EXPECT_EQ(NotationViewInputController::lineColumnToTextPosition(line, 0), 0);
+    EXPECT_EQ(NotationViewInputController::lineColumnToTextPosition(line, 1), 1);
+    EXPECT_EQ(NotationViewInputController::lineColumnToTextPosition(line, 2), 3);
+    EXPECT_EQ(NotationViewInputController::lineColumnToTextPosition(line, 3), 4);
 }

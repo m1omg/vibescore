@@ -1517,9 +1517,67 @@ void NotationViewInputController::keyReleaseEvent(QKeyEvent* event)
 
 void NotationViewInputController::inputMethodEvent(QInputMethodEvent* event)
 {
-    if (viewInteraction()->isTextEditingStarted()) {
-        viewInteraction()->editText(event);
+    if (!viewInteraction()->isTextEditingStarted()) {
+        return;
     }
+
+    // Software keyboards send a space or a hyphen as text, not as a key: in musical text they move on,
+    // like the keys do (next syllable, next chord symbol...)
+    const QString commit = event->commitString();
+    const ActionCode navigation = commit.isEmpty() ? ActionCode() : textNavigationForInput(commit.back());
+    if (!navigation.empty() && event->preeditString().isEmpty()) {
+        // The text before the character, which also ends what was being composed (e.g. a space shown before it is sent)
+        QInputMethodEvent textBefore(QString(), event->attributes());
+        textBefore.setCommitString(commit.chopped(1), event->replacementStart(), event->replacementLength());
+        if (!textBefore.commitString().isEmpty() || textBefore.replacementLength() > 0 || hasImePreedit()) {
+            viewInteraction()->editText(&textBefore);
+        }
+
+        event->accept();
+        m_imePreeditLength = 0;
+        dispatcher()->dispatch(navigation);
+        return;
+    }
+
+    viewInteraction()->editText(event);
+
+    // NotationInteraction::editText shows the text being composed in the text; a commit ends the composition
+    m_imePreeditText = viewInteraction()->editedText();
+    m_imePreeditLength = event->commitString().isEmpty() ? event->preeditString().size() : 0;
+}
+
+bool NotationViewInputController::hasImePreedit() const
+{
+    return m_imePreeditText == viewInteraction()->editedText() && m_imePreeditLength > 0;
+}
+
+int NotationViewInputController::imePreeditLength(int cursorPosition) const
+{
+    if (m_imePreeditText != viewInteraction()->editedText()) {
+        return 0;
+    }
+
+    return std::min(m_imePreeditLength, cursorPosition);
+}
+
+ActionCode NotationViewInputController::textNavigationForInput(QChar character) const
+{
+    const TextBase* text = viewInteraction()->editedText();
+    if (!text) {
+        return ActionCode();
+    }
+
+    if (text->isLyrics()) {
+        switch (character.unicode()) {
+        case ' ': return "next-word";
+        case '-': return "next-syllable";
+        case '_': return "add-melisma";
+        default: return ActionCode();
+        }
+    }
+
+    const bool movesOnWithSpace = text->isHarmony() || text->isFingering() || text->isFiguredBass() || text->isSticking();
+    return movesOnWithSpace && character == u' ' ? ActionCode("next-word") : ActionCode();
 }
 
 bool NotationViewInputController::canHandleInputMethodQuery(Qt::InputMethodQuery query) const
@@ -1531,10 +1589,35 @@ bool NotationViewInputController::canHandleInputMethodQuery(Qt::InputMethodQuery
     static const QList<Qt::InputMethodQuery> allowedQueries {
         Qt::ImCursorRectangle,
         Qt::ImEnabled,
-        Qt::ImHints
+        Qt::ImHints,
+        // The text around the cursor: software keyboards (Android, iOS) use it for corrections, suggestions and deleting
+        Qt::ImSurroundingText,
+        Qt::ImCursorPosition,
+        Qt::ImAnchorPosition,
+        Qt::ImCurrentSelection
     };
 
     return allowedQueries.contains(query);
+}
+
+//! The text of the line with the cursor, as input methods see it (plain UTF-16 text, positions in it)
+static QString plainLineText(const TextBlock& line)
+{
+    QString result;
+    for (const TextFragment& fragment : line.fragments()) {
+        result += fragment.text.toQString();
+    }
+    return result;
+}
+
+//! Text columns count a surrogate pair (e.g. an emoji) as one character
+int NotationViewInputController::lineColumnToTextPosition(const QString& lineText, size_t column)
+{
+    int position = 0;
+    for (size_t col = 0; col < column && position < lineText.size(); ++col) {
+        position += lineText.at(position).isHighSurrogate() ? 2 : 1;
+    }
+    return std::min(position, static_cast<int>(lineText.size()));
 }
 
 //! NOTE: Copied from ScoreView::inputMethodQuery
@@ -1557,8 +1640,47 @@ QVariant NotationViewInputController::inputMethodQuery(Qt::InputMethodQuery quer
     }
     case Qt::ImEnabled:
         return true; // TextBase will always accept input method input
-    case Qt::ImHints:
-        return Qt::ImhNone; // No hints for now, but maybe in future will give hints
+    case Qt::ImHints: {
+        // Musical text (syllables, chord symbols, fingerings...) is no word of a language: no corrections or capitals
+        const TextBase* editedText = viewInteraction()->editedText();
+        switch (editedText->type()) {
+        case ElementType::LYRICS:
+        case ElementType::HARMONY:
+        case ElementType::FINGERING:
+        case ElementType::FIGURED_BASS:
+        case ElementType::STICKING:
+            return static_cast<int>(Qt::ImhNoPredictiveText | Qt::ImhNoAutoUppercase);
+        default:
+            return static_cast<int>(Qt::ImhNone);
+        }
+    }
+    case Qt::ImSurroundingText: {
+        // Without the text being composed: input methods see it as separate from the text (it is shown in the text here)
+        const TextCursor* cursor = viewInteraction()->editedText()->cursor();
+        QString lineText = plainLineText(cursor->curLine());
+        const int cursorPosition = lineColumnToTextPosition(lineText, cursor->column());
+        const int preeditLength = imePreeditLength(cursorPosition);
+        return lineText.remove(cursorPosition - preeditLength, preeditLength);
+    }
+    case Qt::ImCursorPosition: {
+        const TextCursor* cursor = viewInteraction()->editedText()->cursor();
+        const int cursorPosition = lineColumnToTextPosition(plainLineText(cursor->curLine()), cursor->column());
+        return cursorPosition - imePreeditLength(cursorPosition);
+    }
+    case Qt::ImAnchorPosition: {
+        const TextCursor* cursor = viewInteraction()->editedText()->cursor();
+        const QString lineText = plainLineText(cursor->curLine());
+        const int cursorPosition = lineColumnToTextPosition(lineText, cursor->column());
+        if (cursor->selectLine() != cursor->row() || cursor->selectColumn() == cursor->column()) {
+            // A selection over several lines is not seen by the input method
+            return cursorPosition - imePreeditLength(cursorPosition);
+        }
+        return lineColumnToTextPosition(lineText, cursor->selectColumn());
+    }
+    case Qt::ImCurrentSelection: {
+        const TextCursor* cursor = viewInteraction()->editedText()->cursor();
+        return cursor->selectLine() == cursor->row() ? cursor->selectedText().toQString() : QString();
+    }
     default:
         break;
     }

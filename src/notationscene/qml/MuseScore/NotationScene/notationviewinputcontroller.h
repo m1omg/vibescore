@@ -137,6 +137,9 @@ public:
     bool canHandleInputMethodQuery(Qt::InputMethodQuery query) const;
     QVariant inputMethodQuery(Qt::InputMethodQuery query) const;
 
+    //! The position in the plain text of a line (as input methods see it) of a column of that line
+    static int lineColumnToTextPosition(const QString& lineText, size_t column);
+
     bool ignoreNextMouseContextMenuEvent() const { return m_ignoreNextMouseContextMenuEvent; }
 
     void dragEnterEvent(QDragEnterEvent* event);
@@ -155,6 +158,12 @@ public:
     muse::PointF selectionElementPos() const;
 
 private:
+    //! The action that a typed character runs instead of being inserted (e.g. a space in lyrics: next syllable)
+    muse::actions::ActionCode textNavigationForInput(QChar character) const;
+    //! The length of the text being composed by the input method, which is shown before the cursor
+    int imePreeditLength(int cursorPosition) const;
+    bool hasImePreedit() const;
+
     INotationPtr currentNotation() const;
     INotationStylePtr notationStyle() const;
     INotationInteractionPtr viewInteraction() const;
@@ -257,6 +266,9 @@ private:
     bool m_shouldSelectOnLeftClickRelease = false;
     bool m_shouldStartEditOnLeftClickRelease = false;
     bool m_ignoreNextMouseContextMenuEvent = false;
+
+    const TextBase* m_imePreeditText = nullptr;
+    int m_imePreeditLength = 0;
     bool m_touchInput = false;
 };
 }

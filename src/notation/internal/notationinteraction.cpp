@@ -4382,6 +4382,24 @@ void NotationInteraction::startEditText(EngravingItem* element, const PointF& cu
 }
 
 //! NOTE: Copied from TextBase::inputTransition
+//! The column of a line of text at a position of its plain text (as input methods see it):
+//! columns count a surrogate pair (e.g. an emoji) as one character
+static size_t textPositionToLineColumn(const mu::engraving::TextBlock& line, int position)
+{
+    QString lineText;
+    for (const mu::engraving::TextFragment& fragment : line.fragments()) {
+        lineText += fragment.text.toQString();
+    }
+
+    size_t column = 0;
+    for (int i = 0; i < position && i < lineText.size(); ++i) {
+        if (!lineText.at(i).isHighSurrogate()) {
+            ++column;
+        }
+    }
+    return column;
+}
+
 void NotationInteraction::editText(QInputMethodEvent* event)
 {
     if (!isTextEditingStarted()) {
@@ -4401,6 +4419,43 @@ void NotationInteraction::editText(QInputMethodEvent* event)
             text->triggerLayout();
             text->setTextInvalid();
         }
+    }
+
+    // Software keyboards replace text before the cursor (corrections, a backspace)
+    if (event->replacementLength() > 0) {
+        const int moveBy = event->replacementStart();
+        cursor->movePosition(moveBy < 0 ? mu::engraving::TextCursor::MoveOperation::Left
+                             : mu::engraving::TextCursor::MoveOperation::Right,
+                             mu::engraving::TextCursor::MoveMode::MoveAnchor, std::abs(moveBy));
+        cursor->movePosition(mu::engraving::TextCursor::MoveOperation::Right,
+                             mu::engraving::TextCursor::MoveMode::KeepAnchor, event->replacementLength());
+
+        score()->startCmd(TranslatableString("undoableAction", "Edit text"));
+        text->deleteSelectedText(m_editData);
+        score()->endCmd();
+    }
+
+    // ... and move the cursor, or select (positions in the plain text of the current line)
+    for (const QInputMethodEvent::Attribute& attribute : event->attributes()) {
+        if (attribute.type != QInputMethodEvent::Selection) {
+            continue;
+        }
+
+        const mu::engraving::TextBlock& line = cursor->curLine();
+        cursor->setSelectLine(cursor->row());
+        cursor->setSelectColumn(textPositionToLineColumn(line, attribute.start));
+        cursor->setColumn(textPositionToLineColumn(line, attribute.start + attribute.length));
+        cursor->updateCursorFormat();
+        text->setTextInvalid();
+        score()->update();
+    }
+
+    // Text from the input method replaces the selected text, as typing does (e.g. a suggestion replaces the word
+    // that Qt for Android selects)
+    if ((!event->commitString().isEmpty() || !event->preeditString().isEmpty()) && cursor->hasSelection()) {
+        score()->startCmd(TranslatableString("undoableAction", "Edit text"));
+        text->deleteSelectedText(m_editData);
+        score()->endCmd();
     }
 
     if (!event->commitString().isEmpty()) {
