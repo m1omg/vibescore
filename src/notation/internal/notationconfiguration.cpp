@@ -21,6 +21,11 @@
  */
 #include "notationconfiguration.h"
 
+#if defined(Q_OS_ANDROID) || defined(Q_OS_IOS)
+#include <QGuiApplication>
+#include <QScreen>
+#endif
+
 #include "engraving/dom/mscore.h"
 
 #include "io/path.h"
@@ -195,7 +200,14 @@ void NotationConfiguration::init()
         m_foregroundChanged.notify();
     });
 
+#if defined(Q_OS_ANDROID) || defined(Q_OS_IOS)
+    // On a phone a whole page width fits the screen; tablets use 100% as on desktop
+    const QScreen* screen = QGuiApplication::primaryScreen();
+    const bool isPhone = screen && std::min(screen->size().width(), screen->size().height()) < 600;
+    settings()->setDefaultValue(DEFAULT_ZOOM_TYPE, Val(isPhone ? ZoomType::PageWidth : ZoomType::Percentage));
+#else
     settings()->setDefaultValue(DEFAULT_ZOOM_TYPE, Val(ZoomType::Percentage));
+#endif
     settings()->valueChanged(DEFAULT_ZOOM_TYPE).onReceive(this, [this](const Val&) {
         m_defaultZoomChanged.notify();
     });
