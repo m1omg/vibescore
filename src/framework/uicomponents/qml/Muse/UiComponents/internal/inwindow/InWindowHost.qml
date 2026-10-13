@@ -49,6 +49,11 @@ T.Popup {
             item.parent = flickable.contentItem
             item.x = 0
             item.y = 0
+
+            // Like the window this host replaces, which resizes its content to the content's implicit size
+            // (the content's own size bindings may depend on that size, e.g. StyledDialogView)
+            item.width = Qt.binding(function() { return item.implicitWidth })
+            item.height = Qt.binding(function() { return item.implicitHeight })
         }
     }
 
