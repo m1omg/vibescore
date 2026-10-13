@@ -36,7 +36,12 @@
 
 #include "log.h"
 
-#ifndef MUSE_MODULE_DIAGNOSTICS_CRASHPAD_CLIENT
+// On Android and iOS the system crash reporters (tombstones, crash logs) are more useful than this handler
+#if !defined(MUSE_MODULE_DIAGNOSTICS_CRASHPAD_CLIENT) && !defined(Q_OS_ANDROID) && !defined(Q_OS_IOS)
+#define MUE_INSTALL_CRASH_SIGNAL_HANDLER
+#endif
+
+#ifdef MUE_INSTALL_CRASH_SIGNAL_HANDLER
 static void crashCallback(int signum)
 {
     const char* signame = "UNKNOWN SIGNAME";
@@ -68,7 +73,7 @@ static void app_init_qrc()
 
 int main(int argc, char** argv)
 {
-#ifndef MUSE_MODULE_DIAGNOSTICS_CRASHPAD_CLIENT
+#ifdef MUE_INSTALL_CRASH_SIGNAL_HANDLER
     signal(SIGSEGV, crashCallback);
     signal(SIGILL, crashCallback);
     signal(SIGFPE, crashCallback);
@@ -92,7 +97,7 @@ int main(int argc, char** argv)
         qputenv("QT_QUICK_FLICKABLE_WHEEL_DECELERATION", "5000");
     }
 
-#ifdef Q_OS_LINUX
+#if defined(Q_OS_LINUX) && !defined(Q_OS_ANDROID)
     if (qEnvironmentVariable("MU_QT_QPA_PLATFORM") != "offscreen") {
         qputenv("QT_QPA_PLATFORMTHEME", "gtk3");
     }
@@ -113,6 +118,12 @@ int main(int argc, char** argv)
 
     QGuiApplication::styleHints()->setMousePressAndHoldInterval(250);
 
+#ifdef MUE_CONFIGURATION_IS_APPMOBILE
+    // VibeScore keeps its settings and data separate from MuseScore Studio
+    QCoreApplication::setApplicationName(VS_BRAND_NAME_MACHINE);
+    QCoreApplication::setOrganizationName(VS_BRAND_ORGANIZATION);
+    QCoreApplication::setOrganizationDomain(VS_BRAND_DOMAIN);
+#else
 // Can't use MUSE_APP_TITLE until next major release, because this "application name" is used to determine
 // where user settings are stored. Changing it would result in all user settings being lost.
 #ifdef MUSE_APP_UNSTABLE
@@ -122,9 +133,10 @@ int main(int argc, char** argv)
 #endif
     QCoreApplication::setOrganizationName("MuseScore");
     QCoreApplication::setOrganizationDomain("musescore.org");
+#endif
     QCoreApplication::setApplicationVersion(MUSE_APP_VERSION);
 
-#if !defined(Q_OS_WIN) && !defined(Q_OS_DARWIN) && !defined(Q_OS_WASM)
+#if !defined(Q_OS_WIN) && !defined(Q_OS_DARWIN) && !defined(Q_OS_WASM) && !defined(Q_OS_ANDROID)
     // Any OS that uses Freedesktop.org Desktop Entry Specification (e.g. Linux, BSD)
 #ifndef MUSE_APP_INSTALL_SUFFIX
 #define MUSE_APP_INSTALL_SUFFIX ""

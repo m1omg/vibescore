@@ -623,7 +623,7 @@ void NotationViewInputController::wheelEvent(QWheelEvent* event)
     qreal stepsY = 0.0;
 
 // pixelDelta is unreliable on X11
-#ifdef Q_OS_LINUX
+#if defined(Q_OS_LINUX) && !defined(Q_OS_ANDROID)
     if (std::getenv("WAYLAND_DISPLAY") == NULL) {
         // Ignore pixelsScrolled unless Wayland is used
         pixelsScrolled.setX(0);

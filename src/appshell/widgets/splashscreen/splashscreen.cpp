@@ -31,7 +31,7 @@
 
 using namespace mu::appshell;
 
-#ifdef Q_OS_MAC
+#ifdef Q_OS_MACOS
 // Necessary to remove undesired background, so that we really get our rounded corners
 static constexpr Qt::WindowFlags splashScreenWindowFlags = (Qt::SplashScreen | Qt::FramelessWindowHint) & ~Qt::Sheet | Qt::Window;
 #else

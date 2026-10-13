@@ -32,7 +32,7 @@
 #include <QGridLayout>
 #include <QDesktopServices>
 
-#ifdef Q_OS_MAC
+#ifdef Q_OS_MACOS
 #include "platform/macos/macosinteractivehelper.h"
 #elif defined(Q_OS_WIN)
 #include <QDir>

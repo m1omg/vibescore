@@ -170,7 +170,7 @@ int AccessibleItem::accessibleCursorPosition() const
 
 QString AccessibleItem::accessibleText(int start, int end) const
 {
-#if defined(Q_OS_LINUX)
+#if defined(Q_OS_LINUX) && !defined(Q_OS_ANDROID)
     return text().mid(start, end - start + 1);
 #else
     return text().mid(start, end - start);

@@ -26,7 +26,7 @@
 #include <QWindow>
 #include <QTimer>
 
-#ifdef Q_OS_LINUX
+#if defined(Q_OS_LINUX) && !defined(Q_OS_ANDROID)
 #include <QKeyEvent>
 #include <private/qcoreapplication_p.h>
 #endif
@@ -500,7 +500,7 @@ void AccessibilityController::cancelPreviousReading()
         return;
     }
 
-#ifdef Q_OS_LINUX
+#if defined(Q_OS_LINUX) && !defined(Q_OS_ANDROID)
     //! HACK: it needs for canceling reading the name of previous control on accessibility
     QKeyEvent* keyEvent = new QKeyEvent(QEvent::KeyPress, Qt::Key_Cancel, Qt::KeyboardModifier::NoModifier, 0, 1, 0);
     QCoreApplicationPrivate::setEventSpontaneous(keyEvent, true);

@@ -124,13 +124,20 @@ private:
 ///   plugin to be platform dependant. \since MuseScore 3.2
 //---------------------------------------------------------
 
-class MsProcess : public QProcess
+#if QT_CONFIG(process)
+using MsProcessBase = QProcess;
+#else
+//! Starting external programs is not possible on this platform (e.g. iOS): the API is kept, but does nothing
+using MsProcessBase = QObject;
+#endif
+
+class MsProcess : public MsProcessBase
 {
     Q_OBJECT
 
 public:
     MsProcess(QObject* parent = 0)
-        : QProcess(parent) {}
+        : MsProcessBase(parent) {}
 
 public slots:
     /// Execute an external command.
@@ -143,8 +150,8 @@ public slots:
     /// \since MuseScore 4.3
     Q_INVOKABLE void startWithArgs(const QString& program, const QStringList& args);
     /// --
-    Q_INVOKABLE bool waitForFinished(int msecs = 30000) { return QProcess::waitForFinished(msecs); }
+    Q_INVOKABLE bool waitForFinished(int msecs = 30000);
     /// --
-    Q_INVOKABLE QByteArray readAllStandardOutput() { return QProcess::readAllStandardOutput(); }
+    Q_INVOKABLE QByteArray readAllStandardOutput();
 };
 }

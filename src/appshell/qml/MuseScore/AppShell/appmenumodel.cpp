@@ -294,7 +294,7 @@ MenuItem* AppMenuModel::makeViewMenu()
     historyItem->setId(VIEW_TOGGLE_UNDO_HISTORY_PANEL_ITEM_ID);
 
     MenuItemList viewItems {
-#ifndef Q_OS_MAC
+#if !defined(Q_OS_MAC) && !defined(Q_OS_ANDROID)
         makeMenuItem("fullscreen"),
 #endif
         makeMenuItem("toggle-palettes"),

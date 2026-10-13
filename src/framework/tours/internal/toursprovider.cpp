@@ -158,7 +158,7 @@ void ToursProvider::onApplicationStateChanged(Qt::ApplicationState state)
 
 bool ToursProvider::canControlTourPopupClosing() const
 {
-#ifdef Q_OS_LINUX
+#if defined(Q_OS_LINUX) && !defined(Q_OS_ANDROID)
     //! NOTE: There is a problem on Linux for popups that when you turn off automatic closing,
     //! if the user switches to another program, the popup will still be shown on top of the other program.
     //! Let's turn on automatic closing of the popup for Linux.

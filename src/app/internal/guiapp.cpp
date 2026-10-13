@@ -212,6 +212,9 @@ void GuiApp::setup()
     //! NOTE Adjust GS Api
     //! We can hide this algorithm in GSApiProvider,
     //! but it is intentionally left here to illustrate what is happening.
+    //! On mobile the platform's graphics API is always used: there is nothing to switch to,
+    //! and the recovery strategy (restarting the app) is not possible there.
+#if !defined(Q_OS_ANDROID) && !defined(Q_OS_IOS)
     {
         GraphicsApiProvider* gApiProvider = new GraphicsApiProvider(BaseApplication::appVersion());
 
@@ -243,6 +246,9 @@ void GuiApp::setup()
             });
         }
     }
+#else
+    LOGI() << "Gui platform: " << QGuiApplication::platformName();
+#endif
 
     QQmlApplicationEngine* engine = muse::modularity::globalIoc()->resolve<muse::ui::IUiEngine>("app")->qmlAppEngine();
 
@@ -359,7 +365,7 @@ muse::modularity::ContextPtr GuiApp::setupNewContext()
 #endif
 
     // Load main window
-#if defined(Q_OS_MAC)
+#if defined(Q_OS_MACOS)
     QString platform = "mac";
 #elif defined(Q_OS_WIN)
     QString platform = "win";

@@ -272,15 +272,45 @@ int FileIO::modifiedTime()
 
 void MsProcess::start(const QString& command)
 {
+#if QT_CONFIG(process)
     QT_WARNING_PUSH;
     QT_WARNING_DISABLE_DEPRECATED;
     DEPRECATED_USE("startWithArgs(program, [arg1, arg2, ...])");
     QProcess::start(command);
     QT_WARNING_POP;
+#else
+    UNUSED(command);
+    LOGW() << "Starting external programs is not supported on this platform";
+#endif
 }
 
 void MsProcess::startWithArgs(const QString& program, const QStringList& args)
 {
+#if QT_CONFIG(process)
     QProcess::start(program, args, ReadWrite);
+#else
+    UNUSED(program);
+    UNUSED(args);
+    LOGW() << "Starting external programs is not supported on this platform";
+#endif
+}
+
+bool MsProcess::waitForFinished(int msecs)
+{
+#if QT_CONFIG(process)
+    return QProcess::waitForFinished(msecs);
+#else
+    UNUSED(msecs);
+    return false;
+#endif
+}
+
+QByteArray MsProcess::readAllStandardOutput()
+{
+#if QT_CONFIG(process)
+    return QProcess::readAllStandardOutput();
+#else
+    return {};
+#endif
 }
 }
