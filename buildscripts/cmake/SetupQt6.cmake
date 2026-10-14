@@ -105,9 +105,11 @@ if (QT_IS_STATIC)
     if (OS_IS_WASM)
         # The import scanner finds every Qt Quick Controls style through QtQuick.Controls (the style is chosen when
         # the app runs). The web app uses the default one (Basic, or Fusion): the others would only add their code,
-        # QML and images to the module that the browser downloads and keeps in memory
+        # QML and images to the module that the browser downloads and keeps in memory.
+        # Likewise Qt5Compat.GraphicalEffects (and the Qt Shader Tools it needs), which the scanner finds in the
+        # desktop version of Muse.GraphicalEffects: mobile platforms and the web use QtQuick.Effects instead
         get_target_property(qml_plugins all_qml_plugins INTERFACE_LINK_LIBRARIES)
-        list(FILTER qml_plugins EXCLUDE REGEX "qtquickcontrols2(material|universal|imagine|fluentwinui3)style")
+        list(FILTER qml_plugins EXCLUDE REGEX "qtquickcontrols2(material|universal|imagine|fluentwinui3)style|qtgraphicaleffects")
         set_target_properties(all_qml_plugins PROPERTIES INTERFACE_LINK_LIBRARIES "${qml_plugins}")
     endif()
     list(APPEND QT_LIBRARIES all_qml_plugins)

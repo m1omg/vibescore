@@ -20,14 +20,29 @@
 
 muse_create_qml_module(muse_graphicaleffects_qml ALIAS muse::graphicaleffects_qml FOR muse_uicomponents)
 
+set(EFFECT_FILES
+    EffectDropShadow.qml
+    EffectRectangularGlow.qml
+    EffectFastBlur.qml
+    EffectColorOverlay.qml
+)
+
+if (MUSE_CONFIGURATION_IS_MOBILE)
+    # Mobile platforms and the web: the effects of QtQuick.Effects, whose shaders are compiled when Qt is built.
+    # Qt5Compat's effects compile theirs when the app runs, which fails on OpenGL ES 3 and WebGL 2
+    # ("Failed to link shader program": the effect is not drawn), and needs Qt Shader Tools in the app.
+    list(TRANSFORM EFFECT_FILES PREPEND "mobile/")
+    foreach(effect_file ${EFFECT_FILES})
+        get_filename_component(effect_name ${effect_file} NAME)
+        set_source_files_properties(${effect_file} PROPERTIES QT_RESOURCE_ALIAS ${effect_name})
+    endforeach()
+endif()
+
 qt_add_qml_module(muse_graphicaleffects_qml
     URI Muse.GraphicalEffects
     VERSION 1.0
     QML_FILES
-        EffectDropShadow.qml
-        EffectRectangularGlow.qml
-        EffectFastBlur.qml
-        EffectColorOverlay.qml
+        ${EFFECT_FILES}
         RoundedCornersEffect.qml
 )
 
