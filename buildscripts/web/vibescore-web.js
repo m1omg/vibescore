@@ -473,3 +473,37 @@ async function vibescoreLoadSoundFont(instance, onStatus) {
         onStatus?.('No sound: the sound font could not be downloaded');
     }
 }
+
+// Qt for WebAssembly can leave the keyboard focus on the page itself, outside the app, when its windows change (seen
+// when the Properties panel was opened): then the app gets no keys, not even after a click into the score. A click
+// or tap into the app gives the focus back to the window that was clicked, and focus that a window of the app lost to
+// no element goes back to it.
+function vibescoreKeepKeyboardFocus(screen) {
+    const isLost = () => document.activeElement === null || document.activeElement === document.body;
+    const focusHelperOf = element => {
+        for (let e = element; e; e = e.parentElement) {
+            if (e.classList?.contains('qt-window')) {
+                return e.querySelector(':scope > .qt-window-focus-helper');
+            }
+        }
+        return null;
+    };
+
+    screen.addEventListener('pointerdown', event => {
+        if (isLost()) {
+            focusHelperOf(event.composedPath()[0])?.focus({ preventScroll: true });
+        }
+    }, true);
+
+    document.addEventListener('focusout', event => {
+        const helper = event.composedPath()[0];
+        if (event.relatedTarget || !helper.classList?.contains('qt-window-focus-helper')) {
+            return; // the focus moved somewhere
+        }
+        setTimeout(() => {
+            if (isLost() && document.hasFocus() && helper.isConnected) {
+                helper.focus({ preventScroll: true });
+            }
+        }, 0);
+    }, true);
+}

@@ -90,6 +90,7 @@
                             loader.started();
                             loading.style.display = 'none';
                             screen.style.display = 'block';
+                            vibescoreKeepKeyboardFocus(screen);
                         },
                         onExit: exitData => {
                             loader.stopped(exitData);
