@@ -107,7 +107,10 @@ if(CC_IS_EMCC)
     if (BUILD_IS_DEBUG)
         set(EMCC_LINKER_FLAGS -O0)
     else()
-        set(EMCC_LINKER_FLAGS -Os)
+        # -O3, not -Os: the code that Asyncify adds is optimized much better, and the web app does 15-35% less work
+        # per edit (pitch change: 141 -> 97 ms of a desktop CPU), for 1.5% more code.
+        # -msimd128: some modules use WebAssembly SIMD (see the audio engine)
+        set(EMCC_LINKER_FLAGS -O3 -msimd128)
     endif()
 
 
