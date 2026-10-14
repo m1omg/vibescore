@@ -138,6 +138,8 @@
 #include "global/realfn.h"
 #include "engraving/iengravingconfiguration.h"
 
+#include "app_config.h"
+
 #include "log.h"
 
 using namespace mu;
@@ -7285,7 +7287,13 @@ void ExportMusicXml::identification(XmlWriter& xml, Score const* const score)
         xml.tag("software", String(u"MuseScore 0.7.0"));
         xml.tag("encoding-date", String(u"2007-09-10"));
     } else {
+#ifdef VS_BRAND_NAME
+        // A fork (VibeScore): still "MuseScore Studio <version>" first, which other programs may look for
+        xml.tag("software", String(u"MuseScore Studio ") + application()->version().toString()
+                + String::fromAscii(" (" VS_BRAND_NAME " " VS_BRAND_VERSION ")"));
+#else
         xml.tag("software", String(u"MuseScore Studio ") + application()->version().toString());
+#endif
         xml.tag("encoding-date", muse::Date::currentDate().toString(muse::DateFormat::ISODate));
     }
 

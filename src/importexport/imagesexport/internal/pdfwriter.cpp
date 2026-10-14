@@ -27,6 +27,8 @@
 
 #include "engraving/dom/masterscore.h"
 
+#include "app_config.h"
+
 #include "log.h"
 
 using namespace mu::iex::imagesexport;
@@ -150,7 +152,13 @@ Ret PdfWriter::writeList(const INotationPtrList& notations, io::IODevice& destin
 void PdfWriter::preparePdfWriter(QPdfWriter& pdfWriter, const QString& title, const QSizeF& size) const
 {
     pdfWriter.setResolution(configuration()->exportPdfDpiResolution());
+#ifdef VS_BRAND_NAME
+    // A fork of MuseScore Studio (VibeScore): its name and version, and the version of MuseScore Studio it is based on
+    pdfWriter.setCreator(QString(VS_BRAND_NAME " " VS_BRAND_VERSION " (MuseScore Studio %1)")
+                         .arg(application()->version().toString().toQString()));
+#else
     pdfWriter.setCreator(QString("MuseScore Studio Version: ") + application()->version().toString().toQString());
+#endif
     pdfWriter.setTitle(title);
     pdfWriter.setPageMargins(QMarginsF());
     pdfWriter.setPageLayout(QPageLayout(QPageSize(size, QPageSize::Inch), QPageLayout::Orientation::Portrait, QMarginsF()));
