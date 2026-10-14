@@ -39,6 +39,7 @@ target_sources(muse_ui PRIVATE
     idragcontroller.h
     iwindowscontroller.h
     itouchmodifiers.h
+    ihapticfeedback.h
 
     graphicsapiprovider.cpp
     graphicsapiprovider.h
@@ -73,6 +74,8 @@ target_sources(muse_ui PRIVATE
     internal/dragcontroller.h
     internal/touchmodifiers.cpp
     internal/touchmodifiers.h
+    internal/hapticfeedback.cpp
+    internal/hapticfeedback.h
     internal/windowscontroller.cpp
     internal/windowscontroller.h
     internal/qmlnetworkaccessmanagerfactory.cpp
@@ -148,6 +151,19 @@ elseif(OS_IS_MOBILE OR OS_IS_WASM)
         internal/platform/mobile/mobileplatformtheme.cpp
         internal/platform/mobile/mobileplatformtheme.h
     )
+
+    if (OS_IS_IOS)
+        target_sources(muse_ui PRIVATE
+            internal/platform/ios/ioshapticfeedback.h
+            internal/platform/ios/ioshapticfeedback.mm
+        )
+        set_source_files_properties(internal/platform/ios/ioshapticfeedback.mm PROPERTIES
+            SKIP_UNITY_BUILD_INCLUSION ON
+            SKIP_PRECOMPILE_HEADERS ON
+        )
+        find_library(UIKit NAMES UIKit)
+        target_link_libraries(muse_ui PRIVATE ${UIKit})
+    endif()
 elseif(OS_IS_LIN)
     target_sources(muse_ui PRIVATE
         internal/platform/linux/linuxplatformtheme.cpp

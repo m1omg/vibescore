@@ -28,6 +28,7 @@
 
 #include "modularity/ioc.h"
 #include "ui/itouchmodifiers.h"
+#include "ui/ihapticfeedback.h"
 
 class QTouchEvent;
 
@@ -50,6 +51,7 @@ class NotationViewTouchController : public QObject
 
 public:
     muse::GlobalInject<muse::ui::ITouchModifiers> touchModifiers;
+    muse::GlobalInject<muse::ui::IHapticFeedback> hapticFeedback;
 
 public:
     static constexpr int LONG_PRESS_INTERVAL_MS = 450;

@@ -267,6 +267,11 @@ void NotationViewTouchController::onLongPressTimeout()
         return;
     }
 
+    // The finger feels that the long press was recognized
+    if (hapticFeedback()) {
+        hapticFeedback()->perform(muse::ui::IHapticFeedback::Type::LongPress);
+    }
+
     if (m_view->isNoteEnterMode()) {
         m_state = State::NotePreview;
 

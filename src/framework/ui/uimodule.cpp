@@ -35,6 +35,7 @@
 #include "internal/navigationuiactions.h"
 #include "internal/dragcontroller.h"
 #include "internal/touchmodifiers.h"
+#include "internal/hapticfeedback.h"
 #include "view/iconcodes.h"
 
 #if defined(Q_OS_ANDROID) || defined(Q_OS_IOS) || defined(Q_OS_WASM)
@@ -106,6 +107,7 @@ void UiModule::registerExports()
     ioc()->registerExport<INavigationController>(moduleName(), m_keyNavigationController);
     ioc()->registerExport<IDragController>(moduleName(), new DragController());
     ioc()->registerExport<ITouchModifiers>(moduleName(), new TouchModifiers());
+    ioc()->registerExport<IHapticFeedback>(moduleName(), new HapticFeedback());
     ioc()->registerExport<IWindowsController>(moduleName(), m_windowsController);
 
 #ifndef MUSE_MULTICONTEXT_WIP
