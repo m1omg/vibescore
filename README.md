@@ -67,7 +67,7 @@ which signs it for your device:
 - Web: in the browser's storage for the site. Download scores you want to keep elsewhere (File → Export, or
   Share in the Library). Clearing the site's data deletes them.
 
-Home → **Library** lists all scores, with rename, duplicate, delete and share. **Open...** imports files from the
+Home → **Library** lists all scores, with rename, duplicate, delete and share. **Open other…** imports files from the
 device (MuseScore, MusicXML, MIDI, Guitar Pro, MEI, ...). Exports (PDF, PNG, SVG, MusicXML, MIDI, audio, ...) open
 the share sheet; on the web they are downloaded.
 
