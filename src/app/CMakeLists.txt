@@ -321,6 +321,11 @@ if (CC_IS_EMCC)
     target_link_options(MuseScoreStudio PRIVATE "-lidbfs.js")
     # A score is a lot of memory
     target_link_options(MuseScoreStudio PRIVATE "SHELL:-s INITIAL_MEMORY=268435456" "SHELL:-s STACK_SIZE=5242880")
+    # The optimizer must not merge big functions into the one function that calls them: it merged all the static
+    # initializers into __wasm_call_ctors (1.9 MB of code). The browser runs that once, and Chromium's optimizing
+    # compiler then compiles it again in the background: >1 GB of memory and ~20 s of a desktop CPU (minutes on a
+    # phone or tablet), which froze the start on tablets
+    target_link_options(MuseScoreStudio PRIVATE "SHELL:-s BINARYEN_EXTRA_PASSES=--one-caller-inline-max-function-size=1000")
 endif()
 
 
