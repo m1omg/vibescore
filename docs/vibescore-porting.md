@@ -90,7 +90,13 @@ inside the main window instead:
 - **QWidget dialogs** (Style, Page settings, Transpose, Staff properties, ...) are shown in
   `MobileWidgetDialogFrame`: the whole window, a title bar with a close button, kinetic scrolling, and the dialog's
   buttons kept in sight.
+- **Touch versions of dialogs**: Transpose, Measures per system and Create tuplet have QML versions with large
+  controls (`TransposeDialog.qml`, `BreaksDialog.qml`, `TupletDialog.qml` with their models in `notationscene`), which
+  mobile and web builds register for the same URIs instead of the QWidget dialogs.
 - **"Open in a new window"** replaces the current score (`MobileWindowsProvider`).
+- **Keyboard focus**: in-window dialogs and menus give nothing the focus back when they close, so the mobile shell
+  gives it to the score when nothing else has it (`MobileShellView::focusScoreIfNothingActive`); the score's shortcuts
+  then work from a hardware keyboard.
 
 ### The mobile shell (`src/mobile/qml/MuseScore/Mobile`)
 
