@@ -485,6 +485,12 @@ void AbstractNotationPaintView::onViewSizeChanged()
 
     ensureViewportInsideScrollableArea();
 
+    // The view may have become smaller because a software keyboard came up: keep the text being edited in sight
+    const INotationInteractionPtr interaction = notation()->interaction();
+    if (interaction && interaction->isTextEditingStarted() && interaction->editedText()) {
+        adjustCanvasPosition(interaction->editedText()->canvasBoundingRect());
+    }
+
     scheduleRedraw();
 
     emit horizontalScrollChanged();
