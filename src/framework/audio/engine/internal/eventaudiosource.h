@@ -28,12 +28,14 @@
 
 #include "audio/common/audiotypes.h"
 #include "../isynthresolver.h"
+#include "../isoundfontrepository.h"
 #include "track.h"
 
 namespace muse::audio::engine {
 class EventAudioSource : public ITrackAudioInput, public muse::Contextable, public async::Asyncable
 {
     ContextInject<synth::ISynthResolver> synthResolver = { this };
+    ContextInject<synth::ISoundFontRepository> soundFontRepository = { this };
 
 public:
     using OnOffStreamEventsReceived = std::function<void (const TrackId)>;
@@ -81,6 +83,8 @@ private:
     };
 
     void setupSource();
+    void waitForSoundFonts(const AudioInputParams& params);
+    void stopWaitingForSoundFonts();
     SynthCtx currentSynthCtx() const;
     void restoreSynthCtx(const SynthCtx& ctx);
 
@@ -88,6 +92,8 @@ private:
     mpe::PlaybackData m_playbackData;
     synth::ISynthesizerPtr m_synth = nullptr;
     AudioInputParams m_params;
+    AudioInputParams m_paramsWaitingForSoundFonts;
+    bool m_isWaitingForSoundFonts = false;
     async::Channel<AudioInputParams> m_paramsChanges;
     OutputSpec m_outputSpec;
 };

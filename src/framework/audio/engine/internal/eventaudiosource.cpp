@@ -67,7 +67,7 @@ void EventAudioSource::setIsActive(const bool active)
 {
     ONLY_AUDIO_ENGINE_THREAD;
 
-    IF_ASSERT_FAILED(m_synth) {
+    if (!m_synth) {
         return;
     }
 
@@ -106,7 +106,7 @@ async::Channel<unsigned int> EventAudioSource::audioChannelsCountChanged() const
 {
     ONLY_AUDIO_ENGINE_THREAD;
 
-    IF_ASSERT_FAILED(m_synth) {
+    if (!m_synth) {
         return {};
     }
 
@@ -128,7 +128,7 @@ void EventAudioSource::seek(const msecs_t newPositionMsecs, const bool flushSoun
 {
     ONLY_AUDIO_ENGINE_THREAD;
 
-    IF_ASSERT_FAILED(m_synth) {
+    if (!m_synth) {
         return;
     }
 
@@ -147,7 +147,7 @@ void EventAudioSource::flush()
 {
     ONLY_AUDIO_ENGINE_THREAD;
 
-    IF_ASSERT_FAILED(m_synth) {
+    if (!m_synth) {
         return;
     }
 
@@ -179,11 +179,16 @@ void EventAudioSource::applyInputParams(const AudioInputParams& requiredParams)
 
     if (!m_synth) {
         m_synth = synthResolver()->resolveDefaultSynth(m_trackId);
-        IF_ASSERT_FAILED(m_synth) {
-            LOGE() << "Default synth not found!";
+        if (!m_synth) {
+            // No sound font yet (they may still be loading, or arrive later, as in the web app): the track is silent
+            // until the sound fonts change
+            LOGW() << "No synthesizer for track " << m_trackId << " yet, waiting for sound fonts";
+            waitForSoundFonts(requiredParams);
             return;
         }
     }
+
+    stopWaitingForSoundFonts();
 
     m_synth->paramsChanged().onReceive(this, [this](const AudioInputParams& params) {
         m_paramsChanges.send(params);
@@ -201,6 +206,33 @@ void EventAudioSource::applyInputParams(const AudioInputParams& requiredParams)
     m_paramsChanges.send(m_params);
 }
 
+void EventAudioSource::waitForSoundFonts(const AudioInputParams& params)
+{
+    m_paramsWaitingForSoundFonts = params;
+
+    if (m_isWaitingForSoundFonts) {
+        return;
+    }
+
+    m_isWaitingForSoundFonts = true;
+
+    // The resolvers update their resources first (they subscribed earlier)
+    soundFontRepository()->soundFontsChanged().onNotify(this, [this]() {
+        applyInputParams(m_paramsWaitingForSoundFonts);
+    });
+}
+
+void EventAudioSource::stopWaitingForSoundFonts()
+{
+    if (!m_isWaitingForSoundFonts) {
+        return;
+    }
+
+    m_isWaitingForSoundFonts = false;
+    m_paramsWaitingForSoundFonts = {};
+    soundFontRepository()->soundFontsChanged().disconnect(this);
+}
+
 async::Channel<AudioInputParams> EventAudioSource::inputParamsChanged() const
 {
     return m_paramsChanges;
@@ -210,7 +242,7 @@ void EventAudioSource::prepareToPlay()
 {
     ONLY_AUDIO_ENGINE_THREAD;
 
-    IF_ASSERT_FAILED(m_synth) {
+    if (!m_synth) {
         return;
     }
 
@@ -221,8 +253,8 @@ bool EventAudioSource::readyToPlay() const
 {
     ONLY_AUDIO_ENGINE_THREAD;
 
-    IF_ASSERT_FAILED(m_synth) {
-        return false;
+    if (!m_synth) {
+        return true; // silent until the sound fonts come; must not hold up playback
     }
 
     return m_synth->readyToPlay();
@@ -232,7 +264,7 @@ async::Notification EventAudioSource::readyToPlayChanged() const
 {
     ONLY_AUDIO_ENGINE_THREAD;
 
-    IF_ASSERT_FAILED(m_synth) {
+    if (!m_synth) {
         return {};
     }
 
@@ -243,7 +275,7 @@ bool EventAudioSource::hasPendingChunks() const
 {
     ONLY_AUDIO_ENGINE_THREAD;
 
-    IF_ASSERT_FAILED(m_synth) {
+    if (!m_synth) {
         return false;
     }
 
@@ -254,7 +286,7 @@ void EventAudioSource::processInput()
 {
     ONLY_AUDIO_ENGINE_THREAD;
 
-    IF_ASSERT_FAILED(m_synth) {
+    if (!m_synth) {
         return;
     }
 
@@ -265,7 +297,7 @@ InputProcessingProgress EventAudioSource::inputProcessingProgress() const
 {
     ONLY_AUDIO_ENGINE_THREAD;
 
-    IF_ASSERT_FAILED(m_synth) {
+    if (!m_synth) {
         return {};
     }
 
@@ -276,7 +308,7 @@ void EventAudioSource::clearCache()
 {
     ONLY_AUDIO_ENGINE_THREAD;
 
-    IF_ASSERT_FAILED(m_synth) {
+    if (!m_synth) {
         return;
     }
 
@@ -302,7 +334,7 @@ void EventAudioSource::setupSource()
 {
     ONLY_AUDIO_ENGINE_THREAD;
 
-    IF_ASSERT_FAILED(m_synth) {
+    if (!m_synth) {
         return;
     }
 
