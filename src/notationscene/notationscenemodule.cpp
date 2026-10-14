@@ -79,7 +79,11 @@ void NotationSceneModule::resolveImports()
         ir->registerWidgetUri<EditStyle>(Uri("musescore://notation/style"));
         ir->registerWidgetUri<PageSettings>(Uri("musescore://notation/pagesettings"));
         ir->registerWidgetUri<MeasurePropertiesDialog>(Uri("musescore://notation/measureproperties"));
+#ifdef MUSE_CONFIGURATION_IS_MOBILE
+        ir->registerQmlUri(Uri("musescore://notation/breaks"), "MuseScore.NotationScene", "BreaksDialog");
+#else
         ir->registerWidgetUri<BreaksDialog>(Uri("musescore://notation/breaks"));
+#endif
         ir->registerWidgetUri<EditStaff>(Uri("musescore://notation/staffproperties"));
         ir->registerWidgetUri<EditStringData>(Uri("musescore://notation/editstrings"));
 #ifdef MUSE_CONFIGURATION_IS_MOBILE
