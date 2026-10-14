@@ -64,6 +64,14 @@ AbstractNotationPaintView::AbstractNotationPaintView(QQuickItem* parent)
     // paintBackground() covers everything that is painted: no filling with transparency first
     setFillColor(QColor());
 
+#ifdef Q_OS_WASM
+    // The GPU paints the score (Qt's OpenGL paint engine, on WebGL), instead of Qt's software rasterizer into an
+    // image that is then uploaded: painting the view takes about half the time, and the image no longer takes
+    // memory of the app (which phones and tablets give little). The result looks the same.
+    setRenderTarget(QQuickPaintedItem::FramebufferObject);
+    setAntialiasing(true);
+#endif
+
     connect(this, &QQuickPaintedItem::widthChanged, this, &AbstractNotationPaintView::onViewSizeChanged);
     connect(this, &QQuickPaintedItem::heightChanged, this, &AbstractNotationPaintView::onViewSizeChanged);
 
