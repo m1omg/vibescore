@@ -102,5 +102,13 @@ qt_standard_project_setup(REQUIRES 6.8 SUPPORTS_UP_TO 6.10)
 if (QT_IS_STATIC)
     qt_add_library(all_qml_plugins STATIC)
     qt_import_qml_plugins(all_qml_plugins)
+    if (OS_IS_WASM)
+        # The import scanner finds every Qt Quick Controls style through QtQuick.Controls (the style is chosen when
+        # the app runs). The web app uses the default one (Basic, or Fusion): the others would only add their code,
+        # QML and images to the module that the browser downloads and keeps in memory
+        get_target_property(qml_plugins all_qml_plugins INTERFACE_LINK_LIBRARIES)
+        list(FILTER qml_plugins EXCLUDE REGEX "qtquickcontrols2(material|universal|imagine|fluentwinui3)style")
+        set_target_properties(all_qml_plugins PROPERTIES INTERFACE_LINK_LIBRARIES "${qml_plugins}")
+    endif()
     list(APPEND QT_LIBRARIES all_qml_plugins)
 endif()
