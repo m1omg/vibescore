@@ -189,19 +189,21 @@ exceptions) every `invoke_*` import becomes a suspending import, which fails out
 (e.g. in the static initializers).
 
 Speed: everything runs on the page's one thread: the engraving, painting the score (now on the GPU: the view's
-QQuickPaintedItem uses the FramebufferObject render target with Qt's OpenGL paint engine on WebGL), the QML
-interface (interpreted: no JIT in WebAssembly) and the audio engine (FluidSynth, the reverb; see WebAudioDriver).
-What was done, measured with a 64-measure string quartet in Chromium (a desktop CPU, and slowed down 4x with
-device pixel ratio 2 as a tablet): the link is `-O3` (Asyncify's code is optimized much better than with `-Os`);
-the audio engine uses WebAssembly SIMD (`-msimd128 -msse2`: the reverb's SSE2 code); the audio player and the
-engine wake up the page ~100 times a second instead of ~475; no timing of traced functions; no walk through all
-objects on every mouse press (NavigationController); a selection change paints only the old and new selection;
-the background is painted only around the pages; the note input bar does not make its Add menu again (and leak
-it) on every change. On the slowed-down tablet, from a key press to the new frame: a note entered 192 -> 112 ms,
-a pitch change 200 -> 128 ms, a selection change 128 -> 48 ms. What remains per edit: the layout (no single hot
-spot; Asyncify makes it ~30% slower than without), the audio engine while notes sound (~25% of the CPU, but
-spread over time), QML updates. Bigger steps would be the audio engine in a Web Worker (upstream's split engine,
-`WEBENGINE_FACADE_MODE`) and JSPI (above). Measuring: a CPU profile of the page per group of actions (Chrome
+QQuickPaintedItem uses the FramebufferObject render target with Qt's OpenGL paint engine on WebGL), the QML interface
+(interpreted: no JIT in WebAssembly) and the audio engine (FluidSynth, the reverb; see WebAudioDriver). What was done,
+measured with a 64-measure string quartet in Chromium (a desktop CPU, and slowed down 4x with device pixel ratio 2 as
+a tablet): the link is `-O3` (Asyncify's code is optimized much better than with `-Os`); the audio engine uses
+WebAssembly SIMD (`-msimd128 -msse2`: the reverb's SSE2 code); the audio player (AudioWorklet) is sent each block with
+the frame of the AudioContext's time at which it plays, and no silence, and sends nothing back (the page follows it
+with `currentTime`): the idle app takes ~30 instead of ~105 ms of CPU a second on the slowed-down tablet; the engine
+renders every 20 ms; no timing of traced functions; no walk through all objects on every mouse press
+(NavigationController); a selection change paints only the old and new selection; the background is painted only
+around the pages; the note input bar does not make its Add menu again (and leak it) on every change. On the
+slowed-down tablet, from a key press to the new frame: a note entered 192 -> 120 ms, a pitch change 200 -> 120 ms, a
+selection change 128 -> 48 ms; on the desktop CPU an edit takes 35-50% less of the CPU. What remains per edit: the
+layout (no single hot spot; Asyncify makes it ~30% slower than without), the audio engine while notes sound (~25% of
+the CPU, but spread over time), QML updates. Bigger steps would be the audio engine in a Web Worker (upstream's split
+engine, `WEBENGINE_FACADE_MODE`) and JSPI (above). Measuring: a CPU profile of the page per group of actions (Chrome
 DevTools Protocol), with the Event Timing API for the latency; the wasm functions' names come from a link with
 `--emit-symbol-map`.
 
