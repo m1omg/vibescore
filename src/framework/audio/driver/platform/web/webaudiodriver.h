@@ -1,11 +1,8 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * VibeScore - MuseScore Studio for mobile devices
  *
- * MuseScore
- * Music Composition & Notation
- *
- * Copyright (C) 2025 MuseScore Limited and others
+ * Copyright (C) 2026 VibeScore contributors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -21,20 +18,28 @@
  */
 #pragma once
 
-#include "../../../iaudiodriver.h"
+#include <vector>
+
+#include <QTimer>
+
+#include "iaudiodriver.h"
 
 namespace muse::audio {
-//! NOTE Used in the main thread to control the driver.
-//! The callback from the Spec is not used and is not called.
-//! WebAudioChannel is used to transfer audio data
+//! Audio output in the browser (single-threaded WebAssembly): the engine renders on the main thread, a little ahead
+//! of time (driven by a timer), and the blocks are sent to an AudioWorklet that plays them.
+//! Browsers start audio after a user gesture; until then the rendered audio is dropped (the engine still runs).
 class WebAudioDriver : public IAudioDriver
 {
 public:
-    WebAudioDriver() = default;
+    WebAudioDriver();
+    ~WebAudioDriver() override;
 
     void init() override;
 
     std::string name() const override;
+
+    AudioDeviceID defaultDevice() const override;
+
     bool open(const Spec& spec, Spec* activeSpec) override;
     void close() override;
     bool isOpened() const override;
@@ -42,28 +47,20 @@ public:
     const Spec& activeSpec() const override;
     async::Channel<Spec> activeSpecChanged() const override;
 
-    bool setOutputDeviceBufferSize(unsigned int bufferSize) override;
-    async::Notification outputDeviceBufferSizeChanged() const override;
-    bool setOutputDeviceSampleRate(unsigned int sampleRate) override;
-    async::Notification outputDeviceSampleRateChanged() const override;
-    std::vector<unsigned int> availableOutputDeviceBufferSizes() const override;
-    std::vector<unsigned int> availableOutputDeviceSampleRates() const override;
-
-    AudioDeviceID outputDevice() const override;
-    bool selectOutputDevice(const AudioDeviceID& id) override;
-    bool resetToDefaultOutputDevice() override;
-    async::Notification outputDeviceChanged() const override;
-
+    std::vector<samples_t> availableOutputDeviceBufferSizes() const override;
+    std::vector<sample_rate_t> availableOutputDeviceSampleRates() const override;
     AudioDeviceList availableOutputDevices() const override;
     async::Notification availableOutputDevicesChanged() const override;
 
-    void resume() override;
-    void suspend() override;
-
 private:
+    void renderAhead();
 
     bool m_opened = false;
     Spec m_activeSpec;
     async::Channel<Spec> m_activeSpecChanged;
+    async::Notification m_availableOutputDevicesChanged;
+
+    QTimer m_timer;
+    std::vector<float> m_block;
 };
 }

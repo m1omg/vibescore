@@ -125,8 +125,6 @@ elseif(OS_IS_WASM)
     target_sources(muse_audio_driver PRIVATE
         platform/web/webaudiodriver.cpp
         platform/web/webaudiodriver.h
-        platform/web/webaudiochannel.cpp
-        platform/web/webaudiochannel.h
     )
 endif()
 
