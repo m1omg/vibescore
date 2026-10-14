@@ -118,7 +118,8 @@ async def main():
 
     async with async_playwright() as p:
         if args.engine == "firefox":
-            browser = await p.firefox.launch()
+            # Without a GPU (CI), Firefox shows WebGL only when asked to (with Mesa's software renderer)
+            browser = await p.firefox.launch(firefox_user_prefs={"webgl.force-enabled": True})
         else:
             # VS_CHROMIUM: another Chromium than Playwright's own, e.g. /usr/bin/google-chrome-stable
             browser = await p.chromium.launch(executable_path=os.environ.get("VS_CHROMIUM"),

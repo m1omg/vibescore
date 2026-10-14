@@ -39,6 +39,8 @@ jobs:
 
       - name: Install Playwright
         run: |
+          # WebGL without a GPU: Mesa's software renderer
+          sudo apt-get update -q && sudo apt-get install -y -q libgl1-mesa-dri libegl1 libgles2
           python3 -m venv "$RUNNER_TEMP/venv"
           "$RUNNER_TEMP/venv/bin/pip" install -q playwright==1.63.0
           "$RUNNER_TEMP/venv/bin/python" -m playwright install --with-deps ${{ matrix.engine }}
