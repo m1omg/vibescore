@@ -3,8 +3,9 @@
 <html lang="en">
 <head>
     <meta charset="utf-8">
-    <!-- 1 CSS pixel = 1 Qt device independent pixel; the app handles zooming (pinch) itself -->
-    <meta name="viewport" content="width=device-width, height=device-height, initial-scale=1, user-scalable=0">
+    <!-- 1 CSS pixel = 1 Qt device independent pixel; the app handles zooming (pinch) itself. The page shrinks above the
+         on-screen keyboard (interactive-widget), so that the app keeps what is being typed (and its dialogs) visible -->
+    <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=0, interactive-widget=resizes-content">
     <meta name="theme-color" content="#4B2BD1">
     <meta name="description" content="VibeScore: write, play and print sheet music in the browser. Based on MuseScore Studio.">
     <title>VibeScore</title>
