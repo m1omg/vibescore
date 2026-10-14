@@ -50,8 +50,9 @@ static QDialogButtonBox* mainButtonBox(QDialog* dialog)
     return result;
 }
 
+// The frame has its own title bar: no window decoration (the web platform of Qt draws one)
 MobileWidgetDialogFrame::MobileWidgetDialogFrame(QDialog* dialog)
-    : QWidget(nullptr, Qt::Window), m_dialog(dialog)
+    : QWidget(nullptr, Qt::Window | Qt::FramelessWindowHint), m_dialog(dialog)
 {
     setAttribute(Qt::WA_DeleteOnClose);
     setWindowTitle(dialog->windowTitle());
