@@ -24,6 +24,8 @@
 #include <QCursor>
 #include <QGuiApplication>
 #include <QInputMethod>
+#include <QMatrix4x4>
+#include <QSGTransformNode>
 #include <QPainter>
 #include <QMimeData>
 
@@ -71,6 +73,17 @@ AbstractNotationPaintView::AbstractNotationPaintView(QQuickItem* parent)
     m_enableAutoScrollTimer.setSingleShot(true);
     connect(&m_enableAutoScrollTimer, &QTimer::timeout, this, [this]() {
         m_autoScrollEnabled = true;
+    });
+
+    // While a touch gesture moves the score, it is painted again this often (in between, the GPU moves the last painting)
+    static constexpr int GESTURE_REPAINT_INTERVAL_MS = 120;
+    m_gestureRepaintTimer.setSingleShot(true);
+    m_gestureRepaintTimer.setInterval(GESTURE_REPAINT_INTERVAL_MS);
+    connect(&m_gestureRepaintTimer, &QTimer::timeout, this, [this]() {
+        if (m_movingByGesture) {
+            m_gestureRepaintRequested = true;
+            update();
+        }
     });
 }
 
@@ -457,7 +470,17 @@ void AbstractNotationPaintView::onMatrixChanged(const Transform& oldMatrix, cons
         m_shadowNoteRect = newMatrix.map(logicRect);
     }
 
-    scheduleRedraw();
+    if (m_movingByGesture) {
+        // Only moved: the GPU shows the last painting moved (see updatePaintNode); painted again now and then
+        const QTransform currentTransform = Transform::toQTransform(newMatrix * guiScalingCompensation());
+        m_gestureTransform = m_paintedTransform.inverted() * currentTransform;
+        QQuickItem::update();
+        if (!m_gestureRepaintTimer.isActive()) {
+            m_gestureRepaintTimer.start();
+        }
+    } else {
+        scheduleRedraw();
+    }
 
     emit horizontalScrollChanged();
     emit verticalScrollChanged();
@@ -465,6 +488,61 @@ void AbstractNotationPaintView::onMatrixChanged(const Transform& oldMatrix, cons
     emit viewportChanged();
 
     onPlaybackCursorRectChanged();
+}
+
+muse::draw::Transform AbstractNotationPaintView::guiScalingCompensation() const
+{
+    const qreal guiScaling = notationConfiguration()->guiScaling();
+    Transform compensation;
+    compensation.scale(guiScaling, guiScaling);
+    return compensation;
+}
+
+void AbstractNotationPaintView::setMovingByGesture(bool moving)
+{
+    if (m_movingByGesture == moving) {
+        return;
+    }
+
+    m_movingByGesture = moving;
+
+    if (!moving) {
+        m_gestureRepaintTimer.stop();
+        scheduleRedraw();
+    }
+}
+
+QSGNode* AbstractNotationPaintView::updatePaintNode(QSGNode* oldNode, UpdatePaintNodeData* data)
+{
+    // The painting is in a transform node, which moves it while a touch gesture moves the score
+    auto* transformNode = static_cast<QSGTransformNode*>(oldNode);
+    QSGNode* painterNode = transformNode ? transformNode->firstChild() : nullptr;
+
+    if (m_movingByGesture && painterNode && !m_gestureRepaintRequested) {
+        // Not painted again (QQuickPaintedItem would paint everything): the last painting, where the score is now
+        transformNode->setMatrix(QMatrix4x4(m_gestureTransform));
+        return transformNode;
+    }
+
+    m_gestureRepaintRequested = false;
+
+    if (painterNode) {
+        transformNode->removeChildNode(painterNode);
+    }
+
+    QSGNode* newPainterNode = QuickPaintedView::updatePaintNode(painterNode, data);
+    if (!newPainterNode) {
+        delete transformNode;
+        return nullptr;
+    }
+
+    if (!transformNode) {
+        transformNode = new QSGTransformNode();
+    }
+
+    transformNode->appendChildNode(newPainterNode);
+    transformNode->setMatrix(QMatrix4x4()); // painted where the score is now
+    return transformNode;
 }
 
 void AbstractNotationPaintView::onViewSizeChanged()
@@ -716,11 +794,9 @@ void AbstractNotationPaintView::paint(QPainter* qp)
         return;
     }
 
-    qreal guiScaling = notationConfiguration()->guiScaling();
-    Transform guiScalingCompensation;
-    guiScalingCompensation.scale(guiScaling, guiScaling);
-
-    painter->setWorldTransform(m_matrix * guiScalingCompensation);
+    const Transform worldTransform = m_matrix * guiScalingCompensation();
+    painter->setWorldTransform(worldTransform);
+    m_paintedTransform = Transform::toQTransform(worldTransform);
 
     bool isPrinting = publishMode() || m_inputController->readonly();
     notation()->painting()->paintView(painter, toLogical(rect), isPrinting);
@@ -1167,6 +1243,13 @@ bool AbstractNotationPaintView::doMoveCanvas(qreal dx, qreal dy)
 
 void AbstractNotationPaintView::scheduleRedraw(const muse::RectF& rect)
 {
+    if (m_movingByGesture) {
+        // The last painting may be moved: paint everything
+        m_gestureRepaintRequested = true;
+        update();
+        return;
+    }
+
     QRect qrect = correctDrawRect(rect).toQRect();
     update(qrect);
 }

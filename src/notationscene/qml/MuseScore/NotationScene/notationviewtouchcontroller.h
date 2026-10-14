@@ -104,6 +104,9 @@ private:
     void onFlingStep();
     void stopFling();
 
+    //! Tells the view whether a gesture is moving the whole score (pan, pinch, fling)
+    void updateMovingByGesture();
+
     Qt::KeyboardModifiers modifiers() const;
     void sendMouse(QEvent::Type type, const QPointF& pos, Qt::MouseButton button, Qt::MouseButtons buttons);
     void sendHover(const QPointF& pos, const QPointF& oldPos);

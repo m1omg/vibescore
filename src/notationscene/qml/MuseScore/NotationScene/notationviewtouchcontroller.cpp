@@ -123,6 +123,8 @@ void NotationViewTouchController::touchBegin(const TouchPoints& points)
         m_state = State::Pending;
         m_longPressTimer.start();
     }
+
+    updateMovingByGesture();
 }
 
 void NotationViewTouchController::touchUpdate(const TouchPoints& points)
@@ -174,6 +176,7 @@ void NotationViewTouchController::touchUpdate(const TouchPoints& points)
                 sendMouse(QEvent::MouseMove, pos, Qt::NoButton, Qt::LeftButton);
             } else {
                 m_state = State::Panning;
+                updateMovingByGesture();
                 pan(pos - m_lastPos);
             }
         }
@@ -225,6 +228,7 @@ void NotationViewTouchController::touchEnd(const QPointF& lastPos)
     }
 
     m_state = State::Idle;
+    updateMovingByGesture(); // still moving while the score is flung
 }
 
 void NotationViewTouchController::cancel()
@@ -238,6 +242,7 @@ void NotationViewTouchController::cancel()
     }
 
     m_state = State::Idle;
+    stopFling();
 }
 
 void NotationViewTouchController::onTap(const QPointF& pos)
@@ -307,6 +312,7 @@ void NotationViewTouchController::pan(const QPointF& delta)
 void NotationViewTouchController::beginPinch(const QPointF& p1, const QPointF& p2)
 {
     m_state = State::Pinching;
+    updateMovingByGesture();
     m_lastPinchDistance = QLineF(p1, p2).length();
     m_lastPinchCenter = (p1 + p2) / 2;
 }
@@ -372,6 +378,13 @@ void NotationViewTouchController::onFlingStep()
 void NotationViewTouchController::stopFling()
 {
     m_flingTimer.stop();
+    updateMovingByGesture();
+}
+
+void NotationViewTouchController::updateMovingByGesture()
+{
+    const bool moving = m_state == State::Panning || m_state == State::Pinching || m_flingTimer.isActive();
+    m_view->setMovingByGesture(moving);
 }
 
 Qt::KeyboardModifiers NotationViewTouchController::modifiers() const

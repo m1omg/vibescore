@@ -86,6 +86,10 @@ public:
     virtual INotationPlaybackPtr notationPlayback() const = 0;
 
     virtual QQuickItem* asItem() = 0;
+
+    //! While touch gestures move the whole score (pan, pinch, fling), the view may show what it painted last moved
+    //! (by the GPU) and paint the score again only now and then
+    virtual void setMovingByGesture(bool /*moving*/) {}
 };
 
 class NotationViewInputController : public muse::actions::Actionable, public muse::Contextable, public muse::async::Asyncable

@@ -110,6 +110,9 @@ handles: a tap is a click (with a larger hit tolerance), a double tap a double c
 momentum) unless it starts on a selected element or a grip, a long press opens the context menu (in note input:
 a preview of the note under the finger), and two fingers zoom and pan. A stylus keeps the precise mouse behavior.
 `ITouchModifiers` holds the Shift and Ctrl toggles that the shell shows over the score.
+While a gesture moves the whole score (pan, pinch, fling), the score is not painted again for every finger movement:
+the GPU shows the last painting moved and scaled (a transform node around the painted item), and the score is painted
+again every 120 ms and when the gesture ends (`AbstractNotationPaintView::setMovingByGesture`).
 
 ### Software keyboards
 

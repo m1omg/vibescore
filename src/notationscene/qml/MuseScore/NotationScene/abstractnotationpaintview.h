@@ -22,6 +22,7 @@
 #pragma once
 
 #include <QTimer>
+#include <QTransform>
 #include <qqmlintegration.h>
 
 #include "modularity/ioc.h"
@@ -120,6 +121,8 @@ public:
     muse::RectF fromLogical(const muse::RectF& rect) const override;
 
     Q_INVOKABLE bool moveCanvas(qreal dx, qreal dy) override;
+
+    void setMovingByGesture(bool moving) override;
     void moveCanvasVertical(qreal dy) override;
     void moveCanvasHorizontal(qreal dx) override;
 
@@ -203,6 +206,7 @@ protected:
 
     // Draw
     void paint(QPainter* painter) override;
+    QSGNode* updatePaintNode(QSGNode* oldNode, UpdatePaintNodeData* data) override;
 
     virtual void onNotationSetup();
 
@@ -226,6 +230,7 @@ private:
     INotationSelectionPtr notationSelection() const;
 
     void clear();
+    muse::draw::Transform guiScalingCompensation() const;
     void initBackground();
     void initNavigatorOrientation();
 
@@ -323,5 +328,12 @@ private:
     muse::RectF m_shadowNoteRect;
 
     QQuickItem* m_playbackCursorItem = nullptr;
+
+    // Touch gestures (see setMovingByGesture)
+    bool m_movingByGesture = false;
+    bool m_gestureRepaintRequested = false;
+    QTimer m_gestureRepaintTimer;
+    QTransform m_paintedTransform; // the world transform the score was painted with last
+    QTransform m_gestureTransform; // from where the score was painted to where it is now
 };
 }
