@@ -104,6 +104,10 @@ void FirstLaunchSetupModel::setCurrentPageIndex(int index)
 
 bool FirstLaunchSetupModel::askAboutClosingEarly()
 {
+#ifndef MUE_BUILD_MUSESOUNDS_MODULE
+    // The question presents the Muse Sounds libraries on MuseHub, which this build does not offer
+    return true;
+#else
     const std::string title = muse::trc("appshell/gettingstarted", "Are you sure you want to cancel?");
     const std::string body = muse::qtrc("appshell/gettingstarted",
                                         "If you choose to cancel, then be sure to check out our free "
@@ -149,6 +153,7 @@ bool FirstLaunchSetupModel::askAboutClosingEarly()
     }
 
     return result.standardButton() == IInteractive::Button::Cancel;
+#endif
 }
 
 void FirstLaunchSetupModel::finish()
