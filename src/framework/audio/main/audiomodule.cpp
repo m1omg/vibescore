@@ -26,13 +26,8 @@
 
 #include "audio/common/audiosanitizer.h"
 #include "audio/common/audiothreadsecurer.h"
-#ifdef Q_OS_WASM
-#include "audio/common/rpc/platform/web/webrpcchannel.h"
-#include "platform/web/websoundfontcontroller.h"
-#else
 #include "audio/common/rpc/platform/general/generalrpcchannel.h"
 #include "platform/general/generalsoundfontcontroller.h"
-#endif
 
 #include "internal/audioconfiguration.h"
 #include "internal/audioactionscontroller.h"
@@ -68,13 +63,9 @@ void AudioModule::registerExports()
     m_mainPlayback = std::make_shared<Playback>(iocContext());
     m_audioDriverController = std::make_shared<AudioDriverController>(iocContext());
 
-#ifdef Q_OS_WASM
-    m_rpcChannel = std::make_shared<rpc::WebRpcChannel>();
-    m_soundFontController = std::make_shared<WebSoundFontController>();
-#else
+    // Also on the web: the engine runs in the app (see WebAudioDriver)
     m_rpcChannel = std::make_shared<rpc::GeneralRpcChannel>();
     m_soundFontController = std::make_shared<GeneralSoundFontController>(iocContext());
-#endif
 
     m_startAudioController = std::make_shared<StartAudioController>(m_rpcChannel, iocContext());
 
@@ -109,11 +100,9 @@ void AudioModule::onInit(const IApplication::RunMode& mode)
 
     // rpc
     m_rpcChannel->setupOnMain();
-#ifndef Q_OS_WASM
     m_rpcTicker.start(1, [this]() {
         m_rpcChannel->process();
     }, Ticker::Mode::Repeat);
-#endif
 
     m_transportEventsController->init(); //! NOTE: init AFTER RPC
 
@@ -121,9 +110,7 @@ void AudioModule::onInit(const IApplication::RunMode& mode)
 
     m_startAudioController->init();
 
-#ifndef Q_OS_WASM
     m_startAudioController->startAudioProcessing(mode);
-#endif
 
     //! --- Diagnostics ---
     auto pr = ioc()->resolve<muse::diagnostics::IDiagnosticsPathsRegister>(moduleName());

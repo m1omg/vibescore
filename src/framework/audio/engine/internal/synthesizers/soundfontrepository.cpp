@@ -25,10 +25,6 @@
 
 #include "fluidsynth/fluidsoundfontparser.h"
 
-#ifdef Q_OS_WASM
-#include "../../platform/web/networksfloader.h"
-#endif
-
 #include "log.h"
 
 using namespace muse;
@@ -146,30 +142,11 @@ void SoundFontRepository::doAddSoundFont(const SoundFontUri& uri, const SoundFon
         SoundFontPath path = uri.toLocalFile();
         parseAndAdd(uri, path);
     } else {
-#ifdef Q_OS_WASM
-        auto promise = NetworkSFLoader::load(uri);
-        promise.onResolve(this, [uri, parseAndAdd](const RetVal<ByteArray>& data) {
-            if (data.ret) {
-                const io::path_t fileName = fileNameFromUri(uri);
-
-                {
-                    FILE* file = fopen(fileName.c_str(), "wb");
-                    size_t wsize = fwrite(data.val.constChar(), sizeof(char), data.val.size(), file);
-                    IF_ASSERT_FAILED(wsize == data.val.size()) {
-                        return;
-                    }
-                    fclose(file);
-                }
-
-                parseAndAdd(uri, fileName);
-            }
-        });
-#else
+        // Sound fonts are files (also on the web: the page puts them in the file system)
         NOT_SUPPORTED;
         if (onFinished) {
             onFinished();
         }
-#endif
     }
 }
 

@@ -261,13 +261,6 @@ async::Promise<RetVal<TrackName> > Playback::trackName(const TrackSequenceId seq
 async::Promise<TrackId, AudioParams> Playback::addTrack(const TrackSequenceId sequenceId, const TrackName& trackName,
                                                         io::IODevice* playbackData, AudioParams&& params)
 {
-#ifdef MUE_CONFIGURATION_IS_APPWEB
-    NOT_SUPPORTED;
-    return async::make_promise<TrackId, AudioParams>([](auto /*resolve*/, auto reject) {
-        Ret ret = muse::make_ret(Ret::Code::NotSupported);
-        return reject(ret.code(), ret.text());
-    });
-#else
     ONLY_AUDIO_MAIN_THREAD;
     return async::make_promise<TrackId, AudioParams>([this, sequenceId, trackName, playbackData, params](auto resolve, auto reject) {
         ONLY_AUDIO_MAIN_THREAD;
@@ -289,8 +282,6 @@ async::Promise<TrackId, AudioParams> Playback::addTrack(const TrackSequenceId se
         });
         return Promise<TrackId, AudioParams>::dummy_result();
     }, PromiseType::AsyncByBody);
-
-#endif // MUE_CONFIGURATION_IS_APPWEB
 }
 
 async::Promise<TrackId, AudioParams> Playback::addTrack(const TrackSequenceId sequenceId, const TrackName& trackName,

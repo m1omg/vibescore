@@ -30,9 +30,9 @@
 namespace muse::audio::engine {
 class TransportEventsDispatcher : public ITransportEventsDispatcher, public Contextable, public async::Asyncable
 {
+public:
     ContextInject<rpc::IRpcChannel> rpcChannel = { this };
 
-public:
     TransportEventsDispatcher(const modularity::ContextPtr& iocCtx);
 
     void init();

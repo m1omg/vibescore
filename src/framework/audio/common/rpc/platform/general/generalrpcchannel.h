@@ -31,6 +31,18 @@ public:
     GeneralRpcChannel() = default;
     ~GeneralRpcChannel() override;
 
+    //! With one thread (the web app), the sides of the channel are not threads: the code in this scope is the
+    //! engine's side (it runs in the audio driver's callback), the code outside it the main side
+    class EngineScope
+    {
+    public:
+        EngineScope();
+        ~EngineScope();
+
+    private:
+        bool m_wasMainSide = false;
+    };
+
     void setupOnMain() override;
     void setupOnEngine() override;
 
@@ -70,5 +82,36 @@ private:
     // port1 - main thread
     // port2 - engine rpc thread;
     RpcQueue<Msg> m_msgQueue;
+};
+
+//! The engine's side of a GeneralRpcChannel when there is one thread (the web app): everything the engine does
+//! through it is done as the engine, also later in asynchronous continuations (e.g. a response sent when a
+//! promise resolves), which run outside the audio driver's callback
+class EngineSideRpcChannel : public IRpcChannel
+{
+public:
+    explicit EngineSideRpcChannel(std::shared_ptr<IRpcChannel> channel)
+        : m_channel(std::move(channel)) {}
+
+    void setupOnMain() override { m_channel->setupOnMain(); }
+    void setupOnEngine() override { GeneralRpcChannel::EngineScope scope; m_channel->setupOnEngine(); }
+    void process() override { GeneralRpcChannel::EngineScope scope; m_channel->process(); }
+
+    void send(const Msg& msg, const Handler& onResponse = nullptr) override
+    {
+        GeneralRpcChannel::EngineScope scope;
+        m_channel->send(msg, onResponse);
+    }
+
+    void onMethod(Method method, Handler h) override { GeneralRpcChannel::EngineScope scope; m_channel->onMethod(method, h); }
+    void listenAll(Handler h) override { GeneralRpcChannel::EngineScope scope; m_channel->listenAll(h); }
+
+    void addStream(std::shared_ptr<IRpcStream> s) override { GeneralRpcChannel::EngineScope scope; m_channel->addStream(s); }
+    void removeStream(StreamId id) override { GeneralRpcChannel::EngineScope scope; m_channel->removeStream(id); }
+    void sendStream(const StreamMsg& msg) override { GeneralRpcChannel::EngineScope scope; m_channel->sendStream(msg); }
+    void onStream(StreamId id, StreamHandler h) override { GeneralRpcChannel::EngineScope scope; m_channel->onStream(id, h); }
+
+private:
+    std::shared_ptr<IRpcChannel> m_channel;
 };
 }

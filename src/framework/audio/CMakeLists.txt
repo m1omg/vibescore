@@ -22,9 +22,9 @@ muse_create_module(muse_audio ALIAS muse::audio)
 
 include(GetPlatformInfo)
 
-if (OS_IS_WASM)
-    set(WEBENGINE_FACADE_MODE ON)
-endif()
+# Upstream's web app split the engine off (WEBENGINE_FACADE_MODE: it ran in a separate WebAssembly module in an
+# AudioWorklet). VibeScore's web app runs the engine itself, on the main thread (see WebAudioDriver).
+set(WEBENGINE_FACADE_MODE OFF)
 
 target_sources(muse_audio PRIVATE
     # Common public

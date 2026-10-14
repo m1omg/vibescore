@@ -98,6 +98,10 @@ void EngineController::registerExports()
     m_soundFontRepository = std::make_shared<SoundFontRepository>();
     m_transportEventsDispatcher = std::make_shared<TransportEventsDispatcher>(iocContext());
 
+    // The engine's side of the channel (with one thread, it is not the one in the IOC: see StartAudioController)
+    m_rpcController->channel.set(m_rpcChannel);
+    m_transportEventsDispatcher->rpcChannel.set(m_rpcChannel);
+
     globalIoc()->registerExport<IAudioEngineConfiguration>(moduleName(), m_configuration);
     globalIoc()->registerExport<IAudioEngine>(moduleName(), m_audioEngine);
     globalIoc()->registerExport<IEnginePlayback>(moduleName(), m_playback);

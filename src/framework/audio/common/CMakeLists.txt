@@ -41,14 +41,7 @@ target_sources(muse_audio_common PRIVATE
     rpc/rpcpacker.h
 )
 
-if(OS_IS_WASM)
-    target_sources(muse_audio_common PRIVATE
-        rpc/platform/web/webrpcchannel.cpp
-        rpc/platform/web/webrpcchannel.h
-    )
-else()
-    target_sources(muse_audio_common PRIVATE
-        rpc/platform/general/generalrpcchannel.cpp
-        rpc/platform/general/generalrpcchannel.h
-    )
-endif()
+target_sources(muse_audio_common PRIVATE
+    rpc/platform/general/generalrpcchannel.cpp
+    rpc/platform/general/generalrpcchannel.h
+)

@@ -22,19 +22,19 @@
 #include "startaudiocontroller.h"
 
 #include "global/realfn.h"
+#include "muse_framework_config.h"
 #include "global/runtime.h"
 #include "global/async/processevents.h"
 
 #include "audio/common/audiosanitizer.h"
 #include "audio/common/rpc/rpcpacker.h"
+#include "audio/common/rpc/platform/general/generalrpcchannel.h"
 #include "audio/common/workmode.h"
 #include "audio/common/alignmentbuffer.h"
 
 #include "audio/engine/platform/general/generalaudioworker.h"
 
-#ifndef Q_OS_WASM
 #include "audio/engine/internal/enginecontroller.h"
-#endif
 
 #include "audio/devtools/inputlag.h"
 
@@ -60,19 +60,20 @@ StartAudioController::StartAudioController(std::shared_ptr<rpc::IRpcChannel> rpc
                                            const muse::modularity::ContextPtr& iocCtx)
     : muse::Contextable(iocCtx), m_rpcChannel(rpcChannel)
 {
-#ifndef Q_OS_WASM
+#ifdef MUSE_THREADS_SUPPORT
     m_engineController = std::make_shared<engine::EngineController>(rpcChannel, iocCtx);
+#else
+    // One thread: the engine's side of the channel is not its thread (see EngineSideRpcChannel)
+    m_engineController = std::make_shared<engine::EngineController>(std::make_shared<rpc::EngineSideRpcChannel>(rpcChannel),
+                                                                    iocCtx);
 #endif
 }
 
 void StartAudioController::registerExports()
 {
-#ifndef Q_OS_WASM
     m_engineController->registerExports();
-#endif
 }
 
-#ifndef Q_OS_WASM
 void StartAudioController::th_setupEngine()
 {
     LOGI() << "begin engine run";
@@ -86,8 +87,6 @@ void StartAudioController::th_setupEngine()
     LOGI() << "audio engine running";
 }
 
-#endif
-
 void StartAudioController::init()
 {
     m_rpcChannel->onMethod(rpc::Method::EngineRunning, [this](const rpc::Msg&) {
@@ -98,7 +97,8 @@ void StartAudioController::init()
 
     workmode::load();
 
-#ifndef Q_OS_WASM
+    // The modes with a worker thread (the web app has no threads: it uses the driver mode)
+#ifdef MUSE_THREADS_SUPPORT
     if (workmode::mode() == workmode::WorkerMode) {
         m_worker = std::make_shared<engine::GeneralAudioWorker>();
         m_worker->run([this]() {
@@ -149,7 +149,7 @@ void StartAudioController::init()
         });
     }
 
-#endif // not Q_OS_WASM
+#endif // MUSE_THREADS_SUPPORT
 }
 
 bool StartAudioController::isAudioStarted() const
@@ -167,8 +167,6 @@ void StartAudioController::startAudioProcessing(const IApplication::RunMode& mod
     IAudioDriver::Spec requiredSpec;
     requiredSpec.deviceId = configuration()->audioOutputDeviceId();
     requiredSpec.output = configuration()->desiredOutputSpec();
-
-#ifndef Q_OS_WASM
 
     m_requiredSamplesTotal = requiredSpec.output.samplesPerChannel * requiredSpec.output.audioChannelCount;
 
@@ -236,6 +234,10 @@ void StartAudioController::startAudioProcessing(const IApplication::RunMode& mod
         if (workmode::mode() == workmode::WorkerRpcMode) {
             m_engineController->process(procDest, (unsigned)procSamplesPerChannel);
         } else if (workmode::mode() == workmode::DriverMode) {
+#ifndef MUSE_THREADS_SUPPORT
+            // One thread: the engine's side of the RPC channel while the engine works
+            rpc::GeneralRpcChannel::EngineScope engineScope;
+#endif
             static bool once = false;
             if (!once) {
                 th_setupEngine();
@@ -257,8 +259,6 @@ void StartAudioController::startAudioProcessing(const IApplication::RunMode& mod
             measureInputLag(procDest, procSamplesTotal);
         }
     };
-
-#endif // Q_OS_WASM
 
     IAudioDriver::Spec activeSpec;
     if (mode == IApplication::RunMode::GuiApp) {

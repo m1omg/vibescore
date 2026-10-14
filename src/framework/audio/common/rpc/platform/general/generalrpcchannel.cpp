@@ -37,6 +37,17 @@ using namespace muse::audio::rpc;
 
 static thread_local bool s_isMainThread = false;
 
+GeneralRpcChannel::EngineScope::EngineScope()
+    : m_wasMainSide(s_isMainThread)
+{
+    s_isMainThread = false;
+}
+
+GeneralRpcChannel::EngineScope::~EngineScope()
+{
+    s_isMainThread = m_wasMainSide;
+}
+
 GeneralRpcChannel::~GeneralRpcChannel()
 {
     m_engineRpcData.streams.clear();

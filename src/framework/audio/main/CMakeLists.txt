@@ -49,16 +49,10 @@ target_sources(muse_audio_main PRIVATE
     internal/audiodrivercontroller.h
 )
 
-if (OS_IS_WASM)
-    target_sources(muse_audio_main PRIVATE
-        platform/web/websoundfontcontroller.cpp
-        platform/web/websoundfontcontroller.h
-    )
-else()
-    target_sources(muse_audio_main PRIVATE
-        platform/general/generalsoundfontcontroller.cpp
-        platform/general/generalsoundfontcontroller.h
-    )
-endif()
+# Also on the web: the sound fonts are files there too (see buildscripts/web/vibescore-web.js)
+target_sources(muse_audio_main PRIVATE
+    platform/general/generalsoundfontcontroller.cpp
+    platform/general/generalsoundfontcontroller.h
+)
 
 target_link_libraries(muse_audio_main PRIVATE muse_audio_common)
