@@ -155,7 +155,8 @@ else()
         )
     endif()
 
-    if (ARCH_IS_X86_64)
+    if (ARCH_IS_X86_64 OR OS_IS_WASM)
+        # The web: WebAssembly SIMD, which Emscripten's SSE2 intrinsics compile to (see below)
         target_sources(muse_audio_engine PRIVATE
             internal/fx/reverb/simdtypes_sse2.h
         )
@@ -171,6 +172,16 @@ else()
 
     add_subdirectory(../thirdparty/fluidsynth fluidsynth)
     target_link_libraries(muse_audio_engine PRIVATE fluidsynth)
+
+    if (OS_IS_WASM)
+        # The web app renders the audio on the page's main thread, together with the score: WebAssembly SIMD makes
+        # the reverb (written for SSE2/NEON, otherwise scalar) and the vectorizable loops of the mixer and the
+        # synthesizer several times faster. All current browsers have it (Safari since 16.4)
+        target_compile_options(muse_audio_engine PRIVATE -msimd128 -msse2)
+        target_compile_options(fluidsynth PRIVATE -msimd128)
+        # The shared precompiled header is built without SIMD, and Clang does not mix the two
+        set_target_properties(muse_audio_engine PROPERTIES DISABLE_PRECOMPILE_HEADERS ON)
+    endif()
 endif() # End of real engine
 
 if (MUSE_MODULE_AUDIO_EXPORT)
