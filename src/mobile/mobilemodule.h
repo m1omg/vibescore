@@ -22,6 +22,7 @@
 
 namespace mu::mobile {
 class BackNavigationController;
+class BluetoothMidiController;
 class IncomingFilesController;
 class MobileLifecycleController;
 
@@ -39,6 +40,7 @@ public:
 private:
     std::shared_ptr<IncomingFilesController> m_incomingFilesController;
     std::shared_ptr<BackNavigationController> m_backNavigationController;
+    std::shared_ptr<BluetoothMidiController> m_bluetoothMidiController;
     std::shared_ptr<MobileLifecycleController> m_lifecycleController;
 };
 }

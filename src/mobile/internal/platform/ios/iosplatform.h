@@ -27,4 +27,8 @@ void shareFiles(const QStringList& paths);
 
 //! Shows the print dialog (UIPrintInteractionController) for a PDF file
 void printPdf(const QString& pdfPath, const QString& jobName);
+
+//! Shows Apple's panel of nearby Bluetooth MIDI devices (CABTMIDICentralViewController); connected devices are
+//! CoreMIDI devices like the others
+void showBluetoothMidiDevices();
 }

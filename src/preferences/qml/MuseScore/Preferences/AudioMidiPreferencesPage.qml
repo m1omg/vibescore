@@ -64,6 +64,8 @@ PreferencesPage {
             isMIDI20OutputSupported: audioMidiModel.isMIDI20OutputSupported
             useMIDI20Output: audioMidiModel.useMIDI20Output
 
+            isBluetoothMidiSupported: audioMidiModel.isBluetoothMidiSupported
+
             navigation.section: root.navigationSection
             navigation.order: root.navigationOrderStart + 2
 
@@ -77,6 +79,10 @@ PreferencesPage {
 
             onUseMIDI20OutputChangeRequested: function(use) {
                 audioMidiModel.useMIDI20Output = use
+            }
+
+            onConnectBluetoothDeviceRequested: {
+                audioMidiModel.connectBluetoothMidiDevice()
             }
         }
 

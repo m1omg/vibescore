@@ -10,6 +10,8 @@ target_sources(mobile PRIVATE
 
     internal/backnavigationcontroller.cpp
     internal/backnavigationcontroller.h
+    internal/bluetoothmidicontroller.cpp
+    internal/bluetoothmidicontroller.h
     internal/incomingfilescontroller.cpp
     internal/incomingfilescontroller.h
     internal/mobileinteractive.cpp
@@ -31,6 +33,8 @@ target_link_libraries(mobile PRIVATE
 
 if (OS_IS_ANDROID)
     target_sources(mobile PRIVATE
+        internal/platform/android/androidbluetoothmidi.cpp
+        internal/platform/android/androidbluetoothmidi.h
         internal/platform/android/androidincomingfiles.cpp
         internal/platform/android/androidincomingfiles.h
         internal/platform/android/androidprint.cpp
@@ -54,7 +58,8 @@ if (OS_IS_IOS)
     )
 
     find_library(UIKit NAMES UIKit)
-    target_link_libraries(mobile PRIVATE ${UIKit})
+    find_library(CoreAudioKit NAMES CoreAudioKit)
+    target_link_libraries(mobile PRIVATE ${UIKit} ${CoreAudioKit})
 endif()
 
 if (OS_IS_WASM)

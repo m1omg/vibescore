@@ -11,6 +11,10 @@
     <!-- %%INSERT_PERMISSIONS -->
     <!-- %%INSERT_FEATURES -->
     <uses-feature android:name="android.software.midi" android:required="false" />
+    <!-- Bluetooth MIDI devices, chosen in the companion device chooser (see VibeScoreBluetoothMidi) -->
+    <uses-feature android:name="android.software.companion_device_setup" android:required="false" />
+    <uses-feature android:name="android.hardware.bluetooth_le" android:required="false" />
+    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
     <uses-feature android:name="android.hardware.touchscreen" android:required="false" />
     <supports-screens
         android:anyDensity="true"

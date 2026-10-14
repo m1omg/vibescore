@@ -35,6 +35,7 @@
 #include "midi/imidiinport.h"
 #include "playback/iplaybackconfiguration.h"
 #include "global/iinteractive.h"
+#include "actions/iactionsdispatcher.h"
 
 namespace mu::preferences {
 class AudioMidiPreferencesModel : public QObject, public muse::Contextable, public muse::async::Asyncable
@@ -51,6 +52,8 @@ class AudioMidiPreferencesModel : public QObject, public muse::Contextable, publ
     Q_PROPERTY(QString midiOutputDeviceId READ midiOutputDeviceId NOTIFY midiOutputDeviceIdChanged)
 
     Q_PROPERTY(bool isMIDI20OutputSupported READ isMIDI20OutputSupported CONSTANT)
+    //! Android, iOS: Bluetooth MIDI devices are connected by the app (see connectBluetoothMidiDevice)
+    Q_PROPERTY(bool isBluetoothMidiSupported READ isBluetoothMidiSupported CONSTANT)
     Q_PROPERTY(bool useMIDI20Output READ useMIDI20Output WRITE setUseMIDI20Output NOTIFY useMIDI20OutputChanged)
 
     Q_PROPERTY(bool muteHiddenInstruments READ muteHiddenInstruments WRITE setMuteHiddenInstruments NOTIFY muteHiddenInstrumentsChanged)
@@ -71,6 +74,7 @@ class AudioMidiPreferencesModel : public QObject, public muse::Contextable, publ
     muse::ContextInject<muse::midi::IMidiOutPort> midiOutPort = { this };
     muse::ContextInject<muse::midi::IMidiInPort> midiInPort = { this };
     muse::ContextInject<muse::IInteractive> interactive = { this };
+    muse::ContextInject<muse::actions::IActionsDispatcher> dispatcher = { this };
 
 public:
     explicit AudioMidiPreferencesModel(QObject* parent = nullptr);
@@ -96,6 +100,9 @@ public:
 
     bool isMIDI20OutputSupported() const;
     bool useMIDI20Output() const;
+
+    bool isBluetoothMidiSupported() const;
+    Q_INVOKABLE void connectBluetoothMidiDevice();
 
     bool muteHiddenInstruments() const;
 

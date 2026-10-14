@@ -19,6 +19,7 @@
 #include "iosplatform.h"
 
 #import <UIKit/UIKit.h>
+#import <CoreAudioKit/CoreAudioKit.h>
 
 #include "log.h"
 
@@ -101,4 +102,26 @@ void mu::mobile::ios::printPdf(const QString& pdfPath, const QString& jobName)
     } else {
         [controller presentAnimated:YES completionHandler:nil];
     }
+}
+
+void mu::mobile::ios::showBluetoothMidiDevices()
+{
+    UIViewController* presenter = topViewController();
+    if (!presenter) {
+        LOGE() << "Can not show the Bluetooth MIDI devices";
+        return;
+    }
+
+    CABTMIDICentralViewController* devices = [[CABTMIDICentralViewController alloc] init];
+    UINavigationController* navigation = [[UINavigationController alloc] initWithRootViewController:devices];
+
+    __weak UINavigationController* weakNavigation = navigation;
+    devices.navigationItem.rightBarButtonItem
+        = [[UIBarButtonItem alloc] initWithBarButtonSystemItem:UIBarButtonSystemItemDone
+                                                 primaryAction:[UIAction actionWithHandler:^(UIAction*) {
+        [weakNavigation dismissViewControllerAnimated:YES completion:nil];
+    }]];
+
+    navigation.modalPresentationStyle = UIModalPresentationFormSheet;
+    [presenter presentViewController:navigation animated:YES completion:nil];
 }

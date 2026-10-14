@@ -20,6 +20,7 @@ package io.github.m1omg.vibescore;
 
 import android.content.ContentResolver;
 import android.content.Intent;
+import android.content.pm.PackageManager;
 import android.database.Cursor;
 import android.net.Uri;
 import android.os.Bundle;
@@ -36,7 +37,8 @@ import org.qtproject.qt.android.bindings.QtActivity;
 
 /**
  * Main activity: Qt's activity plus handling of documents opened from other apps
- * (VIEW intents from file managers, SEND intents from the share sheet).
+ * (VIEW intents from file managers, SEND intents from the share sheet), and the results of
+ * the Bluetooth MIDI device chooser (see VibeScoreBluetoothMidi).
  *
  * Incoming documents are copied into the app's cache, because content:// URIs are only
  * readable while the intent's permission lasts; the native side then imports them.
@@ -64,6 +66,27 @@ public class VibeScoreActivity extends QtActivity
         super.onNewIntent(intent);
         setIntent(intent);
         handleIntent(intent);
+    }
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data)
+    {
+        super.onActivityResult(requestCode, resultCode, data);
+
+        if (requestCode == VibeScoreBluetoothMidi.REQUEST_CHOOSE_DEVICE) {
+            VibeScoreBluetoothMidi.onDeviceChosen(this, resultCode, data);
+        }
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults)
+    {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+
+        if (requestCode == VibeScoreBluetoothMidi.REQUEST_CONNECT_PERMISSION) {
+            boolean granted = grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED;
+            VibeScoreBluetoothMidi.onConnectPermissionResult(this, granted);
+        }
     }
 
     /** Called from native code once it can receive files; returns the files received before that. */

@@ -214,6 +214,20 @@ bool AudioMidiPreferencesModel::isMIDI20OutputSupported() const
     return midiOutPort()->supportsMIDI20Output();
 }
 
+bool AudioMidiPreferencesModel::isBluetoothMidiSupported() const
+{
+#if defined(Q_OS_ANDROID) || defined(Q_OS_IOS)
+    return true;
+#else
+    return false; // the system connects them
+#endif
+}
+
+void AudioMidiPreferencesModel::connectBluetoothMidiDevice()
+{
+    dispatcher()->dispatch("midi-connect-bluetooth");
+}
+
 bool AudioMidiPreferencesModel::useMIDI20Output() const
 {
     return midiConfiguration()->useMIDI20Output();

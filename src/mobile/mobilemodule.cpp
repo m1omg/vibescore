@@ -22,6 +22,7 @@
 #include "ui/iinteractiveuriregister.h"
 
 #include "internal/backnavigationcontroller.h"
+#include "internal/bluetoothmidicontroller.h"
 #include "internal/incomingfilescontroller.h"
 #include "internal/mobileinteractive.h"
 #include "internal/mobilelifecyclecontroller.h"
@@ -46,6 +47,7 @@ void MobileModule::registerExports()
 {
     m_incomingFilesController = std::make_shared<IncomingFilesController>(iocContext());
     m_backNavigationController = std::make_shared<BackNavigationController>(iocContext());
+    m_bluetoothMidiController = std::make_shared<BluetoothMidiController>(iocContext());
     m_lifecycleController = std::make_shared<MobileLifecycleController>(iocContext());
 
     // On top of the default IInteractive (registered by the global module): system document picker, Scores library
@@ -77,6 +79,7 @@ void MobileModule::onInit(const IApplication::RunMode& mode)
 
     m_incomingFilesController->init();
     m_backNavigationController->init();
+    m_bluetoothMidiController->init();
     m_lifecycleController->init();
 
 #ifdef Q_OS_WASM
@@ -95,5 +98,6 @@ void MobileModule::onDeinit()
 {
     m_lifecycleController.reset();
     m_backNavigationController.reset();
+    m_bluetoothMidiController.reset();
     m_incomingFilesController.reset();
 }

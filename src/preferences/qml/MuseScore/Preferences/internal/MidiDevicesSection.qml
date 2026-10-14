@@ -35,9 +35,12 @@ BaseSection {
     property alias isMIDI20OutputSupported: useMIDI20OutputCheckbox.visible
     property alias useMIDI20Output: useMIDI20OutputCheckbox.checked
 
+    property alias isBluetoothMidiSupported: bluetoothButton.visible
+
     signal inputDeviceIdChangeRequested(string newId)
     signal outputDeviceIdChangeRequested(string newId)
     signal useMIDI20OutputChangeRequested(bool use)
+    signal connectBluetoothDeviceRequested()
 
     title: qsTrc("preferences", "MIDI")
 
@@ -70,6 +73,20 @@ BaseSection {
 
         onValueEdited: function(newIndex, newValue) {
             root.outputDeviceIdChangeRequested(newValue)
+        }
+    }
+
+    FlatButton {
+        id: bluetoothButton
+
+        text: qsTrc("preferences", "Connect Bluetooth MIDI device…")
+
+        navigation.name: "MidiConnectBluetooth"
+        navigation.panel: root.navigation
+        navigation.row: 4
+
+        onClicked: {
+            root.connectBluetoothDeviceRequested()
         }
     }
 
