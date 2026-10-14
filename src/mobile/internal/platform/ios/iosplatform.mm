@@ -112,15 +112,16 @@ void mu::mobile::ios::showBluetoothMidiDevices()
         return;
     }
 
-    CABTMIDICentralViewController* devices = [[CABTMIDICentralViewController alloc] init];
-    UINavigationController* navigation = [[UINavigationController alloc] initWithRootViewController:devices];
+    // This file is compiled without ARC
+    CABTMIDICentralViewController* devices = [[[CABTMIDICentralViewController alloc] init] autorelease];
+    UINavigationController* navigation = [[[UINavigationController alloc] initWithRootViewController:devices] autorelease];
 
-    __weak UINavigationController* weakNavigation = navigation;
+    // Done dismisses what the presenter presents (the block does not retain the navigation controller: no cycle)
+    UIAction* done = [UIAction actionWithHandler:^(UIAction*) {
+        [presenter dismissViewControllerAnimated:YES completion:nil];
+    }];
     devices.navigationItem.rightBarButtonItem
-        = [[UIBarButtonItem alloc] initWithBarButtonSystemItem:UIBarButtonSystemItemDone
-                                                 primaryAction:[UIAction actionWithHandler:^(UIAction*) {
-        [weakNavigation dismissViewControllerAnimated:YES completion:nil];
-    }]];
+        = [[[UIBarButtonItem alloc] initWithBarButtonSystemItem:UIBarButtonSystemItemDone primaryAction:done] autorelease];
 
     navigation.modalPresentationStyle = UIModalPresentationFormSheet;
     [presenter presentViewController:navigation animated:YES completion:nil];

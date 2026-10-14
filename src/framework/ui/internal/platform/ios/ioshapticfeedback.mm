@@ -22,7 +22,9 @@
 
 void muse::ui::ios::performHapticFeedback(bool strong)
 {
+    // This file is compiled without ARC
     UIImpactFeedbackGenerator* generator
-        = [[UIImpactFeedbackGenerator alloc] initWithStyle:strong ? UIImpactFeedbackStyleMedium : UIImpactFeedbackStyleLight];
+        = [[[UIImpactFeedbackGenerator alloc] initWithStyle:strong ? UIImpactFeedbackStyleMedium : UIImpactFeedbackStyleLight]
+           autorelease];
     [generator impactOccurred];
 }
