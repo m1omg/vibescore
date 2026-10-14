@@ -370,14 +370,22 @@ void NavigationController::resetIfNeed(QObject* watched)
         return;
     }
 
+    auto activeCtrl = activeControl();
+    const bool needResetNavigation = activeCtrl && activeCtrl != m_defaultNavigationControl && watched == qApp;
+
+    // Usually there is nothing to reset: then the (expensive) look through the whole object tree below is not needed.
+    // This runs for every object that a mouse press goes to
+    if (!needResetNavigation && !m_isHighlight) {
+        return;
+    }
+
 #ifdef MUSE_MODULE_DIAGNOSTICS
     if (muse::diagnostics::isDiagnosticHierarchy(watched)) {
         return;
     }
 #endif
 
-    auto activeCtrl = activeControl();
-    if (activeCtrl && activeCtrl != m_defaultNavigationControl && watched == qApp) {
+    if (needResetNavigation) {
         resetNavigation();
     }
 
