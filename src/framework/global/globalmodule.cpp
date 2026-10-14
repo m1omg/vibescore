@@ -224,7 +224,12 @@ void GlobalModule::onPreInit(const IApplication::RunMode& mode)
     Profiler::Options profOpt;
     profOpt.stepTimeEnabled = true;
     profOpt.timersEnabled = true;
+#ifdef Q_OS_WASM
+    // In the browser each reading of the clock is a call to JavaScript: timing every traced function costs too much
+    profOpt.funcsTimeEnabled = false;
+#else
     profOpt.funcsTimeEnabled = true;
+#endif
     profOpt.funcsTraceEnabled = false;
     profOpt.funcsMaxThreadCount = 100;
     profOpt.statTopCount = 150;
