@@ -8,6 +8,12 @@ on:
         description: 'ABI: arm64 (devices) or x86_64 (emulator)'
         required: false
         default: 'arm64'
+  workflow_call: # release.yml
+    inputs:
+      abi:
+        type: string
+        required: false
+        default: 'arm64'
   push:
     branches:
       - vibescore
@@ -16,7 +22,7 @@ on:
       - 'share/locale/**'
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: build-android-${{ github.ref }}
   cancel-in-progress: false # a running build finishes; only the newest pending push is kept
 
 env:

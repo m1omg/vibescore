@@ -3,6 +3,13 @@ name: 'Build: iOS'
 
 on:
   workflow_dispatch:
+  workflow_call: # release.yml
+    inputs:
+      device_only:
+        description: 'Only the IPA for devices: no simulator build and smoke test'
+        type: boolean
+        required: false
+        default: false
   push:
     branches:
       - vibescore
@@ -11,7 +18,7 @@ on:
       - 'share/locale/**'
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: build-ios-${{ github.ref }}
   cancel-in-progress: false # a running build finishes; only the newest pending push is kept
 
 env:
@@ -27,14 +34,12 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        include:
-          # Unsigned IPA for sideloading
-          - sdk: 'iphoneos'
-            runner: 'macos-15'
-          # Smoke test with screenshots. Qt's iOS package has simulator code for x86_64 only, which the
-          # simulators of Apple Silicon Macs do not launch: an Intel Mac runs it
-          - sdk: 'iphonesimulator'
-            runner: 'macos-15-intel'
+        # iphoneos: the unsigned IPA for sideloading.
+        # iphonesimulator: the smoke test with screenshots. Qt's iOS package has simulator code for x86_64 only,
+        # which the simulators of Apple Silicon Macs do not launch: an Intel Mac runs it.
+        include: ${{ fromJSON(inputs.device_only
+          && '[{"sdk":"iphoneos","runner":"macos-15"}]'
+          || '[{"sdk":"iphoneos","runner":"macos-15"},{"sdk":"iphonesimulator","runner":"macos-15-intel"}]') }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4

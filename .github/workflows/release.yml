@@ -1,0 +1,54 @@
+# VibeScore: a release. Pushing a version tag (v0.1.0, ...) builds the Android APK and the iOS IPA and publishes them
+# on GitHub Releases. The APK is signed with the release key when the ANDROID_KEYSTORE_BASE64 and
+# ANDROID_KEYSTORE_PASS secrets are set (see build_android.yml): only then can a release update the one before it.
+name: 'Release'
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  android:
+    uses: ./.github/workflows/build_android.yml
+    with:
+      abi: 'arm64'
+    secrets: inherit
+
+  ios:
+    uses: ./.github/workflows/build_ios.yml
+    with:
+      device_only: true
+
+  release:
+    needs: [android, ios]
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download the apps
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          VERSION="${TAG#v}"
+          mkdir release
+          cp artifacts/VibeScore-Android-arm64/VibeScore-arm64.apk "release/VibeScore-$VERSION-android-arm64.apk"
+          cp artifacts/VibeScore-iOS-iphoneos/VibeScore-unsigned.ipa "release/VibeScore-$VERSION-ios-unsigned.ipa"
+          (cd release && sha256sum -- * > SHA256SUMS.txt)
+
+          # 0.x versions and versions like 1.0.0-beta.1 are pre-releases
+          PRERELEASE=""
+          case "$VERSION" in 0.*|*-*) PRERELEASE="--prerelease" ;; esac
+
+          sed "s/@VERSION@/$VERSION/g" buildscripts/release/release_notes.md > release_notes.md
+          gh release create "$TAG" release/* --verify-tag --title "VibeScore $VERSION" --notes-file release_notes.md $PRERELEASE
