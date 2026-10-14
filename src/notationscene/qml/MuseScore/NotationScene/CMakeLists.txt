@@ -44,6 +44,8 @@ qt_add_qml_module(notationscene_qml
         transposedialogmodel.h
         breaksdialogmodel.cpp
         breaksdialogmodel.h
+        tupletdialogmodel.cpp
+        tupletdialogmodel.h
         editpercussionshortcutmodel.cpp
         editpercussionshortcutmodel.h
         elementpopups/caposettingsmodel.cpp
@@ -170,6 +172,7 @@ qt_add_qml_module(notationscene_qml
         EditGridSizeDialog.qml
         TransposeDialog.qml
         BreaksDialog.qml
+        TupletDialog.qml
         EditPercussionShortcutDialog.qml
         elementpopups/CapoPopup.qml
         elementpopups/DynamicPopup.qml

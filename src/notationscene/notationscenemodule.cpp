@@ -94,7 +94,11 @@ void NotationSceneModule::resolveImports()
 #endif
         ir->registerWidgetUri<SelectNoteDialog>(Uri("musescore://notation/selectnote"));
         ir->registerWidgetUri<SelectDialog>(Uri("musescore://notation/selectelement"));
+#ifdef MUSE_CONFIGURATION_IS_MOBILE
+        ir->registerQmlUri(Uri("musescore://notation/othertupletdialog"), "MuseScore.NotationScene", "TupletDialog");
+#else
         ir->registerWidgetUri<TupletDialog>(Uri("musescore://notation/othertupletdialog"));
+#endif
         ir->registerWidgetUri<StaffTextPropertiesDialog>(Uri("musescore://notation/stafftextproperties"));
         ir->registerWidgetUri<RealizeHarmonyDialog>(Uri("musescore://notation/realizechordsymbols"));
 
