@@ -22,6 +22,11 @@
 
 #include "log.h"
 
+#ifdef Q_OS_WASM
+#include "project/inotationproject.h"
+#include "platform/web/webplatform.h"
+#endif
+
 using namespace mu::mobile;
 using namespace muse;
 
@@ -33,6 +38,10 @@ MobileLifecycleController::MobileLifecycleController(const modularity::ContextPt
 void MobileLifecycleController::init()
 {
     connect(qGuiApp, &QGuiApplication::applicationStateChanged, this, &MobileLifecycleController::onApplicationStateChanged);
+
+#ifdef Q_OS_WASM
+    keepSavedScoresInBrowserStorage();
+#endif
 }
 
 void MobileLifecycleController::onApplicationStateChanged(Qt::ApplicationState state)
@@ -44,3 +53,21 @@ void MobileLifecycleController::onApplicationStateChanged(Qt::ApplicationState s
         dispatcher()->dispatch("play");
     }
 }
+
+#ifdef Q_OS_WASM
+//! The files of the web app are in memory: the page writes them to the browser's storage (IndexedDB) regularly and
+//! when the page is hidden, which can come too late when the page is closed right after saving
+void MobileLifecycleController::keepSavedScoresInBrowserStorage()
+{
+    auto watchCurrentProject = [this]() {
+        if (project::INotationProjectPtr project = globalContext()->currentProject()) {
+            project->saveComplited().onReceive(this, [](const muse::io::path_t&, project::SaveMode) {
+                web::syncFileSystem();
+            });
+        }
+    };
+
+    globalContext()->currentProjectChanged().onNotify(this, watchCurrentProject);
+    watchCurrentProject();
+}
+#endif

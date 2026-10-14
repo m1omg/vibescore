@@ -20,19 +20,23 @@
 
 #include <QObject>
 
+#include "async/asyncable.h"
 #include "modularity/ioc.h"
 #include "actions/iactionsdispatcher.h"
+#include "context/iglobalcontext.h"
 #include "playback/iplaybackcontroller.h"
 
 namespace mu::mobile {
 //! The app on mobile platforms goes to the background and comes back: playback pauses in the background
 //! (a notation app is not a media player). The score is autosaved (see ProjectAutoSaver) and the audio
 //! stream is paused (see the audio drivers) by the modules concerned.
-class MobileLifecycleController : public QObject, public muse::Contextable
+//! In the browser, a saved score is written to the browser's storage at once.
+class MobileLifecycleController : public QObject, public muse::Contextable, public muse::async::Asyncable
 {
     Q_OBJECT
 
     muse::ContextInject<muse::actions::IActionsDispatcher> dispatcher = { this };
+    muse::ContextInject<context::IGlobalContext> globalContext = { this };
     muse::ContextInject<playback::IPlaybackController> playbackController = { this };
 
 public:
@@ -42,5 +46,9 @@ public:
 
 private:
     void onApplicationStateChanged(Qt::ApplicationState state);
+
+#ifdef Q_OS_WASM
+    void keepSavedScoresInBrowserStorage();
+#endif
 };
 }

@@ -172,8 +172,6 @@ function vibescoreLoader(elements) {
                 elements.banner.querySelector('span').textContent = warnings.join(' ');
                 elements.banner.style.display = 'flex';
             }
-            // Ask the browser to keep the data (it may otherwise evict it when storage runs low)
-            navigator.storage?.persist?.().catch(() => {});
         },
 
         stopped(exitData) {
@@ -387,6 +385,9 @@ function vsSyncFileSystem(FS, populate) {
     });
 }
 
+// Writes the persistent folders to IndexedDB (set by vibescorePreRun)
+let vsSyncFileSystemNow = null;
+
 // The preRun step of the Emscripten module: runs before main(), and main() waits for the run dependencies
 function vibescorePreRun(module, loader) {
     const FS = module.FS;
@@ -429,8 +430,19 @@ function vibescorePreRun(module, loader) {
         syncing = false;
     };
 
-    window.vibescoreSyncFileSystem = sync;
+    vsSyncFileSystemNow = sync;
     setInterval(sync, VS_SYNC_INTERVAL_MS);
+
+    // The app asks for it after a score was saved. Then the browser is also asked to keep the data (it may otherwise
+    // evict it when storage runs low): some browsers ask the user, which makes more sense after a save than at the start
+    let isPersistenceRequested = false;
+    window.vibescoreSyncFileSystem = () => {
+        if (!isPersistenceRequested) {
+            isPersistenceRequested = true;
+            navigator.storage?.persist?.().catch(() => {});
+        }
+        return sync();
+    };
     document.addEventListener('visibilitychange', () => {
         if (document.visibilityState === 'hidden') {
             sync();
@@ -455,7 +467,7 @@ async function vibescoreLoadSoundFont(instance, onStatus) {
         const data = new Uint8Array(await response.arrayBuffer());
         instance.FS.writeFile(VS_SOUND_FOLDER + '/' + name, data);
         instance.vibescoreSoundFontsChanged();
-        window.vibescoreSyncFileSystem?.();
+        vsSyncFileSystemNow?.();
     } catch (error) {
         console.error('VibeScore: could not download the sound font', error);
         onStatus?.('No sound: the sound font could not be downloaded');
