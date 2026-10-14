@@ -57,6 +57,7 @@ private:
 
     bool m_opened = false;
     bool m_inCallback = false;
+    double m_nextFrame = 0; // the frame of the player's time at which the next rendered block plays
     Spec m_activeSpec;
     async::Channel<Spec> m_activeSpecChanged;
     async::Notification m_availableOutputDevicesChanged;
