@@ -235,19 +235,11 @@ else()
 
     include(GetPlatformInfo)
 
-    if (OS_IS_WASM)
-        target_sources(muse_global PRIVATE
-            io/internal/memfilesystem.cpp
-            io/internal/memfilesystem.h
-            internal/platform/web/webinteractive.cpp
-            internal/platform/web/webinteractive.h
-        )
-    else()
-        target_sources(muse_global PRIVATE
-            io/internal/filesystem.cpp
-            io/internal/filesystem.h
-        )
-    endif()
+    # Also on the web: Emscripten's file system (with IndexedDB for the user's data)
+    target_sources(muse_global PRIVATE
+        io/internal/filesystem.cpp
+        io/internal/filesystem.h
+    )
 
     if (OS_IS_MOBILE)
         target_sources(muse_global PRIVATE

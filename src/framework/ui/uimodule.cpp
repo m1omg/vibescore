@@ -37,7 +37,7 @@
 #include "internal/touchmodifiers.h"
 #include "view/iconcodes.h"
 
-#if defined(Q_OS_ANDROID) || defined(Q_OS_IOS)
+#if defined(Q_OS_ANDROID) || defined(Q_OS_IOS) || defined(Q_OS_WASM)
 #include "internal/platform/mobile/mobileplatformtheme.h"
 #include "internal/windowscontroller.h"
 #elif defined(Q_OS_MACOS)
@@ -81,7 +81,7 @@ void UiModule::registerExports()
     m_keyNavigationController = std::make_shared<NavigationController>(iocContext());
     m_keyNavigationUiActions = std::make_shared<NavigationUiActions>();
 
-    #if defined(Q_OS_ANDROID) || defined(Q_OS_IOS)
+    #if defined(Q_OS_ANDROID) || defined(Q_OS_IOS) || defined(Q_OS_WASM)
     m_platformTheme = std::make_shared<MobilePlatformTheme>();
     m_windowsController = std::make_shared<WindowsController>();
     #elif defined(Q_OS_MACOS)

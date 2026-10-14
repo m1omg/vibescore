@@ -60,16 +60,10 @@
 
 #ifdef MUSE_MODULE_UI
 #include "internal/interactive.h"
-#ifdef Q_OS_WASM
-#include "internal/platform/web/webinteractive.h"
-#endif
 #endif
 
-#ifdef Q_OS_WASM
-#include "io/internal/memfilesystem.h"
-#else
+// The web: Emscripten's file system, with the user's data kept in IndexedDB (see the mobile module)
 #include "io/internal/filesystem.h"
-#endif
 
 #ifdef Q_OS_WIN
 #include "platform/win/waitabletimer.h"
@@ -123,19 +117,11 @@ void GlobalModule::registerExports()
     ioc()->registerExport<ITickerProvider>(moduleName(), m_tickerProvider);
     ioc()->registerExport<api::IApiRegister>(moduleName(), new api::ApiRegister());
 
-#ifdef Q_OS_WASM
-    ioc()->registerExport<IFileSystem>(moduleName(), new MemFileSystem());
-#else
     ioc()->registerExport<IFileSystem>(moduleName(), new FileSystem());
-#endif
 
 #ifdef MUSE_MODULE_UI
-#ifdef Q_OS_WASM
-    std::shared_ptr<IInteractive> originInteractive = std::make_shared<Interactive>(iocContext());
-    ioc()->registerExport<muse::IInteractive>(moduleName(), new WebInteractive(originInteractive));
-#else
+    // The web app is the mobile app: MobileInteractive adapts the dialogs (see the mobile module)
     ioc()->registerExport<IInteractive>(moduleName(), new Interactive(iocContext()));
-#endif
 #endif
 }
 

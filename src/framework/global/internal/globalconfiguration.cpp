@@ -86,7 +86,8 @@ QString GlobalConfiguration::resolveAppDataPath() const
     QDir dir(QCoreApplication::applicationDirPath() + QString("/../Resources"));
     return dir.absolutePath() + "/";
 #elif defined(Q_OS_WASM)
-    return "/files/share";
+    // Unpacked by the page before the app starts (see buildscripts/web/vibescore-web.js)
+    return "/files/share/";
 #else
     // Try relative path (needed for portable AppImage and non-standard installations)
     QDir dir(QCoreApplication::applicationDirPath() + QString("/../share/" MUSE_APP_INSTALL_NAME));

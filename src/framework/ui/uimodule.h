@@ -33,7 +33,7 @@ class NavigationController;
 class NavigationUiActions;
 class WindowsController;
 
-#if defined(Q_OS_ANDROID) || defined(Q_OS_IOS)
+#if defined(Q_OS_ANDROID) || defined(Q_OS_IOS) || defined(Q_OS_WASM)
 class MobilePlatformTheme;
 #elif defined(Q_OS_MACOS)
 class MacOSPlatformTheme;
@@ -68,7 +68,7 @@ private:
     std::shared_ptr<NavigationUiActions> m_keyNavigationUiActions;
     std::shared_ptr<WindowsController> m_windowsController;
 
-    #if defined(Q_OS_ANDROID) || defined(Q_OS_IOS)
+    #if defined(Q_OS_ANDROID) || defined(Q_OS_IOS) || defined(Q_OS_WASM)
     std::shared_ptr<MobilePlatformTheme> m_platformTheme;
     #elif defined(Q_OS_MACOS)
     std::shared_ptr<MacOSPlatformTheme> m_platformTheme;

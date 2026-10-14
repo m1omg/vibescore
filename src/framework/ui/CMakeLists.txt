@@ -142,7 +142,8 @@ elseif(OS_IS_WIN)
     )
 
     target_link_libraries(muse_ui PRIVATE dwmapi)
-elseif(OS_IS_MOBILE)
+elseif(OS_IS_MOBILE OR OS_IS_WASM)
+    # The light/dark color scheme of the system (Qt's style hints; the browser's on the web)
     target_sources(muse_ui PRIVATE
         internal/platform/mobile/mobileplatformtheme.cpp
         internal/platform/mobile/mobileplatformtheme.h
