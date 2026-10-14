@@ -44,8 +44,11 @@ sys.exit(1)
 ' "$1"
 }
 
+# Simulator apps are processes of the Mac: the app's binary in the device's container
 is_running() {
-    xcrun simctl spawn "$1" launchctl list 2>/dev/null | grep -q "UIKitApplication:$BUNDLE_ID"
+    local container
+    container="$(xcrun simctl get_app_container "$1" "$BUNDLE_ID" app 2>/dev/null)" || return 1
+    pgrep -f "$container/$EXECUTABLE" >/dev/null
 }
 
 failed=0
