@@ -229,8 +229,11 @@ MenuItem* AppMenuModel::makeFileMenu()
         makeMenuItem("parts", TranslatableString("action", "Parts…")),
         makeSeparator(),
         makeMenuItem("print"),
+#ifndef MUSE_CONFIGURATION_IS_MOBILE
+        // Mobile systems and browsers end apps themselves (iOS apps must not quit)
         makeSeparator(),
         makeMenuItem("quit", MenuItemRole::QuitRole)
+#endif
     };
 
     return makeMenu(TranslatableString("appshell/menu/file", "&File"), fileItems, "menu-file");
