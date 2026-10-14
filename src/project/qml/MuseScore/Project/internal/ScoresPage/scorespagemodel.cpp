@@ -100,7 +100,7 @@ int ScoresPageModel::tabIndex() const
 
 bool ScoresPageModel::isLibraryAvailable() const
 {
-#if defined(Q_OS_ANDROID) || defined(Q_OS_IOS)
+#if defined(Q_OS_ANDROID) || defined(Q_OS_IOS) || defined(Q_OS_WASM)
     return !isCloudAvailable(); // the second tab
 #else
     return false;

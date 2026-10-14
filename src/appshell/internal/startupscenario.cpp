@@ -334,7 +334,7 @@ void StartupScenario::openScore(const project::ProjectFile& file)
 
 void StartupScenario::restoreLastSession()
 {
-#if defined(Q_OS_ANDROID) || defined(Q_OS_IOS)
+#if defined(Q_OS_ANDROID) || defined(Q_OS_IOS) || defined(Q_OS_WASM)
     // Mobile systems end apps that are in the background instead of asking them to quit,
     // so this is the usual way back to the app: continue where the user left off
     sessionsManager()->restore();

@@ -28,6 +28,11 @@
 #include "internal/mobileprintprovider.h"
 #include "internal/mobilewindowsprovider.h"
 
+#ifdef Q_OS_WASM
+#include "audio/main/isoundfontcontroller.h"
+#include "internal/platform/web/webplatform.h"
+#endif
+
 using namespace mu::mobile;
 using namespace muse;
 using namespace muse::modularity;
@@ -73,6 +78,17 @@ void MobileModule::onInit(const IApplication::RunMode& mode)
     m_incomingFilesController->init();
     m_backNavigationController->init();
     m_lifecycleController->init();
+
+#ifdef Q_OS_WASM
+    web::fixNestedEventLoops();
+
+    // The page downloads the sound font after the app started: then it is loaded like the others
+    web::setSoundFontsChangedHandler([this]() {
+        if (auto soundFonts = ioc()->resolve<muse::audio::ISoundFontController>(moduleName())) {
+            soundFonts->loadSoundFonts();
+        }
+    });
+#endif
 }
 
 void MobileModule::onDeinit()

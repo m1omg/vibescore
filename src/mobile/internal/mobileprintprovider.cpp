@@ -27,6 +27,8 @@
 #include "platform/android/androidprint.h"
 #elif defined(Q_OS_IOS)
 #include "platform/ios/iosplatform.h"
+#elif defined(Q_OS_WASM)
+#include "platform/web/webplatform.h"
 #endif
 
 #include "log.h"
@@ -79,6 +81,8 @@ Ret MobilePrintProvider::printNotation(notation::INotationPtr notation)
     android::printPdf(pdfPath.toQString(), jobName);
 #elif defined(Q_OS_IOS)
     ios::printPdf(pdfPath.toQString(), jobName);
+#elif defined(Q_OS_WASM)
+    web::printPdf(pdfPath.toQString(), jobName);
 #endif
 
     return ret;

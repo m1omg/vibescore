@@ -28,6 +28,10 @@
 #include "platform/android/androidshare.h"
 #elif defined(Q_OS_IOS)
 #include "platform/ios/iosplatform.h"
+#elif defined(Q_OS_WASM)
+#include <QEventLoop>
+#include <QTemporaryDir>
+#include "platform/web/webplatform.h"
 #endif
 
 #include "translation.h"
@@ -38,6 +42,49 @@ using namespace muse;
 
 #if defined(Q_OS_ANDROID) || defined(Q_OS_IOS)
 #define VS_SYSTEM_DOCUMENT_PICKER
+#endif
+
+// Scores are saved in the library and exports are given to the user (shared, downloaded) instead of file dialogs
+#if defined(Q_OS_ANDROID) || defined(Q_OS_IOS) || defined(Q_OS_WASM)
+#define VS_LIBRARY_FILES
+#endif
+
+#ifdef Q_OS_WASM
+//! The browser's file chooser: the chosen file is copied into the library (scores) or the cache folder
+static void openFileFromDevice(const ScoresLibrary& library, const std::function<void(const io::path_t&)>& done)
+{
+    web::openFile(QString(), [&library, done](const QString& fileName, const QByteArray& content) {
+        if (fileName.isEmpty()) {
+            done(io::path_t());
+            return;
+        }
+
+        QTemporaryDir tempDir;
+        const QString tempPath = tempDir.filePath(QFileInfo(fileName).fileName());
+        QFile tempFile(tempPath);
+        if (!tempFile.open(QIODevice::WriteOnly) || tempFile.write(content) != content.size()) {
+            LOGE() << "Can not write " << tempPath;
+            done(io::path_t());
+            return;
+        }
+        tempFile.close();
+
+        done(library.importLocalFileByMoving(tempPath));
+    });
+}
+
+//! The same, waiting for the user (a nested event loop: Asyncify)
+static io::path_t openFileFromDeviceSync(const ScoresLibrary& library)
+{
+    QEventLoop loop;
+    io::path_t result;
+    openFileFromDevice(library, [&loop, &result](const io::path_t& path) {
+        result = path;
+        loop.quit();
+    });
+    loop.exec();
+    return result;
+}
 #endif
 
 static const Uri SAVE_TO_LIBRARY_URI("musescore://mobile/savetolibrary");
@@ -144,6 +191,23 @@ async::Promise<io::path_t> MobileInteractive::selectOpeningFile(const std::strin
 
         return async::Promise<io::path_t>::Result::unchecked();
     }, async::PromiseType::AsyncByBody);
+#elif defined(Q_OS_WASM)
+    UNUSED(title);
+    UNUSED(dir);
+    UNUSED(filter);
+
+    return async::make_promise<io::path_t>([this](auto resolve, auto reject) {
+        openFileFromDevice(m_library, [resolve, reject](const io::path_t& path) {
+            if (path.empty()) {
+                Ret ret = make_ret(Ret::Code::Cancel);
+                (void)reject(ret.code(), ret.text());
+            } else {
+                (void)resolve(path);
+            }
+        });
+
+        return async::Promise<io::path_t>::Result::unchecked();
+    }, async::PromiseType::AsyncByBody);
 #else
     return m_origin->selectOpeningFile(title, dir, filter);
 #endif
@@ -159,6 +223,13 @@ io::path_t MobileInteractive::selectOpeningFileSync(const std::string& title, co
 
     const QUrl url = QFileDialog::getOpenFileUrl(nullptr, QString::fromStdString(title));
     return url.isEmpty() ? io::path_t() : m_library.importFile(url);
+#elif defined(Q_OS_WASM)
+    UNUSED(title);
+    UNUSED(dir);
+    UNUSED(filter);
+    UNUSED(options);
+
+    return openFileFromDeviceSync(m_library);
 #else
     return m_origin->selectOpeningFileSync(title, dir, filter, options);
 #endif
@@ -181,6 +252,15 @@ io::paths_t MobileInteractive::selectOpeningFilesSync(const std::string& title, 
     }
 
     return paths;
+#elif defined(Q_OS_WASM)
+    UNUSED(title);
+    UNUSED(dir);
+    UNUSED(filter);
+    UNUSED(options);
+
+    // One file at a time in the browser
+    const io::path_t path = openFileFromDeviceSync(m_library);
+    return path.empty() ? io::paths_t() : io::paths_t { path };
 #else
     return m_origin->selectOpeningFilesSync(title, dir, filter, options);
 #endif
@@ -189,7 +269,7 @@ io::paths_t MobileInteractive::selectOpeningFilesSync(const std::string& title, 
 io::path_t MobileInteractive::selectSavingFileSync(const std::string& title, const io::path_t& path, const std::vector<std::string>& filter,
                                                    bool confirmOverwrite)
 {
-#ifdef VS_SYSTEM_DOCUMENT_PICKER
+#ifdef VS_LIBRARY_FILES
     UNUSED(title);
 
     if (isScoreSaving(filter)) {
@@ -377,7 +457,7 @@ async::Promise<Ret> MobileInteractive::openApp(const UriQuery& uri) const
 
 Ret MobileInteractive::revealInFileBrowser(const io::path_t& filePath) const
 {
-#ifdef VS_SYSTEM_DOCUMENT_PICKER
+#ifdef VS_LIBRARY_FILES
     // There is no file browser to show files in: they are shared instead
     QStringList files;
     if (io::dirpath(filePath) == m_library.exportsPath()) {
@@ -391,10 +471,12 @@ Ret MobileInteractive::revealInFileBrowser(const io::path_t& filePath) const
         return make_ret(Ret::Code::UnknownError);
     }
 
-#ifdef Q_OS_ANDROID
+#if defined(Q_OS_ANDROID)
     android::shareFiles(files, muse::qtrc("mobile", "Share"));
-#else
+#elif defined(Q_OS_IOS)
     ios::shareFiles(files);
+#else
+    web::downloadFiles(files);
 #endif
     return make_ok();
 #else

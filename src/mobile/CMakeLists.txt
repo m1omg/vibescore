@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: GPL-3.0-only
 #
-# VibeScore: services for mobile platforms (Android, iOS)
+# VibeScore: services for mobile platforms (Android, iOS), also used by the web app
 
 muse_create_module(mobile)
 
@@ -55,6 +55,16 @@ if (OS_IS_IOS)
 
     find_library(UIKit NAMES UIKit)
     target_link_libraries(mobile PRIVATE ${UIKit})
+endif()
+
+if (OS_IS_WASM)
+    target_sources(mobile PRIVATE
+        internal/platform/web/webplatform.cpp
+        internal/platform/web/webplatform.h
+    )
+    # QWasmSuspendResumeControl (see web::fixNestedEventLoops)
+    find_package(Qt6 REQUIRED COMPONENTS CorePrivate)
+    target_link_libraries(mobile PRIVATE Qt::CorePrivate)
 endif()
 
 add_subdirectory(qml/MuseScore/Mobile)
