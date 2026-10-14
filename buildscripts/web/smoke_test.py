@@ -1,0 +1,156 @@
+#!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-3.0-only
+"""Starts the web app in a browser and reports how the start goes.
+
+Usage: smoke_test.py URL OUT_DIR [--engine chromium|firefox] [--timeout SECONDS] [--cpu-slowdown N] [--tablet]
+
+Writes to OUT_DIR, with the engine as prefix: the loading steps with their times (timeline.txt), the browser's console
+(console.log) and screenshots. Exits with 1 when the app did not start in time.
+- --cpu-slowdown N (Chromium): runs the page N times slower, like a slower device.
+- --tablet (Chromium): a touch tablet (mobile viewport).
+"""
+import argparse
+import asyncio
+import json
+import os
+import platform
+import re
+import sys
+import time
+
+from playwright.async_api import async_playwright
+
+# Before the page's scripts: notes each step of the loading screen, and how long the page's thread was busy
+# (the longest time between two ticks of a 100 ms timer)
+PAGE_PROBE = """
+(() => {
+    const probe = window.__vsProbe = { steps: [], longestBusyMs: 0 };
+    let lastTick = performance.now();
+    setInterval(() => {
+        const now = performance.now();
+        probe.longestBusyMs = Math.max(probe.longestBusyMs, now - lastTick - 100);
+        lastTick = now;
+    }, 100);
+    document.addEventListener('DOMContentLoaded', () => {
+        const status = document.querySelector('#status');
+        let lastStep = '';
+        const note = () => {
+            // "Downloading VibeScore… 12 of 140 MB" is one step
+            const step = status.textContent.replace(/[0-9.]+/g, '#');
+            if (step !== lastStep) {
+                lastStep = step;
+                probe.steps.push([Math.round(performance.now()), status.textContent]);
+            }
+        };
+        note();
+        new MutationObserver(note).observe(status, { childList: true, characterData: true, subtree: true });
+    });
+})();
+"""
+
+STATE = """JSON.stringify({
+    status: document.querySelector('#status')?.textContent,
+    problem: document.querySelector('#problem')?.textContent,
+    started: document.querySelector('#loading')?.style.display === 'none',
+    steps: window.__vsProbe?.steps,
+    longestBusyMs: Math.round(window.__vsProbe?.longestBusyMs ?? 0),
+    heapMB: performance.memory ? Math.round(performance.memory.usedJSHeapSize / 1e6) : null,
+})"""
+
+
+async def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("url")
+    parser.add_argument("out")
+    parser.add_argument("--engine", default="chromium", choices=["chromium", "firefox"])
+    parser.add_argument("--timeout", type=float, default=300)
+    parser.add_argument("--cpu-slowdown", type=float, default=0)
+    parser.add_argument("--tablet", action="store_true")
+    args = parser.parse_args()
+
+    os.makedirs(args.out, exist_ok=True)
+    prefix = os.path.join(args.out, args.engine + ("-tablet" if args.tablet else "")
+                          + (f"-slow{args.cpu_slowdown:g}" if args.cpu_slowdown else "") + "-")
+    timeline = []
+    console = []
+    t0 = time.time()
+
+    def note(text):
+        line = f"{time.time() - t0:7.1f}s  {text}"
+        print(line, flush=True)
+        timeline.append(line)
+
+    async with async_playwright() as p:
+        if args.engine == "firefox":
+            browser = await p.firefox.launch()
+        else:
+            browser = await p.chromium.launch(args=["--enable-unsafe-swiftshader", "--ignore-gpu-blocklist"])
+        note(f"{args.engine} {browser.version} on {platform.machine()}, {os.cpu_count()} CPUs")
+
+        options = {"viewport": {"width": 1280, "height": 800}}
+        if args.tablet:
+            options = dict(p.devices["Galaxy Tab S4 landscape"])
+        context = await browser.new_context(**options)
+        page = await context.new_page()
+        await page.add_init_script(PAGE_PROBE)
+        page.on("console", lambda m: console.append(f"{time.time() - t0:7.1f}s [{m.type}] {m.text}"))
+        page.on("pageerror", lambda e: console.append(f"{time.time() - t0:7.1f}s [pageerror] {e}"))
+        page.on("crash", lambda _: note("THE PAGE CRASHED"))
+        page.on("requestfailed", lambda r: console.append(f"{time.time() - t0:7.1f}s [request failed] {r.url} {r.failure}"))
+
+        if args.cpu_slowdown and args.engine == "chromium":
+            cdp = await context.new_cdp_session(page)
+            await cdp.send("Emulation.setCPUThrottlingRate", {"rate": args.cpu_slowdown})
+            note(f"CPU slowed down {args.cpu_slowdown:g} times")
+
+        await page.goto(args.url, wait_until="commit")
+        note("page requested")
+
+        started = False
+        last_status = None
+        state = {}
+        while time.time() - t0 < args.timeout:
+            await asyncio.sleep(1)
+            try:
+                state = json.loads(await asyncio.wait_for(page.evaluate(STATE), 5))
+            except asyncio.TimeoutError:
+                note("the page does not answer (its thread is busy)")
+                continue
+            except Exception as e:
+                note(f"could not read the page: {e}")
+                break
+            status = re.sub(r"[0-9.]+ of", "# of", state.get("status") or "")
+            if status != last_status:
+                last_status = status
+                note(f"status: {state.get('status')!r}  problem: {state.get('problem')!r}  heap: {state.get('heapMB')} MB")
+            if state.get("started"):
+                started = True
+                note("the app started")
+                await asyncio.sleep(8)
+                break
+
+        try:
+            state = json.loads(await asyncio.wait_for(page.evaluate(STATE), 10))
+        except Exception:
+            pass
+        for at, text in state.get("steps") or []:
+            timeline.append(f"  page step at {at / 1000:7.1f}s: {text}")
+        timeline.append(f"  longest time the page's thread was busy: {state.get('longestBusyMs')} ms")
+        timeline.append(f"  problem shown: {state.get('problem')!r}")
+        if not started:
+            note(f"the app did not start in {args.timeout:g} s")
+        try:
+            await asyncio.wait_for(page.screenshot(path=prefix + "screen.png"), 30)
+        except Exception as e:
+            note(f"no screenshot: {e}")
+
+        with open(prefix + "timeline.txt", "w") as f:
+            f.write("\n".join(timeline) + "\n")
+        with open(prefix + "console.log", "w") as f:
+            f.write("\n".join(console) + "\n")
+        await browser.close()
+    return 0 if started else 1
+
+
+if __name__ == "__main__":
+    sys.exit(asyncio.run(main()))

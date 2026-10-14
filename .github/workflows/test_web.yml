@@ -1,0 +1,58 @@
+# VibeScore: starts the published web app in Chromium and Firefox, on x86-64 and on ARM64 (like phones and tablets),
+# and reports how the start went (buildscripts/web/smoke_test.py)
+name: 'Test: Web start'
+
+on:
+  workflow_dispatch:
+    inputs:
+      url:
+        description: 'The page of the web app'
+        default: 'https://m1omg.github.io/vibescore/'
+  workflow_run:
+    workflows: ['Build: Web']
+    types: [completed]
+
+permissions:
+  contents: read
+
+jobs:
+  start:
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, ubuntu-24.04-arm]
+        engine: [chromium, firefox]
+        include:
+          # A slower ARM64 device, with a touch screen
+          - os: ubuntu-24.04-arm
+            engine: chromium
+            extra: '--tablet --cpu-slowdown 4'
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          sparse-checkout: buildscripts/web
+
+      - name: Install Playwright
+        run: |
+          python3 -m venv "$RUNNER_TEMP/venv"
+          "$RUNNER_TEMP/venv/bin/pip" install -q playwright==1.63.0
+          "$RUNNER_TEMP/venv/bin/python" -m playwright install --with-deps ${{ matrix.engine }}
+
+      - name: Start the web app
+        env:
+          URL: ${{ inputs.url || 'https://m1omg.github.io/vibescore/' }}
+        run: |
+          "$RUNNER_TEMP/venv/bin/python" buildscripts/web/smoke_test.py "$URL" out --engine ${{ matrix.engine }} \
+            --timeout 600 ${{ matrix.extra }}
+
+      - name: Upload the report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: web-start-${{ matrix.os }}-${{ matrix.engine }}${{ matrix.extra && '-slow-tablet' || '' }}
+          path: out
+          retention-days: 14
