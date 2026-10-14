@@ -80,7 +80,7 @@ Not available:
 - MuseScore.com and Audio.com (publishing, cloud scores), the online score import, update checks, crash reports
   and telemetry. VibeScore does not collect any data.
 - Video export and AAC export.
-- On the web: MIDI keyboards, plugins, Learn, language packs and audio export (for now).
+- On the web: MIDI keyboards, plugins, Learn and language packs (for now).
 
 ## Building
 

@@ -48,6 +48,17 @@ GeneralRpcChannel::EngineScope::~EngineScope()
     s_isMainThread = m_wasMainSide;
 }
 
+GeneralRpcChannel::MainScope::MainScope()
+    : m_wasMainSide(s_isMainThread)
+{
+    s_isMainThread = true;
+}
+
+GeneralRpcChannel::MainScope::~MainScope()
+{
+    s_isMainThread = m_wasMainSide;
+}
+
 GeneralRpcChannel::~GeneralRpcChannel()
 {
     m_engineRpcData.streams.clear();

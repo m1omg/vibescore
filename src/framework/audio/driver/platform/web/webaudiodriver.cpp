@@ -20,6 +20,8 @@
 
 #include <emscripten.h>
 
+#include "global/defer.h"
+
 #include "log.h"
 
 using namespace muse;
@@ -230,6 +232,16 @@ void WebAudioDriver::renderAhead()
     if (!m_opened || !m_activeSpec.callback || m_block.empty()) {
         return;
     }
+
+    // The engine may let the app run inside the callback (an audio export, see SoundTrackWriter): the timer then
+    // calls this again, and the engine is not called again until the callback returns
+    if (m_inCallback) {
+        return;
+    }
+    m_inCallback = true;
+    DEFER {
+        m_inCallback = false;
+    };
 
     const int blockFrames = static_cast<int>(m_block.size() / 2);
     const int queued = vs_audio_queued_frames();

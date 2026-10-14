@@ -39,12 +39,53 @@
 #include "aacencoder.h"
 #endif
 
+#ifndef MUSE_THREADS_SUPPORT
+#include <chrono>
+
+#include <QEventLoop>
+#include <QTimer>
+
+#include "audio/common/rpc/platform/general/generalrpcchannel.h"
+#endif
+
 #include "log.h"
 
 using namespace muse;
 using namespace muse::audio;
 using namespace muse::audio::engine;
 using namespace muse::audio::soundtrack;
+
+#ifndef MUSE_THREADS_SUPPORT
+//! One thread (the web app): the export renders in the audio driver's callback, in the app's only thread, so now
+//! and then it lets the app run (its progress, the Cancel button), and the browser (painting, input)
+static void letAppRun(rpc::IRpcChannel* channel)
+{
+    static constexpr std::chrono::milliseconds INTERVAL(150);
+    //! Long enough for the browser to paint a frame
+    static constexpr int PAUSE_MS = 20;
+    static std::chrono::steady_clock::time_point lastTime;
+
+    const auto now = std::chrono::steady_clock::now();
+    if (now - lastTime < INTERVAL) {
+        return;
+    }
+
+    {
+        // The app's side of the audio RPC channel while it runs (see GeneralRpcChannel::EngineScope)
+        rpc::GeneralRpcChannel::MainScope mainScope;
+
+        // What the engine sent to the app (e.g. the progress of the export): the timer that usually handles it may
+        // be the one that is running the export
+        channel->process();
+
+        QEventLoop loop;
+        QTimer::singleShot(PAUSE_MS, &loop, &QEventLoop::quit);
+        loop.exec();
+    }
+
+    lastTime = std::chrono::steady_clock::now();
+}
+#endif
 
 static encode::AbstractAudioEncoderPtr createEncoder(const SoundTrackType type)
 {
@@ -184,6 +225,9 @@ Ret SoundTrackWriter::writeStreaming()
         framesWritten += chunk;
         sendStreamingProgress(framesWritten, m_totalSamples);
         rpcChannel()->process();
+#ifndef MUSE_THREADS_SUPPORT
+        letAppRun(rpcChannel().get());
+#endif
     }
 
     // Phase 2: actual audio data
@@ -202,6 +246,9 @@ Ret SoundTrackWriter::writeStreaming()
         framesWritten += chunk;
         sendStreamingProgress(framesWritten, m_totalSamples);
         rpcChannel()->process();
+#ifndef MUSE_THREADS_SUPPORT
+        letAppRun(rpcChannel().get());
+#endif
     }
 
     // Phase 3: trailing silence
@@ -219,6 +266,9 @@ Ret SoundTrackWriter::writeStreaming()
         framesWritten += chunk;
         sendStreamingProgress(framesWritten, m_totalSamples);
         rpcChannel()->process();
+#ifndef MUSE_THREADS_SUPPORT
+        letAppRun(rpcChannel().get());
+#endif
     }
 
     if (m_isAborted) {

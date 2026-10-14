@@ -56,6 +56,7 @@ private:
     void renderAhead();
 
     bool m_opened = false;
+    bool m_inCallback = false;
     Spec m_activeSpec;
     async::Channel<Spec> m_activeSpecChanged;
     async::Notification m_availableOutputDevicesChanged;

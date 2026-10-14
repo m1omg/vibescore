@@ -43,6 +43,17 @@ public:
         bool m_wasMainSide = false;
     };
 
+    //! The main side again, inside an EngineScope: the engine lets the app run while it works long (an audio export)
+    class MainScope
+    {
+    public:
+        MainScope();
+        ~MainScope();
+
+    private:
+        bool m_wasMainSide = false;
+    };
+
     void setupOnMain() override;
     void setupOnEngine() override;
 

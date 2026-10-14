@@ -22,9 +22,11 @@
 #include "abstractaudiowriter.h"
 
 #include <QCoreApplication>
+#include <QEventLoop>
 #include <QFile>
 #include <QFileInfo>
 #include <QThread>
+#include <QTimer>
 
 #include "global/containers.h"
 
@@ -35,6 +37,34 @@ using namespace muse::audio;
 using namespace mu::iex::audioexport;
 using namespace mu::project;
 using namespace mu::notation;
+
+//! Lets the app run until the condition is met
+static void waitUntil(const std::function<bool()>& condition, IApplication* application)
+{
+#ifdef Q_OS_WASM
+    // One thread (the web app): the audio engine runs in the app's thread, through timers, which a loop of
+    // processEvents() does not let run (the browser runs them); a nested event loop does
+    UNUSED(application);
+    QEventLoop loop;
+    QTimer timer;
+    timer.setInterval(10);
+    QObject::connect(&timer, &QTimer::timeout, [&loop, &condition]() {
+        if (condition()) {
+            loop.quit();
+        }
+    });
+    if (condition()) {
+        return;
+    }
+    timer.start();
+    loop.exec();
+#else
+    while (!condition()) {
+        application->processEvents();
+        QThread::yieldCurrentThread();
+    }
+#endif
+}
 
 std::vector<INotationWriter::UnitType> AbstractAudioWriter::supportedUnitTypes() const
 {
@@ -104,10 +134,7 @@ Ret AbstractAudioWriter::doWriteAndWait(INotationPtr notation,
     }
 
     //! NOTE Waiting for the audio system to start if it is not already running
-    while (!startAudioController()->isAudioStarted()) {
-        application()->processEvents();
-        QThread::yieldCurrentThread();
-    }
+    waitUntil([this]() { return startAudioController()->isAudioStarted(); }, application().get());
 
     m_isCompleted = false;
     m_writeRet = muse::Ret();
@@ -129,10 +156,7 @@ Ret AbstractAudioWriter::doWriteAndWait(INotationPtr notation,
 
     bool waitForCompletion = muse::value(options, OptionKey::WAIT_FOR_COMPLETION, Val(true)).toBool();
     if (waitForCompletion) {
-        while (!m_isCompleted) {
-            application()->processEvents();
-            QThread::yieldCurrentThread();
-        }
+        waitUntil([this]() { return m_isCompleted; }, application().get());
     }
 
     return m_writeRet;

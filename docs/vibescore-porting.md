@@ -153,7 +153,10 @@ scores (rename, duplicate, delete, share).
 - Web: `WebAudioDriver`. There is no audio thread: the engine renders on the main thread, a little ahead of time,
   and the blocks are played by an AudioWorklet. Browsers play audio after a user gesture. The page downloads the
   sound font after the app started (once: it is kept in IndexedDB); instruments that find no sound font wait for
-  one (`EventAudioSource`), so a score opened before the download finished gets its sounds then.
+  one (`EventAudioSource`), so a score opened before the download finished gets its sounds then. An audio export
+  renders in the driver's callback too: every 150 ms `SoundTrackWriter` hands the app what the engine sent it and
+  lets the app and the browser run for a moment (a nested event loop, on the app's side of the RPC channel), so that
+  the progress shows and Cancel works; the driver does not call the engine again meanwhile.
 
 The app pauses playback and stops the audio stream when it goes to the background, and saves an autosave.
 
@@ -182,4 +185,4 @@ desktop platforms.
 
 - Muse Sounds (a proprietary library), VST and other audio plugins.
 - Video export (FFmpeg), AAC export (fdk-aac is not compatible with the GPL).
-- On the web: MIDI devices, language packs, Learn, plugins and audio export (for now).
+- On the web: MIDI devices, language packs, Learn and plugins (for now).
