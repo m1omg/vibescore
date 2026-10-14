@@ -3,9 +3,11 @@
 """Starts the web app in a browser and reports how the start goes.
 
 Usage: smoke_test.py URL OUT_DIR [--engine chromium|firefox] [--timeout SECONDS] [--cpu-slowdown N] [--tablet]
+                     [--max-memory MB]
 
 Writes to OUT_DIR, with the engine as prefix: the loading steps with their times (timeline.txt), the browser's console
-(console.log) and screenshots. Exits with 1 when the app did not start in time.
+(console.log) and screenshots. Exits with 1 when the app did not start in time, or (on Linux) when the page's process
+used more memory than --max-memory.
 - --cpu-slowdown N (Chromium): runs the page N times slower, like a slower device.
 - --tablet (Chromium): a touch tablet (mobile viewport).
 """
@@ -19,6 +21,37 @@ import sys
 import time
 
 from playwright.async_api import async_playwright
+
+
+def page_process_memory_mb():
+    """The memory (RSS) of the biggest page process (renderer, content process) that this script started (Linux)."""
+    children = {}
+    for pid in os.listdir("/proc"):
+        if not pid.isdigit():
+            continue
+        try:
+            with open(f"/proc/{pid}/stat") as f:
+                ppid = int(f.read().rsplit(")", 1)[1].split()[1])
+            children.setdefault(ppid, []).append(int(pid))
+        except (OSError, ValueError, IndexError):
+            pass
+    biggest = 0
+    todo = [os.getpid()]
+    while todo:
+        pid = todo.pop()
+        todo += children.get(pid, [])
+        try:
+            with open(f"/proc/{pid}/cmdline", "rb") as f:
+                cmdline = f.read()
+            if b"--type=renderer" not in cmdline and b"-contentproc" not in cmdline:
+                continue
+            with open(f"/proc/{pid}/status") as f:
+                for line in f:
+                    if line.startswith("VmRSS:"):
+                        biggest = max(biggest, int(line.split()[1]) // 1024)
+        except OSError:
+            pass
+    return biggest
 
 # Before the page's scripts: notes each step of the loading screen, and how long the page's thread was busy
 # (the longest time between two ticks of a 100 ms timer)
@@ -66,7 +99,10 @@ async def main():
     parser.add_argument("--timeout", type=float, default=300)
     parser.add_argument("--cpu-slowdown", type=float, default=0)
     parser.add_argument("--tablet", action="store_true")
+    parser.add_argument("--max-memory", type=float, default=0)
     args = parser.parse_args()
+    has_proc = os.path.isdir("/proc/self")
+    peak_memory = 0
 
     os.makedirs(args.out, exist_ok=True)
     prefix = os.path.join(args.out, args.engine + ("-tablet" if args.tablet else "")
@@ -84,7 +120,9 @@ async def main():
         if args.engine == "firefox":
             browser = await p.firefox.launch()
         else:
-            browser = await p.chromium.launch(args=["--enable-unsafe-swiftshader", "--ignore-gpu-blocklist"])
+            # VS_CHROMIUM: another Chromium than Playwright's own, e.g. /usr/bin/google-chrome-stable
+            browser = await p.chromium.launch(executable_path=os.environ.get("VS_CHROMIUM"),
+                                              args=["--enable-unsafe-swiftshader", "--ignore-gpu-blocklist"])
         note(f"{args.engine} {browser.version} on {platform.machine()}, {os.cpu_count()} CPUs")
 
         options = {"viewport": {"width": 1280, "height": 800}}
@@ -111,6 +149,8 @@ async def main():
         state = {}
         while time.time() - t0 < args.timeout:
             await asyncio.sleep(1)
+            if has_proc:
+                peak_memory = max(peak_memory, page_process_memory_mb())
             try:
                 state = json.loads(await asyncio.wait_for(page.evaluate(STATE), 5))
             except asyncio.TimeoutError:
@@ -126,7 +166,11 @@ async def main():
             if state.get("started"):
                 started = True
                 note("the app started")
-                await asyncio.sleep(8)
+                # The memory is watched a while longer (the browser keeps compiling in the background)
+                for _ in range(20):
+                    await asyncio.sleep(1)
+                    if has_proc:
+                        peak_memory = max(peak_memory, page_process_memory_mb())
                 break
 
         try:
@@ -137,8 +181,13 @@ async def main():
             timeline.append(f"  page step at {at / 1000:7.1f}s: {text}")
         timeline.append(f"  longest time the page's thread was busy: {state.get('longestBusyMs')} ms")
         timeline.append(f"  problem shown: {state.get('problem')!r}")
+        if has_proc:
+            note(f"peak memory of the page's process: {peak_memory} MB")
         if not started:
             note(f"the app did not start in {args.timeout:g} s")
+        too_much_memory = args.max_memory and peak_memory > args.max_memory
+        if too_much_memory:
+            note(f"the page used more than {args.max_memory:g} MB")
         try:
             await asyncio.wait_for(page.screenshot(path=prefix + "screen.png"), 30)
         except Exception as e:
@@ -149,7 +198,7 @@ async def main():
         with open(prefix + "console.log", "w") as f:
             f.write("\n".join(console) + "\n")
         await browser.close()
-    return 0 if started else 1
+    return 0 if started and not too_much_memory else 1
 
 
 if __name__ == "__main__":

@@ -23,11 +23,12 @@ jobs:
       matrix:
         os: [ubuntu-24.04, ubuntu-24.04-arm]
         engine: [chromium, firefox]
+        variant: ['']
         include:
           # A slower ARM64 device, with a touch screen
           - os: ubuntu-24.04-arm
             engine: chromium
-            extra: '--tablet --cpu-slowdown 4'
+            variant: 'slow-tablet'
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30
     steps:
@@ -46,13 +47,14 @@ jobs:
         env:
           URL: ${{ inputs.url || 'https://m1omg.github.io/vibescore/' }}
         run: |
+          # The page's process must stay well below what phones and tablets give a tab
           "$RUNNER_TEMP/venv/bin/python" buildscripts/web/smoke_test.py "$URL" out --engine ${{ matrix.engine }} \
-            --timeout 600 ${{ matrix.extra }}
+            --timeout 600 --max-memory 1400 ${{ matrix.variant == 'slow-tablet' && '--tablet --cpu-slowdown 4' || '' }}
 
       - name: Upload the report
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: web-start-${{ matrix.os }}-${{ matrix.engine }}${{ matrix.extra && '-slow-tablet' || '' }}
+          name: web-start-${{ matrix.os }}-${{ matrix.engine }}${{ matrix.variant && format('-{0}', matrix.variant) || '' }}
           path: out
           retention-days: 14
