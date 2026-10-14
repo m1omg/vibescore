@@ -32,7 +32,8 @@ static const AudioDeviceID DEFAULT_DEVICE_ID = "default";
 //! How far ahead of the playback the engine renders (seconds): more is safer against a busy main thread,
 //! less makes playback start and stop sooner
 static constexpr double RENDER_AHEAD_SECONDS = 0.15;
-static constexpr int RENDER_INTERVAL_MS = 10;
+//! Each wake-up of the page costs (the timer, the messages to the player): a block (1024 frames) lasts ~21 ms
+static constexpr int RENDER_INTERVAL_MS = 20;
 
 // Creates the AudioContext and the player (an AudioWorklet), and returns the sample rate of the browser's output
 EM_JS(int, vs_audio_open, (), {
@@ -42,14 +43,18 @@ EM_JS(int, vs_audio_open, (), {
         const audio = { ctx: ctx, node: null, sent: 0, played: 0 };
         Module.vibescoreAudio = audio;
 
-        // Plays the interleaved stereo blocks it is sent, in order, and reports how many frames it played
+        // Plays the interleaved stereo blocks it is sent, in order, and reports how many frames it played: every
+        // REPORT_QUANTA render quanta (~21 ms), and at once when it runs out of blocks (each message wakes up the page)
         const processor = `
+            const REPORT_QUANTA = 8;
             class VibeScorePlayer extends AudioWorkletProcessor {
                 constructor() {
                     super();
                     this.queue = [];
                     this.offset = 0;
                     this.played = 0;
+                    this.quanta = 0;
+                    this.starved = false;
                     this.port.onmessage = (event) => this.queue.push(event.data);
                 }
                 process(inputs, outputs) {
@@ -71,11 +76,16 @@ EM_JS(int, vs_audio_open, (), {
                         }
                     }
                     this.played += i;
+                    const ranOut = i < left.length;
                     for (; i < left.length; ++i) {
                         left[i] = 0;
                         right[i] = 0;
                     }
-                    this.port.postMessage(this.played);
+                    if (++this.quanta >= REPORT_QUANTA || (ranOut && !this.starved)) {
+                        this.quanta = 0;
+                        this.port.postMessage(this.played);
+                    }
+                    this.starved = ranOut;
                     return true;
                 }
             }
