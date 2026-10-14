@@ -181,7 +181,9 @@ Memory (what phones and tablets give a tab is limited): the module is ~140 MB, ~
 functions with a single caller apart when they are big (`--one-caller-inline-max-function-size`): otherwise all the
 static initializers end up in `__wasm_call_ctors` (1.9 MB), which Chromium's optimizing compiler compiles again after
 the start for more than a gigabyte of memory (the page's process went from ~0.65 GB to ~1.9 GB; the start froze on a
-tablet). Only the Qt Quick Controls style that the app uses is linked (`SetupQt6.cmake`). JSPI instead of Asyncify
+tablet). Only the Qt Quick Controls style that the app uses is linked (`SetupQt6.cmake`). On mobile platforms and
+the web, `Muse.GraphicalEffects` uses QtQuick.Effects (`GraphicalEffects/mobile/`): Qt5Compat's effects compile their
+shaders when the app runs, which fails on WebGL 2 and OpenGL ES 3, and needs Qt Shader Tools in the app. JSPI instead of Asyncify
 would halve the code, but it needs a Qt built with WebAssembly exceptions: with the prebuilt Qt (JavaScript
 exceptions) every `invoke_*` import becomes a suspending import, which fails outside `WebAssembly.promising`
 (e.g. in the static initializers).
