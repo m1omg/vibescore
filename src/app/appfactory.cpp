@@ -273,10 +273,6 @@
 #include "stubs/project/projectstubmodule.h"
 #endif
 
-#ifdef MUE_CONFIGURATION_IS_APPWEB
-#include "web/appjs/appjsmodule.h"
-#endif
-
 using namespace muse;
 using namespace mu::app;
 
@@ -424,10 +420,6 @@ std::shared_ptr<muse::IApplication> AppFactory::newGuiApp(const CmdOptions& opti
     app->addModule(new mu::project::ProjectModule());
     app->addModule(new muse::update::UpdateModule());
     app->addModule(new muse::workspace::WorkspaceModule());
-
-#ifdef MUE_CONFIGURATION_IS_APPWEB
-    app->addModule(new mu::appjs::AppJsModule());
-#endif
 
 #ifdef MUE_CONFIGURATION_IS_APPMOBILE
     app->addModule(new mu::mobile::MobileModule());

@@ -79,7 +79,7 @@ elseif(OS_IS_MAC)
 
 elseif(OS_IS_WASM)
 
-    set(EXECUTABLE_NAME MuseScoreStudio)
+    set(EXECUTABLE_NAME ${VS_BRAND_NAME_MACHINE})
 
 elseif(OS_IS_ANDROID)
 
@@ -203,10 +203,6 @@ if (OS_IS_WIN)
     )
 endif()
 
-if (MUE_CONFIGURATION_IS_APPWEB)
-    list(APPEND LINK_LIB appjs)
-endif()
-
 ###########################################
 # Resources
 ###########################################
@@ -235,10 +231,6 @@ if (MUE_ENABLE_CONSOLEAPP)
         internal/consoleapp.cpp
         internal/consoleapp.h
     )
-endif()
-
-if (CC_IS_EMCC)
-    set(APP_SRC ${APP_SRC} webapi_export.cpp)
 endif()
 
 qt_add_executable(MuseScoreStudio
@@ -289,6 +281,9 @@ if (OS_IS_ANDROID)
 elseif (OS_IS_IOS)
     include(SetupIOSPackaging)
     vs_setup_ios_packaging(MuseScoreStudio)
+elseif (OS_IS_WASM)
+    include(SetupWebPackaging)
+    vs_setup_web_packaging(MuseScoreStudio)
 endif()
 
 ###########################################
@@ -319,9 +314,13 @@ target_include_directories(MuseScoreStudio PRIVATE
 target_link_libraries(MuseScoreStudio PRIVATE ${LINK_LIB} ${COVERAGE_LINK_FLAGS})
 
 if (CC_IS_EMCC)
-    include(exported_functions.cmake)
     target_link_options(MuseScoreStudio PRIVATE ${EMCC_LINKER_FLAGS})
-    target_link_options(MuseScoreStudio PRIVATE ${EXPORTED_FUNCTIONS})
+    # Nested event loops (dialogs that wait for an answer: QEventLoop::exec) need Asyncify
+    target_link_options(MuseScoreStudio PRIVATE "SHELL:-s ASYNCIFY" "SHELL:-s ASYNCIFY_STACK_SIZE=1048576")
+    # Scores, settings and the library are kept in the browser's IndexedDB (see the web platform of the mobile module)
+    target_link_options(MuseScoreStudio PRIVATE "-lidbfs.js")
+    # A score is a lot of memory
+    target_link_options(MuseScoreStudio PRIVATE "SHELL:-s INITIAL_MEMORY=268435456" "SHELL:-s STACK_SIZE=5242880")
 endif()
 
 
@@ -434,14 +433,7 @@ elseif(OS_IS_MAC)
 # Wasm
 ###########################################
 elseif(OS_IS_WASM)
-
-    add_custom_command(
-        TARGET MuseScoreStudio
-        POST_BUILD
-        COMMAND node ${PROJECT_SOURCE_DIR}/src/web/appjs/install.js ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}
-        WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
-        COMMENT "Install js api..."
-    )
+    # The web app is the folder CMAKE_RUNTIME_OUTPUT_DIRECTORY (see SetupBuildEnvironment.cmake)
 
 elseif(OS_IS_MOBILE)
     # Packaged by androiddeployqt (Android) or as an app bundle (iOS), see above

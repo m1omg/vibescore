@@ -26,7 +26,9 @@
 #include <QStyleHints>
 #include <QQuickWindow>
 #include <QSettings>
+#ifndef Q_OS_WASM
 #include <QSslSocket>
+#endif
 
 #include "appfactory.h"
 #include "internal/commandlineparser.h"
@@ -206,12 +208,14 @@ int main(int argc, char** argv)
 
     app->setupNewContext();
 
+#ifndef Q_OS_WASM // the browser does the network's encryption
     LOGI() << QString("SSL Info: supported: %1, build: %2, runtime: %3, active backend: %4, available backends: %5")
         .arg(QSslSocket::supportsSsl())
         .arg(QSslSocket::sslLibraryBuildVersionString())
         .arg(QSslSocket::sslLibraryVersionString())
         .arg(QSslSocket::activeBackend())
         .arg(QSslSocket::availableBackends().join(", "));
+#endif
 
     // ====================================================
     // Run main loop

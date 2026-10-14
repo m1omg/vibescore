@@ -87,7 +87,8 @@ if(QT_ADD_WEBSOCKET)
 endif()
 
 if (OS_IS_WASM)
-    set(QT_WASM_EXTRA_EXPORTED_METHODS ccall)
+    # The page prepares the file system before the app starts (see buildscripts/web/vibescore-web.js)
+    set(QT_WASM_EXTRA_EXPORTED_METHODS "ccall,addRunDependency,removeRunDependency")
 endif()
 
 find_package(Qt6 6.8 REQUIRED COMPONENTS ${qt_components})

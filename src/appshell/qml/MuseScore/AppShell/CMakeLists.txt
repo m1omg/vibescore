@@ -126,8 +126,8 @@ elseif(OS_IS_WIN)
             platform/win/AppTitleBar.qml
             platform/win/Main.qml
     )
-elseif(OS_IS_LIN OR OS_IS_FBSD OR OS_IS_MOBILE)
-    # Mobile: the desktop shell is used until the touch shell (src/mobile) replaces it
+elseif(OS_IS_LIN OR OS_IS_FBSD OR OS_IS_MOBILE OR OS_IS_WASM)
+    # Mobile and web: the desktop shell (MUSE_DESKTOP_SHELL=1) besides the mobile shell (src/mobile)
     qt_target_qml_sources(appshell_qml 
         QML_FILES
             platform/linux/Main.qml

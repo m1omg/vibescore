@@ -1,0 +1,10 @@
+{
+    "name": "VibeScore",
+    "short_name": "VibeScore",
+    "description": "Write, play and print sheet music. Based on MuseScore Studio.",
+    "start_url": ".",
+    "display": "standalone",
+    "background_color": "#4B2BD1",
+    "theme_color": "#4B2BD1",
+    "icons": [ { "src": "vibescore.svg", "sizes": "any", "type": "image/svg+xml" } ]
+}

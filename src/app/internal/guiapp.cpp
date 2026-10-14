@@ -212,9 +212,9 @@ void GuiApp::setup()
     //! NOTE Adjust GS Api
     //! We can hide this algorithm in GSApiProvider,
     //! but it is intentionally left here to illustrate what is happening.
-    //! On mobile the platform's graphics API is always used: there is nothing to switch to,
+    //! On mobile and on the web the platform's graphics API is always used: there is nothing to switch to,
     //! and the recovery strategy (restarting the app) is not possible there.
-#if !defined(Q_OS_ANDROID) && !defined(Q_OS_IOS)
+#if !defined(Q_OS_ANDROID) && !defined(Q_OS_IOS) && !defined(Q_OS_WASM)
     {
         GraphicsApiProvider* gApiProvider = new GraphicsApiProvider(BaseApplication::appVersion());
 

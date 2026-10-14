@@ -93,11 +93,8 @@ if (MUE_BUILD_PROJECT_MODULE)
 endif()
 
 if (MUE_BUILD_APPSHELL_MODULE)
-    if (MUE_CONFIGURATION_IS_APPWEB)
-        add_subdirectory(web/appshell)
-    else()
-        add_subdirectory(appshell)
-    endif()
+    # The web app (app-web) is the mobile app built for the browser: same app shell and mobile shell
+    add_subdirectory(appshell)
 endif()
 
 if (MUE_CONFIGURATION_IS_APPMOBILE)
@@ -106,9 +103,6 @@ endif()
 
 # App (main)
 add_subdirectory(app)
-if (MUE_CONFIGURATION_IS_APPWEB)
-    add_subdirectory(web/appjs)
-endif()
 
 if (MUE_BUILD_MACOS_INTEGRATION AND OS_IS_MAC)
     add_subdirectory(macos_integration)
