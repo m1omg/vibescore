@@ -61,7 +61,10 @@ buildscripts/web/web_build.sh [Release|Debug]   # configure (first time) and bui
 buildscripts/web/serve.sh [port]                # http://localhost:8000/
 ```
 
-CI: `.github/workflows/build_web.yml` builds the web app and publishes it on GitHub Pages.
+CI: `.github/workflows/build_web.yml` builds the web app and publishes it on GitHub Pages; then
+`.github/workflows/test_web.yml` starts the published app in Chromium and Firefox on x86-64 and ARM64 (and on a
+slowed-down ARM64 tablet) with `buildscripts/web/smoke_test.py`, which notes the time of each step of the start and
+fails when the page's process needs more than 1.4 GB of memory.
 
 ### Releases
 
@@ -173,6 +176,15 @@ database that the browser does not open in 10 seconds fails instead, and the app
 and says so. The app is linked with Asyncify, so that dialogs that wait for an answer
 (nested event loops) work; `web::fixNestedEventLoops()` works around a Qt 6.10 bug that stopped the event processing
 after such a dialog.
+
+Memory (what phones and tablets give a tab is limited): the module is ~140 MB, ~100 MB of it code. The link keeps
+functions with a single caller apart when they are big (`--one-caller-inline-max-function-size`): otherwise all the
+static initializers end up in `__wasm_call_ctors` (1.9 MB), which Chromium's optimizing compiler compiles again after
+the start for more than a gigabyte of memory (the page's process went from ~0.65 GB to ~1.9 GB; the start froze on a
+tablet). Only the Qt Quick Controls style that the app uses is linked (`SetupQt6.cmake`). JSPI instead of Asyncify
+would halve the code, but it needs a Qt built with WebAssembly exceptions: with the prebuilt Qt (JavaScript
+exceptions) every `invoke_*` import becomes a suspending import, which fails outside `WebAssembly.promising`
+(e.g. in the static initializers).
 
 ## Platform checks
 
