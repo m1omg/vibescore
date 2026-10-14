@@ -21,6 +21,7 @@
  */
 #include "notationscenemodule.h"
 
+#include "muse_framework_config.h"
 #include "modularity/ioc.h"
 #include "ui/iinteractiveuriregister.h"
 #include "ui/iuiactionsregister.h"
@@ -81,7 +82,12 @@ void NotationSceneModule::resolveImports()
         ir->registerWidgetUri<BreaksDialog>(Uri("musescore://notation/breaks"));
         ir->registerWidgetUri<EditStaff>(Uri("musescore://notation/staffproperties"));
         ir->registerWidgetUri<EditStringData>(Uri("musescore://notation/editstrings"));
+#ifdef MUSE_CONFIGURATION_IS_MOBILE
+        // Touch screens: a QML version with large controls
+        ir->registerQmlUri(Uri("musescore://notation/transpose"), "MuseScore.NotationScene", "TransposeDialog");
+#else
         ir->registerWidgetUri<TransposeDialog>(Uri("musescore://notation/transpose"));
+#endif
         ir->registerWidgetUri<SelectNoteDialog>(Uri("musescore://notation/selectnote"));
         ir->registerWidgetUri<SelectDialog>(Uri("musescore://notation/selectelement"));
         ir->registerWidgetUri<TupletDialog>(Uri("musescore://notation/othertupletdialog"));
