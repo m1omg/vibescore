@@ -7,6 +7,8 @@ set -euo pipefail
 APP="$1"
 OUT="$2"
 mkdir -p "$OUT"
+# Absolute: simctl hands the --stdout/--stderr paths to the simulator's launchd, which resolves relative ones from /
+OUT="$(cd "$OUT" && pwd)"
 
 BUNDLE_ID="$(/usr/libexec/PlistBuddy -c "Print CFBundleIdentifier" "$APP/Info.plist")"
 
