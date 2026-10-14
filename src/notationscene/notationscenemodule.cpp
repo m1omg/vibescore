@@ -93,7 +93,11 @@ void NotationSceneModule::resolveImports()
         ir->registerWidgetUri<TransposeDialog>(Uri("musescore://notation/transpose"));
 #endif
         ir->registerWidgetUri<SelectNoteDialog>(Uri("musescore://notation/selectnote"));
+#ifdef MUSE_CONFIGURATION_IS_MOBILE
+        ir->registerQmlUri(Uri("musescore://notation/selectelement"), "MuseScore.NotationScene", "SelectDialog");
+#else
         ir->registerWidgetUri<SelectDialog>(Uri("musescore://notation/selectelement"));
+#endif
 #ifdef MUSE_CONFIGURATION_IS_MOBILE
         ir->registerQmlUri(Uri("musescore://notation/othertupletdialog"), "MuseScore.NotationScene", "TupletDialog");
 #else
