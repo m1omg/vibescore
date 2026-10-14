@@ -108,6 +108,7 @@ jobs:
         run: |
           "$QT_ROOT_DIR/bin/qt-cmake" -S . -B build-android -G Ninja \
             -DMUSESCORE_BUILD_CONFIGURATION=app-mobile \
+            -DMUSE_APP_BUILD_MODE=release \
             -DCMAKE_BUILD_TYPE=${BUILD_TYPE} \
             -DQT_HOST_PATH="$VS_QT_HOST_PATH" \
             -DANDROID_SDK_ROOT="$ANDROID_SDK_ROOT" \

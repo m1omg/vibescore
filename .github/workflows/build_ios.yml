@@ -77,6 +77,7 @@ jobs:
           SDK="${{ matrix.sdk }}"
           "$QT_ROOT_DIR/bin/qt-cmake" -S . -B build-ios -G Xcode \
             -DMUSESCORE_BUILD_CONFIGURATION=app-mobile \
+            -DMUSE_APP_BUILD_MODE=release \
             -DCMAKE_BUILD_TYPE=${BUILD_TYPE} \
             -DQT_HOST_PATH="$VS_QT_HOST_PATH" \
             -DCMAKE_OSX_SYSROOT="$SDK" \
