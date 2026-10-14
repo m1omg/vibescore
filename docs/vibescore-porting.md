@@ -63,6 +63,14 @@ buildscripts/web/serve.sh [port]                # http://localhost:8000/
 
 CI: `.github/workflows/build_web.yml` builds the web app and publishes it on GitHub Pages.
 
+### Releases
+
+Pushing a tag `vX.Y.Z` runs `.github/workflows/release.yml`: it builds the Android APK and the iOS IPA (through the
+build workflows) and publishes them on GitHub Releases, with checksums and the notes of
+`buildscripts/release/release_notes.md`. Android installs an update only when it is signed with the same key as the
+installed app, so releases need the release key in the repository's secrets `ANDROID_KEYSTORE_BASE64` (the keystore,
+base64-encoded; key alias `vibescore`) and `ANDROID_KEYSTORE_PASS`. The version is set in `MobileBranding.cmake`.
+
 ### Unit tests
 
 Host tests use the `utest` configuration (Debug, ASAN) in `~/osm/build/host-utest`; run them with
@@ -110,6 +118,9 @@ cursor (without the text being composed), get hints (no corrections or capitals 
 fingerings), and their replacements, cursor moves and suggestions are applied (`NotationInteraction::editText`).
 Qt for Android only sends keyboard input to an object with an `inputMethodHints` property, which the score view
 therefore has. A space or hyphen that a keyboard sends as text in lyrics moves on, as the keys do.
+While text is edited, `TextEditBar.qml` (above the keyboard, in place of the status bar) has the actions of the keys
+that software keyboards lack (next syllable, word, verse, beat; bold, italic, underline) and Done; its buttons are not
+in the keyboard navigation, so that tapping them leaves the focus (and the typed text) on the score.
 
 ### Files
 
@@ -122,8 +133,13 @@ scores (rename, duplicate, delete, share).
 
 ### Audio and MIDI
 
-- Android: `OboeAudioDriver` (AAudio, OpenSL ES fallback); MIDI devices through `android.media.midi`.
-- iOS: `IosAudioDriver` (RemoteIO, AVAudioSession); MIDI through CoreMIDI.
+- Android: `OboeAudioDriver` (AAudio, OpenSL ES fallback); MIDI devices through `android.media.midi`. Bluetooth LE
+  MIDI devices are chosen in the system's companion device chooser (no location permission) and opened with
+  `MidiManager.openBluetoothDevice` (`VibeScoreBluetoothMidi.java`); then they are MIDI devices like the others.
+- iOS: `IosAudioDriver` (RemoteIO, AVAudioSession); MIDI through CoreMIDI; Bluetooth MIDI devices are connected in
+  Apple's panel (`CABTMIDICentralViewController`).
+- Both: Preferences → Audio & MIDI → "Connect Bluetooth MIDI device…" runs the action `midi-connect-bluetooth`
+  (`BluetoothMidiController` in the mobile module).
 - Web: `WebAudioDriver`. There is no audio thread: the engine renders on the main thread, a little ahead of time,
   and the blocks are played by an AudioWorklet. Browsers play audio after a user gesture. The page downloads the
   sound font after the app started (once: it is kept in IndexedDB); instruments that find no sound font wait for

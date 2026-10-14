@@ -51,6 +51,10 @@ which signs it for your device:
 - **Tablets**: the panels (palettes, properties, layout, ...) open beside the score, the keypad, mixer, piano
   keyboard and timeline below it.
 - **Phones**: panels open over the score, one at a time; the note input keypad opens with note input.
+- **Text on the score** (lyrics, chord symbols, staff text, ...): while you type, the bar above the keyboard moves on
+  to the next syllable, word, verse, note or beat, and has bold, italic and underline; **Done** ends the editing.
+- **MIDI keyboards**: USB keyboards work when they are plugged in. Bluetooth MIDI keyboards: Preferences → Audio &
+  MIDI → *Connect Bluetooth MIDI device…* (Android connects them again when the app starts).
 - **Menu** (⋯ in the top bar): all the menus of MuseScore Studio. Keyboard shortcuts work with a hardware keyboard.
 - **Settings → Appearance → Interface scale** makes everything bigger or smaller.
 - **Back** (Android) closes the open dialog or panel, then goes Home.
@@ -89,3 +93,4 @@ VibeScore is licensed under the [GNU General Public License version 3](LICENSE.t
 MuseScore Studio is © MuseScore Limited and its contributors; see the
 [MuseScore repository](https://github.com/musescore/MuseScore) for the original program.
 "MuseScore" is a trademark of MuseScore Limited; VibeScore does not use it as its name.
+The third-party components in VibeScore and their licenses are listed in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).

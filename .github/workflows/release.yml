@@ -44,6 +44,7 @@ jobs:
           mkdir release
           cp artifacts/VibeScore-Android-arm64/VibeScore-arm64.apk "release/VibeScore-$VERSION-android-arm64.apk"
           cp artifacts/VibeScore-iOS-iphoneos/VibeScore-unsigned.ipa "release/VibeScore-$VERSION-ios-unsigned.ipa"
+          cp THIRD_PARTY_NOTICES.md release/
           (cd release && sha256sum -- * > SHA256SUMS.txt)
 
           # 0.x versions and versions like 1.0.0-beta.1 are pre-releases
