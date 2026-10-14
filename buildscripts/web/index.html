@@ -19,7 +19,7 @@
                    justify-content: center; gap: 16px; text-align: center; padding: 16px; }
         #loading img { width: 96px; height: 96px; }
         #loading h1 { font-size: 22px; font-weight: 600; margin: 0; }
-        #status { font-size: 14px; opacity: 0.8; min-height: 1.4em; max-width: 480px; }
+        #status { font-size: 14px; opacity: 0.8; min-height: 1.4em; max-width: 480px; white-space: pre-line; }
         #progress { width: min(320px, 80vw); height: 4px; border-radius: 2px; background: rgba(128, 128, 128, 0.25);
                     overflow: hidden; }
         #progress div { width: 0%; height: 100%; background: #4B2BD1; transition: width 0.2s; }
@@ -78,6 +78,7 @@
             if (!loader.checkBrowser()) {
                 return;
             }
+            vibescorePrefetchShare();
 
             try {
                 const instance = await qtLoad({

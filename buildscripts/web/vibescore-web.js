@@ -21,6 +21,13 @@ const VS_INDEXEDDB_TIMEOUT_MS = 10000;
 const VS_RESTORE_TIMEOUT_MS = 20000;
 // A step that shows no progress for this long is reported to the user
 const VS_STALL_MS = 30000;
+// The download of the app is started again when no data arrives for this long
+const VS_DOWNLOAD_STALL_MS = 20000;
+const VS_DOWNLOAD_ATTEMPTS = 3;
+// Preparing the app (the browser compiles it) can take minutes on phones and tablets: the user is told so after this
+// time, and that something is wrong only after the longer one
+const VS_PREPARE_HINT_MS = 10000;
+const VS_PREPARE_STALL_MS = 240000;
 
 const vsMB = bytes => (bytes / 1e6).toFixed(0);
 
@@ -62,33 +69,72 @@ function vsGuardIndexedDB(onTimeout) {
     };
 }
 
+// The browser and the device, for the reports of problems
+function vsDeviceSummary() {
+    const brands = navigator.userAgentData?.brands?.filter(b => !/Not.A.Brand/i.test(b.brand))
+        .map(b => b.brand + ' ' + b.version).join(', ');
+    return [brands || navigator.userAgent,
+            navigator.hardwareConcurrency ? navigator.hardwareConcurrency + ' cores' : '',
+            navigator.deviceMemory ? navigator.deviceMemory + ' GB memory' : ''].filter(Boolean).join(', ');
+}
+
 // The loading screen: what is being done, the progress, problems
 function vibescoreLoader(elements) {
     let stage = '';
+    let stageStartTime = Date.now();
     let lastProgressTime = Date.now();
+    let progressText = '';
+    // The step shows the seconds since it started (it has no progress of its own)
+    let isCounting = false;
+    let hint = '';
+    let hintAfterMs = 0;
+    let stallMs = VS_STALL_MS;
     let isStarted = false;
     let isFailed = false;
     let warnings = [];
+
+    // When each step started, for the reports of problems (and the browser's console: vibescoreTimings)
+    const loadStartTime = Date.now();
+    const timings = window.vibescoreTimings = [];
+    const noteTiming = text => timings.push(`${((Date.now() - loadStartTime) / 1000).toFixed(1)} s: ${text}`);
+
+    const showStatus = () => {
+        const elapsed = Date.now() - stageStartTime;
+        let text = stage + (progressText ? ' ' + progressText : '')
+                   + (isCounting ? ` ${Math.floor(elapsed / 1000)} s` : '');
+        if (hint && elapsed >= hintAfterMs) {
+            text += '\n' + hint;
+        }
+        elements.status.textContent = text;
+    };
 
     const showProblems = extra => {
         elements.problem.textContent = [...warnings, extra].filter(Boolean).join('\n');
     };
 
     const loader = {
-        // A step of the start, e.g. "Downloading VibeScore…"
-        setStage(text) {
+        // A step of the start, e.g. "Downloading VibeScore…". Options:
+        // - counting: shows the seconds since the step started (for a step without a progress of its own);
+        // - hint, hintAfterMs: a line shown under the step once it takes longer than hintAfterMs (default: at once);
+        // - stallMs: how long the step may go without progress before it is reported as a problem.
+        setStage(text, options = {}) {
             stage = text;
-            lastProgressTime = Date.now();
-            elements.status.textContent = text;
+            stageStartTime = lastProgressTime = Date.now();
+            progressText = '';
+            isCounting = options.counting ?? false;
+            hint = options.hint ?? '';
+            hintAfterMs = options.hintAfterMs ?? 0;
+            stallMs = options.stallMs ?? VS_STALL_MS;
+            noteTiming(text);
+            showStatus();
             showProblems();
         },
 
         // fraction: 0…1, or null for unknown
         setProgress(fraction, text) {
             lastProgressTime = Date.now();
-            if (text) {
-                elements.status.textContent = stage + ' ' + text;
-            }
+            progressText = text ?? '';
+            showStatus();
             const bar = elements.progress.firstElementChild;
             bar.style.width = fraction === null ? '100%' : Math.round(Math.min(1, fraction) * 100) + '%';
             bar.style.opacity = fraction === null ? '0.4' : '1';
@@ -108,13 +154,19 @@ function vibescoreLoader(elements) {
             }
             isFailed = true;
             console.error(error);
+            const message = String(error?.message ?? error);
+            noteTiming('failed: ' + message);
             elements.status.textContent = 'VibeScore could not start.';
             elements.progress.style.visibility = 'hidden';
-            showProblems(String(error?.message ?? error) + '\nReload the page to try again.');
+            const advice = error instanceof RangeError || /memory/i.test(message)
+                ? 'The browser did not have enough memory for VibeScore: close other tabs and apps, then reload the page.'
+                : 'Reload the page to try again.';
+            showProblems(`${message}\n${advice}\n(${vsDeviceSummary()})`);
         },
 
         started() {
             isStarted = true;
+            noteTiming('started');
             elements.progress.style.visibility = 'hidden';
             if (warnings.length > 0 && elements.banner) {
                 elements.banner.querySelector('span').textContent = warnings.join(' ');
@@ -146,45 +198,45 @@ function vibescoreLoader(elements) {
             return true;
         },
 
-        // Module.instantiateWasm: downloads and compiles the app, with progress (the download is ~45 MB compressed)
+        // Downloads the app and compiles it (while it downloads, where the browser can), with progress.
+        // A download that stops (no data for VS_DOWNLOAD_STALL_MS) is started again.
+        async compile(url, expectedSize) {
+            for (let attempt = 1; ; ++attempt) {
+                let isStalled = false;
+                try {
+                    return await vsCompileWasm(url, expectedSize, loader, attempt > 1, () => { isStalled = true; });
+                } catch (error) {
+                    if (!isStalled) {
+                        throw error;
+                    }
+                    if (attempt >= VS_DOWNLOAD_ATTEMPTS) {
+                        throw new Error('The download of VibeScore stopped, several times. Check the connection, then '
+                                        + 'reload the page.');
+                    }
+                    console.warn('VibeScore: the download stopped, downloading again', error);
+                }
+            }
+        },
+
+        // Module.instantiateWasm: downloads and compiles the app, then creates it (the download is ~45 MB compressed)
         instantiateWasm(url, expectedSize) {
             return (imports, successCallback) => {
                 (async () => {
-                    loader.setStage('Downloading VibeScore…');
-                    const response = await fetch(url, { credentials: 'same-origin' });
-                    if (!response.ok) {
-                        throw new Error(`Could not download the app (${url}: ${response.status} ${response.statusText})`);
-                    }
-
-                    // The bytes are counted as they arrive (decompressed: the size of the wasm)
-                    let received = 0;
-                    const counter = new TransformStream({
-                        transform(chunk, controller) {
-                            received += chunk.byteLength;
-                            loader.setProgress(expectedSize > 0 ? received / expectedSize : null,
-                                               expectedSize > 0 ? `${vsMB(received)} of ${vsMB(expectedSize)} MB`
-                                                                : `${vsMB(received)} MB`);
-                            controller.enqueue(chunk);
-                        },
-                    });
-                    const counted = new Response(response.body.pipeThrough(counter),
-                                                 { headers: { 'Content-Type': 'application/wasm' } });
-
-                    // Compiled while it downloads, where the browser can
-                    let result;
-                    if (typeof WebAssembly.instantiateStreaming === 'function') {
-                        result = await WebAssembly.instantiateStreaming(counted, imports);
-                    } else {
-                        result = await WebAssembly.instantiate(await counted.arrayBuffer(), imports);
-                    }
-
-                    loader.setStage('Starting…');
-                    loader.setProgress(null);
-                    successCallback(result.instance, result.module);
+                    const module = await loader.compile(url, expectedSize);
+                    noteTiming('compiled');
+                    const instance = await WebAssembly.instantiate(module, imports);
+                    noteTiming('created');
+                    successCallback(instance, module);
                 })().catch(error => loader.failed(error));
 
                 return {}; // the exports come through successCallback
             };
+        },
+
+        // The last step: the app starts (the page cannot show anything else until the app shows itself)
+        starting() {
+            loader.setStage('Starting…', { hint: 'This can take a minute on phones and tablets.' });
+            loader.setProgress(null);
         },
     };
 
@@ -212,19 +264,78 @@ function vibescoreLoader(elements) {
         }
     });
 
-    // A step that does not progress is reported, so that "Loading…" never stays without an explanation
+    // Every second: the seconds of a step that counts them, its hint, and a step that does not progress is reported,
+    // so that the loading screen never stays without an explanation. (When the seconds stop, the page's thread is busy:
+    // the browser shows nothing new until it is done.)
     const watchdog = setInterval(() => {
         if (isStarted || isFailed) {
             clearInterval(watchdog);
             return;
         }
-        if (Date.now() - lastProgressTime > VS_STALL_MS) {
-            showProblems(`"${stage || 'Loading'}" is taking longer than it should. If it stays like this, reload `
-                         + 'the page; the browser\'s console (F12) may tell why.');
+        showStatus();
+        if (Date.now() - lastProgressTime > stallMs) {
+            showProblems(`"${stage || 'Loading'}" is taking longer than it should. If it stays like this, reload the `
+                         + `page; the browser's console (F12) may tell why.\n(${vsDeviceSummary()})`);
         }
-    }, 5000);
+    }, 1000);
 
     return loader;
+}
+
+// Downloads and compiles the app (loader.compile). onStall is called before a download that stopped is cancelled.
+async function vsCompileWasm(url, expectedSize, loader, isRetry, onStall) {
+    loader.setStage(isRetry ? 'The download stopped. Downloading VibeScore again…' : 'Downloading VibeScore…');
+
+    // No data for VS_DOWNLOAD_STALL_MS: the download is cancelled (the compilation then fails)
+    const abort = new AbortController();
+    let lastDataTime = Date.now();
+    let isDownloaded = false;
+    const stallCheck = setInterval(() => {
+        if (!isDownloaded && Date.now() - lastDataTime > VS_DOWNLOAD_STALL_MS) {
+            clearInterval(stallCheck);
+            onStall();
+            abort.abort();
+        }
+    }, 1000);
+
+    try {
+        const response = await fetch(url, { credentials: 'same-origin', signal: abort.signal,
+                                            cache: isRetry ? 'reload' : 'default' });
+        if (!response.ok) {
+            throw new Error(`Could not download the app (${url}: ${response.status} ${response.statusText})`);
+        }
+
+        // The bytes are counted as they arrive (decompressed: the size of the wasm)
+        let received = 0;
+        const counter = new TransformStream({
+            transform(chunk, controller) {
+                received += chunk.byteLength;
+                lastDataTime = Date.now();
+                loader.setProgress(expectedSize > 0 ? received / expectedSize : null,
+                                   expectedSize > 0 ? `${vsMB(received)} of ${vsMB(expectedSize)} MB`
+                                                    : `${vsMB(received)} MB`);
+                controller.enqueue(chunk);
+            },
+            flush() {
+                // The browser finishes compiling it (it compiled what arrived while it was downloading)
+                isDownloaded = true;
+                loader.setStage('Preparing VibeScore…', {
+                    counting: true,
+                    hint: 'This can take a few minutes on phones and tablets.',
+                    hintAfterMs: VS_PREPARE_HINT_MS,
+                    stallMs: VS_PREPARE_STALL_MS,
+                });
+            },
+        });
+        const counted = new Response(response.body.pipeThrough(counter), { headers: { 'Content-Type': 'application/wasm' } });
+
+        if (typeof WebAssembly.compileStreaming === 'function') {
+            return await WebAssembly.compileStreaming(counted);
+        }
+        return await WebAssembly.compile(await counted.arrayBuffer());
+    } finally {
+        clearInterval(stallCheck);
+    }
 }
 
 function vsMakeTree(FS, path) {
@@ -239,15 +350,24 @@ function vsMakeTree(FS, path) {
     }
 }
 
-async function vsLoadShare(FS) {
-    const version = '?v=' + (window.VS_BUILD ?? '');
-    const [indexResponse, dataResponse] = await Promise.all([fetch('share.json' + version), fetch('share.data' + version)]);
-    if (!indexResponse.ok || !dataResponse.ok) {
-        throw new Error('Could not download the application data (share.data)');
-    }
+// The application data (share.data, ~6 MB) is downloaded while the app downloads (vibescorePrefetchShare)
+let vsShareDownload = null;
 
-    const index = await indexResponse.json();
-    const data = new Uint8Array(await dataResponse.arrayBuffer());
+function vibescorePrefetchShare() {
+    const version = '?v=' + (window.VS_BUILD ?? '');
+    vsShareDownload ??= Promise.all([fetch('share.json' + version), fetch('share.data' + version)])
+        .then(async ([indexResponse, dataResponse]) => {
+            if (!indexResponse.ok || !dataResponse.ok) {
+                throw new Error('Could not download the application data (share.data)');
+            }
+            return [await indexResponse.json(), new Uint8Array(await dataResponse.arrayBuffer())];
+        });
+    vsShareDownload.catch(() => {}); // reported by vsLoadShare
+    return vsShareDownload;
+}
+
+async function vsLoadShare(FS) {
+    const [index, data] = await vibescorePrefetchShare();
 
     for (const file of index.files) {
         const path = VS_SHARE_FOLDER + '/' + file.path;
@@ -294,7 +414,7 @@ function vibescorePreRun(module, loader) {
     });
 
     Promise.all([restore, vsLoadShare(FS)]).then(() => {
-        loader.setStage('Starting…');
+        loader.starting();
         module.removeRunDependency('vibescore-files');
     }).catch(error => loader.failed(error));
 
