@@ -3,7 +3,7 @@
 """Starts the web app in a browser and reports how the start goes.
 
 Usage: smoke_test.py URL OUT_DIR [--engine chromium|firefox] [--timeout SECONDS] [--cpu-slowdown N] [--tablet]
-                     [--max-memory MB]
+                     [--max-memory MB] [--headed]
 
 Writes to OUT_DIR, with the engine as prefix: the loading steps with their times (timeline.txt), the browser's console
 (console.log) and screenshots. Exits with 1 when the app did not start in time, or (on Linux) when the page's process
@@ -100,6 +100,7 @@ async def main():
     parser.add_argument("--cpu-slowdown", type=float, default=0)
     parser.add_argument("--tablet", action="store_true")
     parser.add_argument("--max-memory", type=float, default=0)
+    parser.add_argument("--headed", action="store_true")
     args = parser.parse_args()
     has_proc = os.path.isdir("/proc/self")
     peak_memory = 0
@@ -118,11 +119,13 @@ async def main():
 
     async with async_playwright() as p:
         if args.engine == "firefox":
-            # Without a GPU (CI), Firefox shows WebGL only when asked to (with Mesa's software renderer)
-            browser = await p.firefox.launch(firefox_user_prefs={"webgl.force-enabled": True})
+            # Without a GPU (CI), Firefox shows WebGL only when asked to, with Mesa's software renderer (in a virtual
+            # display: --headed under xvfb-run)
+            browser = await p.firefox.launch(headless=not args.headed,
+                                             firefox_user_prefs={"webgl.force-enabled": True, "webgl.forbid-software": False})
         else:
             # VS_CHROMIUM: another Chromium than Playwright's own, e.g. /usr/bin/google-chrome-stable
-            browser = await p.chromium.launch(executable_path=os.environ.get("VS_CHROMIUM"),
+            browser = await p.chromium.launch(executable_path=os.environ.get("VS_CHROMIUM"), headless=not args.headed,
                                               args=["--enable-unsafe-swiftshader", "--ignore-gpu-blocklist"])
         note(f"{args.engine} {browser.version} on {platform.machine()}, {os.cpu_count()} CPUs")
 
@@ -164,6 +167,9 @@ async def main():
             if status != last_status:
                 last_status = status
                 note(f"status: {state.get('status')!r}  problem: {state.get('problem')!r}  heap: {state.get('heapMB')} MB")
+            if "could not start" in (state.get("status") or ""):
+                note("the page says that the app could not start")
+                break
             if state.get("started"):
                 started = True
                 note("the app started")

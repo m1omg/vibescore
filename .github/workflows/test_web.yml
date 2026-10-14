@@ -39,8 +39,8 @@ jobs:
 
       - name: Install Playwright
         run: |
-          # WebGL without a GPU: Mesa's software renderer
-          sudo apt-get update -q && sudo apt-get install -y -q libgl1-mesa-dri libegl1 libgles2
+          # WebGL without a GPU: Mesa's software renderer (Firefox: in a virtual display)
+          sudo apt-get update -q && sudo apt-get install -y -q libgl1-mesa-dri libegl1 libgles2 xvfb
           python3 -m venv "$RUNNER_TEMP/venv"
           "$RUNNER_TEMP/venv/bin/pip" install -q playwright==1.63.0
           "$RUNNER_TEMP/venv/bin/python" -m playwright install --with-deps ${{ matrix.engine }}
@@ -50,7 +50,8 @@ jobs:
           URL: ${{ inputs.url || 'https://m1omg.github.io/vibescore/' }}
         run: |
           # The page's process must stay well below what phones and tablets give a tab
-          "$RUNNER_TEMP/venv/bin/python" buildscripts/web/smoke_test.py "$URL" out --engine ${{ matrix.engine }} \
+          ${{ matrix.engine == 'firefox' && 'xvfb-run -a' || '' }} "$RUNNER_TEMP/venv/bin/python" buildscripts/web/smoke_test.py \
+            "$URL" out --engine ${{ matrix.engine }} ${{ matrix.engine == 'firefox' && '--headed' || '' }} \
             --timeout 600 --max-memory 1400 ${{ matrix.variant == 'slow-tablet' && '--tablet --cpu-slowdown 4' || '' }}
 
       - name: Upload the report
