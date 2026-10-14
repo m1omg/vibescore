@@ -19,16 +19,30 @@
                    justify-content: center; gap: 16px; text-align: center; padding: 16px; }
         #loading img { width: 96px; height: 96px; }
         #loading h1 { font-size: 22px; font-weight: 600; margin: 0; }
-        #status { font-size: 14px; opacity: 0.8; min-height: 1.4em; }
+        #status { font-size: 14px; opacity: 0.8; min-height: 1.4em; max-width: 480px; }
+        #progress { width: min(320px, 80vw); height: 4px; border-radius: 2px; background: rgba(128, 128, 128, 0.25);
+                    overflow: hidden; }
+        #progress div { width: 0%; height: 100%; background: #4B2BD1; transition: width 0.2s; }
+        #problem { font-size: 13px; max-width: 480px; color: #C4132C; white-space: pre-line; }
+        @media (prefers-color-scheme: dark) { #problem { color: #FF7A85; } }
+        #problem:empty { display: none; }
+        #banner { position: absolute; top: 8px; left: 50%; transform: translateX(-50%); z-index: 10; display: none;
+                  align-items: center; gap: 12px; max-width: min(640px, calc(100vw - 32px)); box-sizing: border-box;
+                  padding: 10px 12px 10px 16px; border-radius: 6px; font-size: 13px; background: #FFF3C4;
+                  color: #3D2E00; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25); }
+        #banner button { flex: none; border: none; border-radius: 4px; padding: 6px 10px; font: inherit;
+                         background: rgba(0, 0, 0, 0.1); color: inherit; cursor: pointer; }
         #notice { font-size: 12px; opacity: 0.6; max-width: 480px; }
         #notice a { color: inherit; }
     </style>
 </head>
-<body onload="vibescoreStart()">
+<body>
     <div id="loading">
         <img src="vibescore.svg" alt="">
         <h1>VibeScore</h1>
         <div id="status">Loading…</div>
+        <div id="progress"><div></div></div>
+        <div id="problem"></div>
         <noscript>VibeScore needs JavaScript.</noscript>
         <div id="notice">
             Based on MuseScore Studio. Not affiliated with or endorsed by Muse Group.
@@ -38,26 +52,45 @@
         </div>
     </div>
     <div id="screen" style="display: none"></div>
+    <!-- Problems found while starting (e.g. no saved data) that the app does not know about -->
+    <div id="banner" role="alert"><span></span><button onclick="this.parentElement.style.display = 'none'">OK</button></div>
 
-    <script src="vibescore-web.js"></script>
+    <!-- The build: makes the browser load the files of this build, not ones it kept from an earlier one
+         (written by buildscripts/web/stamp_page.py) -->
+    <script>
+        window.VS_BUILD = '@VS_BUILD@';
+        window.VS_WASM_SIZE = Number('@VS_WASM_SIZE@') || 0;
+    </script>
+    <script src="vibescore-web.js?v=@VS_BUILD@"></script>
+    <script src="VibeScore.js?v=@VS_BUILD@"></script>
+    <script src="qtloader.js?v=@VS_BUILD@"></script>
     <script>
         async function vibescoreStart() {
             const loading = document.querySelector('#loading');
             const screen = document.querySelector('#screen');
-            const status = document.querySelector('#status');
-            const setStatus = text => status.textContent = text;
+            const loader = vibescoreLoader({
+                status: document.querySelector('#status'),
+                progress: document.querySelector('#progress'),
+                problem: document.querySelector('#problem'),
+                banner: document.querySelector('#banner'),
+            });
+
+            if (!loader.checkBrowser()) {
+                return;
+            }
 
             try {
                 const instance = await qtLoad({
-                    preRun: [module => vibescorePreRun(module, setStatus)],
+                    instantiateWasm: loader.instantiateWasm('VibeScore.wasm?v=' + window.VS_BUILD, window.VS_WASM_SIZE),
+                    preRun: [module => vibescorePreRun(module, loader)],
                     qt: {
                         onLoaded: () => {
+                            loader.started();
                             loading.style.display = 'none';
                             screen.style.display = 'block';
                         },
                         onExit: exitData => {
-                            setStatus('VibeScore stopped' + (exitData.text ? ': ' + exitData.text : '')
-                                      + '. Reload the page to start it again.');
+                            loader.stopped(exitData);
                             screen.style.display = 'none';
                             loading.style.display = 'flex';
                         },
@@ -68,12 +101,15 @@
                 window.vibescoreInstance = instance; // for debugging in the browser's console
                 vibescoreLoadSoundFont(instance, console.warn);
             } catch (error) {
-                console.error(error);
-                setStatus('VibeScore could not start: ' + error);
+                loader.failed(error);
             }
         }
+
+        vibescoreStart().catch(error => {
+            // e.g. a script of the page that the browser did not load
+            console.error(error);
+            document.querySelector('#status').textContent = 'VibeScore could not start: ' + error;
+        });
     </script>
-    <script src="VibeScore.js"></script>
-    <script src="qtloader.js"></script>
 </body>
 </html>

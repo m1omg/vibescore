@@ -2,7 +2,8 @@
 #
 # VibeScore web app packaging: next to the wasm and the scripts that Qt generates (in CMAKE_RUNTIME_OUTPUT_DIRECTORY,
 # see SetupBuildEnvironment.cmake), the page (index.html), its loader (vibescore-web.js), the web app manifest,
-# the icon, and the application data packed into share.data (see buildscripts/web/pack_share.py).
+# the icon, and the application data packed into share.data (see buildscripts/web/pack_share.py). The page is
+# stamped with the build (see buildscripts/web/stamp_page.py).
 
 function(vs_setup_web_packaging target)
     set(web_dir "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}")
@@ -23,6 +24,7 @@ function(vs_setup_web_packaging target)
                 --exclude locale --exclude sound --exclude autobotscripts --exclude extensions --exclude plugins
         COMMAND ${CMAKE_COMMAND} -E copy "${web_src}/index.html" "${web_src}/vibescore-web.js" "${web_src}/manifest.json"
                 "${web_dir}/"
+        COMMAND ${Python3_EXECUTABLE} "${web_src}/stamp_page.py" "${web_dir}"
         COMMAND ${CMAKE_COMMAND} -E copy
                 "${PROJECT_SOURCE_DIR}/src/appshell/qml/MuseScore/AppShell/resources/vibescore_logo.svg"
                 "${web_dir}/vibescore.svg"

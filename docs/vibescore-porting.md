@@ -159,11 +159,15 @@ The app pauses playback and stops the audio stream when it goes to the backgroun
 
 ### The web app
 
-`buildscripts/web/index.html` and `vibescore-web.js` prepare the file system before the app starts: the user's
+`buildscripts/web/index.html` and `vibescore-web.js` download the app with a progress bar and say which step of
+the start takes too long or failed (the page is stamped with the build by `stamp_page.py`, so that the browser
+does not mix files of different builds). They prepare the file system before the app starts: the user's
 folders (`/home/web_user`, `/files/data`) and the downloaded sound font (`/files/share/sound`) are mounted from
 IndexedDB, and the application data (`/files/share`) is unpacked from `share.data` (made by `pack_share.py` at build
 time). The folders are written back to IndexedDB
-regularly and when the page is hidden. The app is linked with Asyncify, so that dialogs that wait for an answer
+regularly and when the page is hidden. The start waits for IndexedDB (the app's runtime opens a database too); a
+database that the browser does not open in 10 seconds fails instead, and the app starts without the saved data
+and says so. The app is linked with Asyncify, so that dialogs that wait for an answer
 (nested event loops) work; `web::fixNestedEventLoops()` works around a Qt 6.10 bug that stopped the event processing
 after such a dialog.
 
