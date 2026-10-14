@@ -47,6 +47,10 @@ Item {
         }
     }
 
+    HomeMenuModel {
+        id: homeMenuModel
+    }
+
     function select(name) {
         root.subSection = ""
         root.section = name
@@ -169,12 +173,20 @@ Item {
             Repeater {
                 id: bottomBarItems
 
-                model: [
-                    { "name": "scores", "title": qsTrc("appshell", "Scores"), "icon": IconCode.MUSIC_NOTES },
-                    { "name": "extensions", "title": qsTrc("appshell", "Plugins"), "icon": IconCode.PLUGIN },
-                    { "name": "learn", "title": qsTrc("appshell", "Learn"), "icon": IconCode.MORTAR_BOARD },
-                    { "name": "preferences", "title": qsTrc("appshell/preferences", "Preferences"), "icon": IconCode.SETTINGS_COG }
-                ]
+                model: {
+                    let items = [ { "name": "scores", "title": qsTrc("appshell", "Scores"), "icon": IconCode.MUSIC_NOTES } ]
+
+                    if (homeMenuModel.isPluginsAvailable) {
+                        items.push({ "name": "extensions", "title": qsTrc("appshell", "Plugins"), "icon": IconCode.PLUGIN })
+                    }
+
+                    if (homeMenuModel.isLearnAvailable) {
+                        items.push({ "name": "learn", "title": qsTrc("appshell", "Learn"), "icon": IconCode.MORTAR_BOARD })
+                    }
+
+                    items.push({ "name": "preferences", "title": qsTrc("appshell/preferences", "Preferences"), "icon": IconCode.SETTINGS_COG })
+                    return items
+                }
 
                 FlatButton {
                     required property var modelData

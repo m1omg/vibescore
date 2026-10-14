@@ -95,15 +95,20 @@ Item {
 
             model: {
                 let items = [
-                    { "name": "scores", "title": qsTrc("appshell", "Scores"), "iconCode": IconCode.MUSIC_NOTES },
-                    { "name": "extensions", "title": qsTrc("appshell", "Plugins"), "iconCode":  IconCode.PLUGIN }
+                    { "name": "scores", "title": qsTrc("appshell", "Scores"), "iconCode": IconCode.MUSIC_NOTES }
                 ]
+
+                if (menuModel.isPluginsAvailable) {
+                    items.push({ "name": "extensions", "title": qsTrc("appshell", "Plugins"), "iconCode":  IconCode.PLUGIN })
+                }
 
                 if (menuModel.isMuseSoundsAvailable) {
                     items.push({ "name": "musesounds", "title": qsTrc("appshell", "MuseSounds"), "iconCode": IconCode.PLAY })
                 }
 
-                items.push({ "name": "learn", "title": qsTrc("appshell", "Learn"), "iconCode":  IconCode.MORTAR_BOARD })
+                if (menuModel.isLearnAvailable) {
+                    items.push({ "name": "learn", "title": qsTrc("appshell", "Learn"), "iconCode":  IconCode.MORTAR_BOARD })
+                }
 
                 return items
             }

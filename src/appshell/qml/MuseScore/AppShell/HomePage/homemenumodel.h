@@ -33,6 +33,10 @@ class HomeMenuModel : public QObject
     //! Muse Sounds (needs the proprietary MuseSampler library)
     Q_PROPERTY(bool isMuseSoundsAvailable READ isMuseSoundsAvailable CONSTANT)
 
+    //! Plugins (extensions module) and Learn (videos; learn module): not in every build (e.g. the web app)
+    Q_PROPERTY(bool isPluginsAvailable READ isPluginsAvailable CONSTANT)
+    Q_PROPERTY(bool isLearnAvailable READ isLearnAvailable CONSTANT)
+
     QML_ELEMENT
 
 public:
@@ -40,5 +44,7 @@ public:
 
     bool isAccountAvailable() const;
     bool isMuseSoundsAvailable() const;
+    bool isPluginsAvailable() const;
+    bool isLearnAvailable() const;
 };
 }

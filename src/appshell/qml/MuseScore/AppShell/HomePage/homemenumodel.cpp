@@ -45,3 +45,21 @@ bool HomeMenuModel::isMuseSoundsAvailable() const
     return false;
 #endif
 }
+
+bool HomeMenuModel::isPluginsAvailable() const
+{
+#ifdef MUSE_MODULE_EXTENSIONS
+    return true;
+#else
+    return false;
+#endif
+}
+
+bool HomeMenuModel::isLearnAvailable() const
+{
+#ifdef MUSE_MODULE_LEARN
+    return true;
+#else
+    return false;
+#endif
+}

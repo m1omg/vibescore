@@ -73,8 +73,11 @@ void AppMenuModel::load()
         makeAddMenu(),
         makeFormatMenu(),
         makeToolsMenu(),
-        makePluginsMenu()
     };
+
+#ifdef MUSE_MODULE_EXTENSIONS
+    items << makePluginsMenu();
+#endif
 
     if (globalConfiguration()->devModeEnabled()) {
         items << makeHelpMenu(false);
@@ -123,6 +126,7 @@ void AppMenuModel::setupConnections()
     });
 #endif
 
+#ifdef MUSE_MODULE_EXTENSIONS
     extensionsProvider()->manifestListChanged().onNotify(this, [this]() {
         MenuItem& pluginsMenu = findMenu("menu-plugins");
         pluginsMenu.setSubitems(makePluginsMenuSubitems());
@@ -132,6 +136,7 @@ void AppMenuModel::setupConnections()
         MenuItem& pluginsItem = findMenu("menu-plugins");
         pluginsItem.setSubitems(makePluginsMenuSubitems());
     });
+#endif
 
     globalContext()->currentNotationChanged().onNotify(this, [this]() {
         auto stack = undoStack();
