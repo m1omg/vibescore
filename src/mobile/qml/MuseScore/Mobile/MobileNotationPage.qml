@@ -463,6 +463,15 @@ Item {
 
             Component.onCompleted: {
                 root.notationView = notationView.paintView
+                if (root.shell) {
+                    root.shell.setDefaultNavigationControl(notationView.defaultNavigationControl)
+                }
+            }
+
+            Component.onDestruction: {
+                if (root.shell) {
+                    root.shell.setDefaultNavigationControl(null)
+                }
             }
         }
 
@@ -606,6 +615,12 @@ Item {
 
     AppMenuDrawer {
         id: appMenuDrawer
+
+        onVisibleChanged: {
+            if (!visible && root.shell) {
+                Qt.callLater(root.shell.focusScoreIfNothingActive)
+            }
+        }
 
         anchors.fill: parent
         z: 100

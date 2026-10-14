@@ -19,6 +19,7 @@
 #pragma once
 
 #include <QHash>
+#include <QPointer>
 #include <QQuickItem>
 #include <QStringList>
 #include <QVariantMap>
@@ -30,6 +31,8 @@
 #include "dockwindow/idockwindowprovider.h"
 #include "actions/iactionsdispatcher.h"
 #include "context/iglobalcontext.h"
+#include "ui/inavigationcontroller.h"
+#include "global/iinteractive.h"
 
 namespace mu::mobile {
 //! The window content of the mobile shell: shows one page at a time (Home, score, ...) and keeps track of
@@ -62,6 +65,8 @@ class MobileShellView : public QQuickItem, public muse::dock::IDockWindow, publi
     muse::ContextInject<muse::dock::IDockWindowProvider> dockWindowProvider = { this };
     muse::ContextInject<muse::actions::IActionsDispatcher> dispatcher = { this };
     muse::ContextInject<context::IGlobalContext> globalContext = { this };
+    muse::ContextInject<muse::ui::INavigationController> navigationController = { this };
+    muse::ContextInject<muse::IInteractive> interactive = { this };
 
 public:
     enum EditedTextKind {
@@ -94,6 +99,13 @@ public:
 
     //! Runs an action (e.g. "play") from a button of the shell
     Q_INVOKABLE void dispatch(const QString& actionCode);
+
+    //! The keyboard navigation goes back to this control (the score) when nothing else is active, e.g. after a dialog
+    //! closed, so that the score gets the keyboard shortcuts again (a muse::ui::NavigationControl, or null)
+    Q_INVOKABLE void setDefaultNavigationControl(QObject* control);
+
+    //! On the score page, gives the score the keyboard when nothing else has it (e.g. after the menu drawer closed)
+    Q_INVOKABLE void focusScoreIfNothingActive();
 
     //! Called by the interactive provider for primary pages (musescore://home, musescore://notation, ...)
     Q_INVOKABLE void loadPage(const QString& uri, const QVariantMap& params);
@@ -147,6 +159,7 @@ private:
     bool m_panelsOverlay = false;
     QStringList m_exclusiveGroups;
     bool m_isNoteInputMode = false;
+    QPointer<QObject> m_defaultNavigationControl;
     bool m_isEditingText = false;
     EditedTextKind m_editedTextKind = OtherText;
     muse::async::Channel<QStringList> m_docksOpenStatusChanged;

@@ -18,7 +18,10 @@
  */
 #include "mobileshellview.h"
 
+#include <QTimer>
+
 #include "engraving/dom/textbase.h"
+#include "ui/qml/Muse/Ui/navigationcontrol.h"
 
 #include "log.h"
 
@@ -50,6 +53,14 @@ void MobileShellView::componentComplete()
             listenNotation();
         });
         listenNotation();
+    }
+
+    // In-window dialogs, popups and the menu drawer leave nothing active when they close (windows of the desktop
+    // give the focus back): then the score gets the keyboard again, so that its shortcuts work
+    if (navigationController()) {
+        navigationController()->navigationChanged().onNotify(this, [this]() {
+            QTimer::singleShot(0, this, &MobileShellView::focusScoreIfNothingActive);
+        });
     }
 }
 
@@ -308,6 +319,38 @@ void MobileShellView::restoreDefaultLayout()
 
 void MobileShellView::notifyAboutDocksChanged(const QStringList& changed)
 {
+    // A panel that had the keyboard may have closed
+    QTimer::singleShot(0, this, &MobileShellView::focusScoreIfNothingActive);
+
     emit openDocksChanged();
     m_docksOpenStatusChanged.send(changed);
+}
+
+void MobileShellView::setDefaultNavigationControl(QObject* control)
+{
+    m_defaultNavigationControl = control;
+
+    if (navigationController()) {
+        navigationController()->setDefaultNavigationControl(dynamic_cast<muse::ui::INavigationControl*>(control));
+    }
+}
+
+void MobileShellView::focusScoreIfNothingActive()
+{
+    auto* scoreControl = dynamic_cast<muse::ui::INavigationControl*>(m_defaultNavigationControl.data());
+    if (!scoreControl || !navigationController() || m_currentPageUri != "musescore://notation") {
+        return;
+    }
+
+    const muse::ui::INavigationSection* section = navigationController()->activeSection();
+    const muse::ui::INavigationPanel* panel = navigationController()->activePanel();
+    if (section && section->enabled() && panel && panel->enabled()) {
+        return; // something is active (e.g. a panel, a menu)
+    }
+
+    if (interactive() && interactive()->isCurrentUriDialog().val) {
+        return;
+    }
+
+    scoreControl->requestActive();
 }
