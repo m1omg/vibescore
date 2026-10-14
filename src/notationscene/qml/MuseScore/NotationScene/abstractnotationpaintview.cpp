@@ -28,10 +28,12 @@
 #include <QSGTransformNode>
 #include <QPainter>
 #include <QMimeData>
+#include <QRegion>
 
 #include "async/async.h"
 
 #include "actions/actiontypes.h"
+#include "engraving/dom/page.h"
 #include "engraving/dom/shadownote.h"
 
 #include "notationviewtouchcontroller.h"
@@ -58,6 +60,9 @@ AbstractNotationPaintView::AbstractNotationPaintView(QQuickItem* parent)
     setFlag(ItemHasContents, true);
     setFlag(ItemAcceptsDrops, true);
     setAcceptedMouseButtons(Qt::AllButtons);
+
+    // paintBackground() covers everything that is painted: no filling with transparency first
+    setFillColor(QColor());
 
     connect(this, &QQuickPaintedItem::widthChanged, this, &AbstractNotationPaintView::onViewSizeChanged);
     connect(this, &QQuickPaintedItem::heightChanged, this, &AbstractNotationPaintView::onViewSizeChanged);
@@ -952,11 +957,32 @@ void AbstractNotationPaintView::paintBackground(const RectF& rect, muse::draw::P
     TRACEFUNC;
 
     const QPixmap& wallpaper = notationConfiguration()->backgroundWallpaper();
+    const bool useColor = notationConfiguration()->backgroundUseColor() || wallpaper.isNull();
 
-    if (notationConfiguration()->backgroundUseColor() || wallpaper.isNull()) {
-        painter->fillRect(rect, notationConfiguration()->backgroundColor());
-    } else {
-        painter->drawTiledPixmap(rect, wallpaper, rect.topLeft() - PointF(m_matrix.m31(), m_matrix.m32()));
+    // The pages are painted over the background (see NotationPainting::paintPageSheet), and they cover most of the
+    // view: the background is painted only around them (filling the view is a large part of painting it)
+    QRegion region(rect.toQRectF().toAlignedRect());
+    if (isInited() && notationElements()) {
+        const Transform toView = m_matrix * guiScalingCompensation();
+        for (const Page* page : notationElements()->pages()) {
+            const RectF pageRect = toView.map(page->ldata()->bbox().translated(page->pos()));
+            // The whole pixels inside the page, with one to spare: its edges are anti-aliased over the background
+            const QRect inside(QPoint(static_cast<int>(std::ceil(pageRect.left())) + 1, static_cast<int>(std::ceil(pageRect.top())) + 1),
+                               QPoint(static_cast<int>(std::floor(pageRect.right())) - 2,
+                                      static_cast<int>(std::floor(pageRect.bottom())) - 2));
+            if (inside.isValid()) {
+                region -= inside;
+            }
+        }
+    }
+
+    for (const QRect& part : region) {
+        const RectF partRect = RectF::fromQRectF(QRectF(part));
+        if (useColor) {
+            painter->fillRect(partRect, notationConfiguration()->backgroundColor());
+        } else {
+            painter->drawTiledPixmap(partRect, wallpaper, partRect.topLeft() - PointF(m_matrix.m31(), m_matrix.m32()));
+        }
     }
 }
 
