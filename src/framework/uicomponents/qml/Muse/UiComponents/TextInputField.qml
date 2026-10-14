@@ -77,6 +77,8 @@ FocusScope {
         textCleared()
     }
 
+    readonly property bool isTouchPlatform: Qt.platform.os === "android" || Qt.platform.os === "ios" || Qt.platform.os === "wasm"
+
     function ensureActiveFocus() {
         if (Window.window && Window.window.objectName.includes("_WindowView_QQuickView")) {
             // See also WindowView::eventFilter
@@ -120,7 +122,9 @@ FocusScope {
         accessible.cursorPosition: valueInput.cursorPosition
 
         onActiveChanged: {
-            if (navCtrl.active) {
+            // On touch screens, the field takes the focus (which shows the on-screen keyboard) only when the user
+            // navigates to it with a keyboard, not when e.g. a dialog that starts with it opens
+            if (navCtrl.active && (!root.isTouchPlatform || navCtrl.highlight)) {
                 root.ensureActiveFocus()
             }
         }
