@@ -277,6 +277,9 @@ private:
 
     void onNoteInputStateChanged();
 
+    void onSelectionChanged();
+    void updateSelectionRect();
+
     void onShowItemRequested(const INotationInteraction::ShowItemRequest& request);
 
     void onPlayingChanged();
@@ -326,6 +329,13 @@ private:
     bool m_isContextMenuOpen = false;
 
     muse::RectF m_shadowNoteRect;
+
+    // Where the selection is (canvas coordinates; see onSelectionChanged); not known: painted again completely
+    muse::RectF m_selectionRect;
+    bool m_selectionRectKnown = false;
+    // What the last painting showed (see updateLoopMarkers, onNoteInputStateChanged)
+    LoopBoundaries m_paintedLoopBoundaries;
+    bool m_paintedNoteInputMode = false;
 
     QQuickItem* m_playbackCursorItem = nullptr;
 

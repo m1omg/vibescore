@@ -286,10 +286,13 @@ void AbstractNotationPaintView::onLoadNotation(INotationPtr)
         m_notation->painting()->setViewMode(m_notation->viewState()->viewMode());
     }
 
+    m_selectionRectKnown = false;
+
     m_notation->notationChanged().onNotify(this, [this]() {
         updateLoopMarkers();
         updateShadowNoteVisibility();
         scheduleRedraw();
+        updateSelectionRect(); // the layout may have moved it
     });
 
     onNoteInputStateChanged();
@@ -310,7 +313,7 @@ void AbstractNotationPaintView::onLoadNotation(INotationPtr)
     });
 
     interaction->selectionChanged().onNotify(this, [this]() {
-        scheduleRedraw();
+        onSelectionChanged();
     });
 
     interaction->showItemRequested().onReceive(this, [this](const INotationInteraction::ShowItemRequest& request) {
@@ -592,7 +595,11 @@ void AbstractNotationPaintView::updateLoopMarkers()
         m_loopOutMarker->updatePosition(loop.loopOutTick);
     }
 
-    scheduleRedraw();
+    // Painted again when the loop changed (a layout, which may move the markers, paints everything anyway)
+    if (loop != m_paintedLoopBoundaries) {
+        m_paintedLoopBoundaries = loop;
+        scheduleRedraw();
+    }
 }
 
 void AbstractNotationPaintView::updateShadowNoteVisibility()
@@ -661,14 +668,77 @@ INotationSelectionPtr AbstractNotationPaintView::notationSelection() const
     return notationInteraction() ? notationInteraction()->selection() : nullptr;
 }
 
+void AbstractNotationPaintView::onSelectionChanged()
+{
+    // Painted again only where the selection was and where it is now: painting the whole view costs much more,
+    // above all on the high-density screens of phones and tablets, and in the browser
+    const RectF oldRect = m_selectionRect;
+    const bool oldRectKnown = m_selectionRectKnown;
+    updateSelectionRect();
+
+    if (!oldRectKnown || !m_selectionRectKnown) {
+        scheduleRedraw();
+        return;
+    }
+
+    RectF dirtyRect = oldRect.united(m_selectionRect);
+    if (dirtyRect.isNull()) {
+        return; // nothing was selected, and nothing is
+    }
+
+    // The outline of a selected range, and the anti-aliasing
+    static constexpr double MARGIN_PX = 8;
+    dirtyRect = fromLogical(dirtyRect);
+    dirtyRect.adjust(-MARGIN_PX, -MARGIN_PX, MARGIN_PX, MARGIN_PX);
+    compensateFloatPart(dirtyRect);
+    scheduleRedraw(dirtyRect);
+}
+
+void AbstractNotationPaintView::updateSelectionRect()
+{
+    m_selectionRect = RectF();
+    m_selectionRectKnown = true;
+
+    const INotationSelectionPtr selection = notationSelection();
+    if (!selection || selection->isNone()) {
+        return;
+    }
+
+    // A selected dynamic has grips around it (see NotationInteraction::drawGripPoints)
+    const EngravingItem* element = selection->element();
+    if (element && element->isDynamic()) {
+        m_selectionRectKnown = false;
+        return;
+    }
+
+    if (selection->isRange()) {
+        for (const RectF& rect : selection->range()->boundingArea()) {
+            m_selectionRect = m_selectionRect.united(rect);
+        }
+    } else {
+        for (const EngravingItem* selected : selection->elements()) {
+            m_selectionRect = m_selectionRect.united(selected->canvasBoundingRect());
+        }
+    }
+
+    m_selectionRectKnown = m_selectionRect.isValid();
+}
+
 void AbstractNotationPaintView::onNoteInputStateChanged()
 {
     TRACEFUNC;
 
-    setAcceptHoverEvents(isNoteEnterMode());
+    const bool noteInputMode = isNoteEnterMode();
+    setAcceptHoverEvents(noteInputMode);
     updateLoopMarkers();
     updateShadowNoteVisibility();
-    scheduleRedraw();
+
+    // The note input cursor is painted in note input mode only. Outside it, the state follows the selection (it
+    // changes with every selection change), and nothing of it is painted: then only the selection is painted again
+    if (noteInputMode || m_paintedNoteInputMode) {
+        scheduleRedraw();
+    }
+    m_paintedNoteInputMode = noteInputMode;
 }
 
 void AbstractNotationPaintView::onShowItemRequested(const INotationInteraction::ShowItemRequest& request)
