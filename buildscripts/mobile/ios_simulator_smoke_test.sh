@@ -12,6 +12,17 @@ BUNDLE_ID="$(/usr/libexec/PlistBuddy -c "Print CFBundleIdentifier" "$APP/Info.pl
 
 # Built without signing: sign it to run locally, as Xcode does for simulators
 codesign --force --sign - --timestamp=none "$APP"
+
+EXECUTABLE="$(/usr/libexec/PlistBuddy -c "Print CFBundleExecutable" "$APP/Info.plist")"
+{
+    echo "== $APP"
+    ls -la "$APP" | head -30
+    file "$APP/$EXECUTABLE"
+    lipo -info "$APP/$EXECUTABLE" || true
+    codesign -dv "$APP" 2>&1 || true
+    /usr/libexec/PlistBuddy -c "Print" "$APP/Info.plist"
+} > "$OUT/app-info.txt" 2>&1
+
 SCORE="share/templates/02-Choral/07-Voice_+_Piano/07-Voice_+_Piano.mscx"
 STARTUP_SECONDS=90
 
@@ -53,8 +64,13 @@ run_on() {
     if ! xcrun simctl launch --terminate-running-process --stdout="$OUT/$label-1-home.log" --stderr="$OUT/$label-1-home.log" \
         "$udid" "$BUNDLE_ID"; then
         echo "::error::$label: the app could not be started"
-        xcrun simctl spawn "$udid" log show --last 5m --style compact --predicate 'process == "SpringBoard" OR process CONTAINS "VibeScore"' \
+        xcrun simctl spawn "$udid" log show --last 5m --style compact --predicate 'process == "SpringBoard" OR process == "runningboardd" OR process == "launchd_sim" OR process CONTAINS "VibeScore"' \
             > "$OUT/$label-system.log" 2>&1 || true
+        # Started directly, the binary tells why it does not run (dyld errors, missing libraries, ...)
+        container="$(xcrun simctl get_app_container "$udid" "$BUNDLE_ID" app 2>/dev/null || true)"
+        if [ -n "$container" ]; then
+            ( xcrun simctl spawn "$udid" "$container/$EXECUTABLE" > "$OUT/$label-spawn.log" 2>&1 & pid=$!; sleep 30; kill $pid 2>/dev/null ) || true
+        fi
         failed=1
         return
     fi
