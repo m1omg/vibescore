@@ -85,7 +85,6 @@ private:
     void updateVoicesState();
     void updateArticulationsState();
     void updateRestState();
-    void updateAddState();
 
     muse::uicomponents::MenuItem* makeActionItem(const muse::ui::UiAction& action, const QString& section,
                                                  const muse::uicomponents::MenuItemList& subitems = {});

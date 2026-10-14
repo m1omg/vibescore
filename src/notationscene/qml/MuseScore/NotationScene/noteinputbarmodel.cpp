@@ -223,7 +223,9 @@ void NoteInputBarModel::updateNoteInputState()
     updateVoicesState();
     updateArticulationsState();
     updateRestState();
-    updateAddState();
+    // The items of the Add menu are not made again here: their state follows the actions (see AbstractMenuModel),
+    // and new items (owned by this model) were made for every change of the note input state, which is every
+    // selection change and edit
 }
 
 void NoteInputBarModel::updateNoteInputModeState()
@@ -386,11 +388,6 @@ void NoteInputBarModel::updateArticulationsState()
 void NoteInputBarModel::updateRestState()
 {
     updateItemsStateChecked(ActionCode("pad-rest"), resolveRestSelected());
-}
-
-void NoteInputBarModel::updateAddState()
-{
-    findItem(ADD_ACTION_CODE).setSubitems(makeAddItems());
 }
 
 int NoteInputBarModel::resolveCurrentVoiceIndex() const
