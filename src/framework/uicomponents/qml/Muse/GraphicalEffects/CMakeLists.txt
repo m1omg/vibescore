@@ -36,6 +36,10 @@ fixup_qml_module_dependencies(muse_graphicaleffects_qml)
 qt_add_shaders(muse_graphicaleffects_qml muse_graphicaleffects_qml_shaders
     PREFIX
         "/qt/qml/Muse/GraphicalEffects"
+    # The default versions, and GLSL ES 3.00 for OpenGL ES 3 and WebGL 2, where Qt's vertex shaders are 3.00
+    # (a fragment shader of another version does not link with them: the effect is not drawn)
+    GLSL
+        "100es,120,150,300es"
     FILES
         "shaders/roundcorners.frag"
 )
