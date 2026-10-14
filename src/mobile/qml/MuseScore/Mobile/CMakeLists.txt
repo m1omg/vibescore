@@ -21,6 +21,7 @@ qt_add_qml_module(mobile_qml
         MobileShell.qml
         NoteInputKeypad.qml
         SaveToLibraryDialog.qml
+        TextEditBar.qml
     IMPORTS
         TARGET muse_ui_qml
         TARGET muse_uicomponents_qml

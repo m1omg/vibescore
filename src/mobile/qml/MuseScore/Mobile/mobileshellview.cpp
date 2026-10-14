@@ -18,6 +18,8 @@
  */
 #include "mobileshellview.h"
 
+#include "engraving/dom/textbase.h"
+
 #include "log.h"
 
 using namespace mu::mobile;
@@ -45,22 +47,30 @@ void MobileShellView::componentComplete()
 
     if (globalContext()) {
         globalContext()->currentNotationChanged().onNotify(this, [this]() {
-            listenNoteInputMode();
+            listenNotation();
         });
-        listenNoteInputMode();
+        listenNotation();
     }
 }
 
-void MobileShellView::listenNoteInputMode()
+void MobileShellView::listenNotation()
 {
     const notation::INotationPtr notation = globalContext()->currentNotation();
     if (notation) {
-        notation->interaction()->noteInput()->stateChanged().onNotify(this, [this]() {
+        const notation::INotationInteractionPtr interaction = notation->interaction();
+        interaction->noteInput()->stateChanged().onNotify(this, [this]() {
             updateNoteInputMode();
+        });
+        interaction->textEditingStarted().onNotify(this, [this]() {
+            updateEditedText();
+        });
+        interaction->textEditingEnded().onReceive(this, [this](engraving::TextBase*) {
+            updateEditedText();
         });
     }
 
     updateNoteInputMode();
+    updateEditedText();
 }
 
 void MobileShellView::updateNoteInputMode()
@@ -77,6 +87,41 @@ void MobileShellView::updateNoteInputMode()
 bool MobileShellView::isNoteInputMode() const
 {
     return m_isNoteInputMode;
+}
+
+void MobileShellView::updateEditedText()
+{
+    const notation::INotationPtr notation = globalContext()->currentNotation();
+    const notation::INotationInteractionPtr interaction = notation ? notation->interaction() : nullptr;
+    const engraving::TextBase* text = interaction && interaction->isTextEditingStarted() ? interaction->editedText() : nullptr;
+
+    EditedTextKind kind = OtherText;
+    if (text) {
+        if (text->isLyrics()) {
+            kind = Lyrics;
+        } else if (text->isHarmony()) {
+            kind = ChordSymbol;
+        } else if (text->isFingering() || text->isFiguredBass() || text->isSticking()) {
+            kind = MusicalText;
+        }
+    }
+
+    const bool isEditingText = text != nullptr;
+    if (m_isEditingText != isEditingText || m_editedTextKind != kind) {
+        m_isEditingText = isEditingText;
+        m_editedTextKind = kind;
+        emit editedTextChanged();
+    }
+}
+
+bool MobileShellView::isEditingText() const
+{
+    return m_isEditingText;
+}
+
+int MobileShellView::editedTextKind() const
+{
+    return m_editedTextKind;
 }
 
 QString MobileShellView::currentPageUri() const

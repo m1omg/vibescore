@@ -50,6 +50,19 @@ Item {
 
     property var notationView: null
 
+    //! While text on the score is edited: the bar over the keyboard
+    readonly property bool isEditingText: root.shell ? root.shell.isEditingText : false
+
+    //! The part of the page under the keyboard. Android makes the window smaller when the keyboard comes
+    //! (adjustResize: nothing under it); on iOS the keyboard covers the window.
+    readonly property real keyboardOverlap: {
+        if (!Qt.inputMethod.visible || Qt.inputMethod.keyboardRectangle.height <= 0) {
+            return 0
+        }
+        const pageBottom = root.mapToItem(null, 0, root.height).y
+        return Math.max(0, pageBottom - Qt.inputMethod.keyboardRectangle.y)
+    }
+
     readonly property string sideGroup: "side"
     readonly property string bottomGroup: "bottom"
 
@@ -406,7 +419,7 @@ Item {
         anchors.top: noteInputBarContainer.bottom
         anchors.left: parent.left
         anchors.right: parent.right
-        anchors.bottom: statusBar.top
+        anchors.bottom: textEditBar.visible ? textEditBar.top : statusBar.top
 
         MobileSheet {
             id: sideSheet
@@ -557,6 +570,21 @@ Item {
         }
     }
 
+    // Text editing: in place of the status bar, over the keyboard
+
+    TextEditBar {
+        id: textEditBar
+
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.bottom: parent.bottom
+        anchors.bottomMargin: root.keyboardOverlap
+
+        visible: root.isEditingText
+
+        shell: root.shell
+    }
+
     // Status bar
 
     Rectangle {
@@ -567,7 +595,7 @@ Item {
         anchors.bottom: parent.bottom
 
         height: visible ? 36 : 0
-        visible: root.isOpen(pageModel.statusBarName())
+        visible: root.isOpen(pageModel.statusBarName()) && !root.isEditingText
 
         color: ui.theme.backgroundSecondaryColor
 

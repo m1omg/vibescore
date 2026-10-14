@@ -52,6 +52,11 @@ class MobileShellView : public QQuickItem, public muse::dock::IDockWindow, publi
     //! Whether the current score is in note input mode (e.g. to show the note input keypad on phones)
     Q_PROPERTY(bool isNoteInputMode READ isNoteInputMode NOTIFY isNoteInputModeChanged)
 
+    //! Whether text on the score is being edited, and which kind of text (see EditedTextKind),
+    //! for the bar of text editing over the keyboard
+    Q_PROPERTY(bool isEditingText READ isEditingText NOTIFY editedTextChanged)
+    Q_PROPERTY(int editedTextKind READ editedTextKind NOTIFY editedTextChanged)
+
     QML_ELEMENT
 
     muse::ContextInject<muse::dock::IDockWindowProvider> dockWindowProvider = { this };
@@ -59,6 +64,14 @@ class MobileShellView : public QQuickItem, public muse::dock::IDockWindow, publi
     muse::ContextInject<context::IGlobalContext> globalContext = { this };
 
 public:
+    enum EditedTextKind {
+        OtherText,
+        Lyrics,
+        ChordSymbol,
+        MusicalText // fingerings, figured bass, sticking: one per note, like lyrics
+    };
+    Q_ENUM(EditedTextKind)
+
     explicit MobileShellView(QQuickItem* parent = nullptr);
     ~MobileShellView() override;
 
@@ -72,6 +85,8 @@ public:
     void setExclusiveGroups(const QStringList& groups);
 
     bool isNoteInputMode() const;
+    bool isEditingText() const;
+    int editedTextKind() const;
 
     //! Back key: closes the shell's overlay (see closeOverlay() in MobileShell.qml),
     //! or the panel opened last when panels are shown over the score
@@ -105,6 +120,7 @@ signals:
     void openDocksChanged();
     void panelsOverlayChanged();
     void isNoteInputModeChanged();
+    void editedTextChanged();
 
     //! A page is shown, the first one or another one
     void pageLoaded();
@@ -119,8 +135,9 @@ private:
     };
 
     void notifyAboutDocksChanged(const QStringList& changed);
-    void listenNoteInputMode();
+    void listenNotation();
     void updateNoteInputMode();
+    void updateEditedText();
 
     QString m_currentPageUri;
     QVariantMap m_currentPageParams;
@@ -130,6 +147,8 @@ private:
     bool m_panelsOverlay = false;
     QStringList m_exclusiveGroups;
     bool m_isNoteInputMode = false;
+    bool m_isEditingText = false;
+    EditedTextKind m_editedTextKind = OtherText;
     muse::async::Channel<QStringList> m_docksOpenStatusChanged;
 };
 }
