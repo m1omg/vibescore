@@ -23,8 +23,12 @@
 #include "log.h"
 
 #ifdef Q_OS_WASM
+#include <QTimer>
+
 #include "project/inotationproject.h"
 #include "platform/web/webplatform.h"
+
+static constexpr int SETTINGS_WRITE_DELAY_MS = 1000;
 #endif
 
 using namespace mu::mobile;
@@ -56,7 +60,8 @@ void MobileLifecycleController::onApplicationStateChanged(Qt::ApplicationState s
 
 #ifdef Q_OS_WASM
 //! The files of the web app are in memory: the page writes them to the browser's storage (IndexedDB) regularly and
-//! when the page is hidden, which can come too late when the page is closed right after saving
+//! when the page is hidden, which can come too late when the page is closed right after saving. The same goes for
+//! the list of the open scores in the settings: a score that was closed would come back at the next start
 void MobileLifecycleController::keepSavedScoresInBrowserStorage()
 {
     auto watchCurrentProject = [this]() {
@@ -65,6 +70,11 @@ void MobileLifecycleController::keepSavedScoresInBrowserStorage()
                 web::syncFileSystem();
             });
         }
+
+        // The settings are written to their file a moment after they change
+        QTimer::singleShot(SETTINGS_WRITE_DELAY_MS, this, []() {
+            web::syncFileSystem();
+        });
     };
 
     globalContext()->currentProjectChanged().onNotify(this, watchCurrentProject);

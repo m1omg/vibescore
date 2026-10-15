@@ -23,6 +23,7 @@
 #include "startupscenario.h"
 
 #include <QCoreApplication>
+#include <QFileInfo>
 
 #include "async/async.h"
 #include "translation.h"
@@ -334,7 +335,24 @@ void StartupScenario::openScore(const project::ProjectFile& file)
 
 void StartupScenario::restoreLastSession()
 {
-#if defined(Q_OS_ANDROID) || defined(Q_OS_IOS) || defined(Q_OS_WASM)
+#if defined(Q_OS_WASM)
+    // In the browser, closing the page is the usual way to quit, so the scores that were open then are not opened
+    // again at every start (a big one takes long to open): they are in the library, and their unsaved changes are
+    // kept and come back when they are opened. Only a new score that was never saved is opened again, as there is
+    // no other way back to it
+    io::paths_t newProjects;
+    for (const io::path_t& path : configuration()->sessionProjectsPaths()) {
+        if (projectAutoSaver()->isAutosaveOfNewlyCreatedProject(path) && QFileInfo::exists(path.toQString())) {
+            newProjects.push_back(path);
+        }
+    }
+
+    sessionsManager()->reset();
+
+    for (const io::path_t& path : newProjects) {
+        dispatcher()->dispatch("file-open", ActionData::make_arg1<QUrl>(path.toQUrl()));
+    }
+#elif defined(Q_OS_ANDROID) || defined(Q_OS_IOS)
     // Mobile systems end apps that are in the background instead of asking them to quit,
     // so this is the usual way back to the app: continue where the user left off
     sessionsManager()->restore();
