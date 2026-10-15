@@ -279,6 +279,7 @@ private:
     bool canBeCrossStaff() const;
 
     friend class SpannerSegment;
+    friend class SpannerMap;
 
     EngravingItem* m_startElement = nullptr;
     EngravingItem* m_endElement = nullptr;
@@ -290,6 +291,8 @@ private:
     Fraction m_ticks = Fraction(0, 1);
     track_idx_t m_track2 = muse::nidx;
     bool m_broken = false;
+    // Whether the score's SpannerMap has this spanner (a change of its ticks makes the map update its lookup tree)
+    bool m_isInSpannerMap = false;
 
     std::vector<SpannerSegment*> m_segments;
     std::deque<SpannerSegment*> m_unusedSegments;   // Currently unused segments which can be reused later.

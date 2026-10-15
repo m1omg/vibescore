@@ -21,6 +21,9 @@
  */
 
 #include "spannermap.h"
+
+#include <algorithm>
+
 #include "spanner.h"
 #include "part.h"
 
@@ -153,6 +156,20 @@ void SpannerMap::collectIntervals(IntervalList& regularIntervals, IntervalList& 
 void SpannerMap::addSpanner(Spanner* s)
 {
     insert(std::pair<int, Spanner*>(s->tick().ticks(), s));
+    s->m_isInSpannerMap = true;
+    m_dirty = true;
+}
+
+//---------------------------------------------------------
+//   clear
+//---------------------------------------------------------
+
+void SpannerMap::clear()
+{
+    for (auto& pair : *this) {
+        pair.second->m_isInSpannerMap = false;
+    }
+    std::multimap<int, Spanner*>::clear();
     m_dirty = true;
 }
 
@@ -165,6 +182,8 @@ bool SpannerMap::removeSpanner(Spanner* s)
     for (auto i = begin(); i != end(); ++i) {
         if (i->second == s) {
             erase(i);
+            // (the same spanner could be in the map twice)
+            s->m_isInSpannerMap = std::any_of(begin(), end(), [s](const auto& pair) { return pair.second == s; });
             m_dirty = true;
             return true;
         }

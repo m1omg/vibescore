@@ -1377,7 +1377,9 @@ void Spanner::setTick(const Fraction& v)
 
     m_tick = v;
 
-    Score* score = this->score();
+    // Only the score's map of spanners needs to know (not for spanners that the layout makes, like lyrics lines: each
+    // of those changes made the map rebuild its lookup tree for the next search, during the layout of every syllable)
+    Score* score = m_isInSpannerMap ? this->score() : nullptr;
 
     if (score) {
         score->spannerMap().setDirty();
@@ -1414,7 +1416,7 @@ void Spanner::setTicks(const Fraction& f)
         m_ticks = f;
     }
 
-    Score* score = this->score();
+    Score* score = m_isInSpannerMap ? this->score() : nullptr;
 
     if (score) {
         score->spannerMap().setDirty();

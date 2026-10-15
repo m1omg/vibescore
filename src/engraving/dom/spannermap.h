@@ -56,7 +56,7 @@ public:
     const_it cend() const { return std::multimap<int, Spanner*>::cend(); }
     void addSpanner(Spanner* s);
     bool removeSpanner(Spanner* s);
-    void clear() { std::multimap<int, Spanner*>::clear(); m_dirty = true; }
+    void clear();
     bool empty() const { return std::multimap<int, Spanner*>::empty(); }
     void update() const;
     void setDirty() const { m_dirty = true; }     // must be called if a spanner changes start/length
