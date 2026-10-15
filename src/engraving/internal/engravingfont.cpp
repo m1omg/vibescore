@@ -59,6 +59,7 @@ EngravingFont::EngravingFont(const std::string& name, const std::string& family,
 EngravingFont::EngravingFont(const EngravingFont& other)
     : muse::Contextable(other.iocContext())
 {
+    m_registered = false;
     m_loaded = false;
     m_symbols  = other.m_symbols;
     m_name     = other.m_name;
@@ -83,11 +84,13 @@ const std::string& EngravingFont::family() const
 
 std::unordered_map<Sid, PropertyValue> EngravingFont::engravingDefaults() const
 {
+    ensureLoaded();
     return m_engravingDefaults;
 }
 
 double EngravingFont::textEnclosureThickness()
 {
+    ensureLoaded();
     return m_textEnclosureThickness;
 }
 
@@ -95,9 +98,9 @@ double EngravingFont::textEnclosureThickness()
 // Load
 // =============================================
 
-void EngravingFont::ensureLoad()
+void EngravingFont::ensureRegistered()
 {
-    if (m_loaded) {
+    if (m_registered) {
         return;
     }
 
@@ -114,13 +117,38 @@ void EngravingFont::ensureLoad()
 
     m_font.setPointSizeF(StyleDef::DEFAULT_SMUFL_POINT_SIZE());
 
+    m_registered = true;
+}
+
+void EngravingFont::ensureLoaded() const
+{
+    if (!m_loaded) {
+        const_cast<EngravingFont*>(this)->ensureLoad();
+    }
+}
+
+void EngravingFont::ensureLoad()
+{
+    if (m_loaded) {
+        return;
+    }
+
+    ensureRegistered();
+    if (!m_registered) {
+        return;
+    }
+
+    // From here on the symbols are read through sym(), which would load the font again
+    m_loaded = true;
+
+    // Each glyph is measured when its symbol is used first: measuring the thousands of glyphs of a font was a good part
+    // of the start of the app on phones, tablets and in the browser
     for (size_t id = 0; id < m_symbols.size(); ++id) {
         Smufl::Code code = Smufl::code(static_cast<SymId>(id));
         if (!code.isValid()) {
             continue;
         }
-        Sym& sym = m_symbols[id];
-        computeMetrics(sym, code);
+        m_symbols[id].hasPendingMetrics = true;
     }
 
     File metadataFile(m_metadataPath);
@@ -144,8 +172,6 @@ void EngravingFont::ensureLoad()
     loadComposedGlyphs();
     loadStylisticAlternates(metadataJson.value("glyphsWithAlternates").toObject());
     loadEngravingDefaults(metadataJson.value("engravingDefaults").toObject());
-
-    m_loaded = true;
 }
 
 void EngravingFont::loadComposedGlyphs()
@@ -720,7 +746,7 @@ void EngravingFont::loadGlyphsWithAnchors(const JsonObject& glyphsWithAnchors)
             continue;
         }
 
-        Sym& sym = this->sym(symId);
+        Sym& sym = m_symbols[static_cast<size_t>(symId)]; // the anchors only (the glyph is measured when it is used)
         const JsonObject anchors = glyphsWithAnchors.value(symName).toObject();
         if (!anchors.isValid()) {
             continue;
@@ -862,14 +888,28 @@ void EngravingFont::computeMetrics(EngravingFont::Sym& sym, const Smufl::Code& c
 // Symbol properties
 // =============================================
 
+void EngravingFont::computePendingMetrics(Sym& sym, SymId id) const
+{
+    if (sym.hasPendingMetrics) {
+        sym.hasPendingMetrics = false;
+        const_cast<EngravingFont*>(this)->computeMetrics(sym, Smufl::code(id));
+    }
+}
+
 EngravingFont::Sym& EngravingFont::sym(SymId id)
 {
-    return m_symbols[static_cast<size_t>(id)];
+    ensureLoaded();
+    Sym& s = m_symbols[static_cast<size_t>(id)];
+    computePendingMetrics(s, id);
+    return s;
 }
 
 const EngravingFont::Sym& EngravingFont::sym(SymId id) const
 {
-    return m_symbols.at(static_cast<size_t>(id));
+    ensureLoaded();
+    Sym& s = const_cast<Sym&>(m_symbols.at(static_cast<size_t>(id)));
+    computePendingMetrics(s, id);
+    return s;
 }
 
 char32_t EngravingFont::symCode(SymId id) const
@@ -885,6 +925,10 @@ char32_t EngravingFont::symCode(SymId id) const
 
 SymId EngravingFont::fromCode(char32_t code) const
 {
+    ensureLoaded();
+    for (size_t id = 0; id < m_symbols.size(); ++id) {
+        computePendingMetrics(const_cast<Sym&>(m_symbols[id]), static_cast<SymId>(id));
+    }
     auto it = std::find_if(m_symbols.begin(), m_symbols.end(), [code](const Sym& s) { return s.code == code; });
     return static_cast<SymId>(it == m_symbols.end() ? 0 : it - m_symbols.begin());
 }

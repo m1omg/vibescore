@@ -129,10 +129,12 @@ void EngravingFontsProvider::clearExternalFonts()
 
 void EngravingFontsProvider::loadAllFonts()
 {
+    // The fonts are added to the font database; each one measures its glyphs when it is used first (thousands of
+    // glyphs per font: measuring those of all the fonts was a third of the start of the web app)
     for (std::shared_ptr<EngravingFont>& f : m_symbolFonts) {
-        f->ensureLoad();
+        f->ensureRegistered();
     }
     for (const auto& [_, f] : m_externalSymbolFonts) {
-        f->ensureLoad();
+        f->ensureRegistered();
     }
 }

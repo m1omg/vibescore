@@ -92,9 +92,13 @@ public:
     void draw(const SymIdList& ids, muse::draw::Painter* p, double mag, const PointF& pos, const double angle = 0) const override;
     void draw(const SymIdList& ids, muse::draw::Painter* p, const SizeF& mag, const PointF& pos, const double angle = 0) const override;
 
+    //! Adds the font to the font database (to draw with it by its family name)
+    void ensureRegistered();
+    //! Also reads its metadata, when the font is used first (its glyphs are measured when they are used first)
     void ensureLoad();
 
 private:
+    void ensureLoaded() const;
 
     friend class SymbolFonts;
 
@@ -106,6 +110,9 @@ private:
 
         std::map<SmuflAnchorId, PointF> smuflAnchors;
         SymIdList subSymbolIds;
+
+        //! The glyph is measured when the symbol is used first (see sym())
+        bool hasPendingMetrics = false;
 
         bool isValid() const
         {
@@ -123,6 +130,7 @@ private:
     void loadStylisticAlternates(const muse::JsonObject& glyphsWithAlternatesObject);
     void loadEngravingDefaults(const muse::JsonObject& engravingDefaultsObject);
     void computeMetrics(Sym& sym, const Smufl::Code& code);
+    void computePendingMetrics(Sym& sym, SymId id) const;
 
     void constructShapeWithCutouts(Shape& shape, SymId id);
 
@@ -131,6 +139,7 @@ private:
 
     bool useFallbackFont(SymId id) const;
 
+    bool m_registered = false;
     bool m_loaded = false;
     std::vector<Sym> m_symbols;
     mutable muse::draw::Font m_font;
