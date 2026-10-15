@@ -303,34 +303,40 @@ async function vsCompileWasm(url, expectedSize, loader, isRetry, onStall) {
             throw new Error(`Could not download the app (${url}: ${response.status} ${response.statusText})`);
         }
 
-        // The bytes are counted as they arrive (decompressed: the size of the wasm)
-        let received = 0;
-        const counter = new TransformStream({
-            transform(chunk, controller) {
-                received += chunk.byteLength;
+        // The bytes are counted as they arrive (decompressed: the size of the wasm), on a copy of the response: the
+        // browser compiles the response itself, which it can then keep compiled in its cache (Chromium's code cache
+        // works only for a response as fetched), so that later starts skip most of the compilation
+        const counting = response.clone();
+        const counted = (async () => {
+            const reader = counting.body.getReader();
+            let received = 0;
+            for (;;) {
+                const { done, value } = await reader.read();
+                if (done) {
+                    break;
+                }
+                received += value.byteLength;
                 lastDataTime = Date.now();
                 loader.setProgress(expectedSize > 0 ? received / expectedSize : null,
                                    expectedSize > 0 ? `${vsMB(received)} of ${vsMB(expectedSize)} MB`
                                                     : `${vsMB(received)} MB`);
-                controller.enqueue(chunk);
-            },
-            flush() {
-                // The browser finishes compiling it (it compiled what arrived while it was downloading)
-                isDownloaded = true;
-                loader.setStage('Preparing VibeScore…', {
-                    counting: true,
-                    hint: 'This can take a few minutes on phones and tablets.',
-                    hintAfterMs: VS_PREPARE_HINT_MS,
-                    stallMs: VS_PREPARE_STALL_MS,
-                });
-            },
-        });
-        const counted = new Response(response.body.pipeThrough(counter), { headers: { 'Content-Type': 'application/wasm' } });
+            }
+            // The browser finishes compiling it (it compiled what arrived while it was downloading)
+            isDownloaded = true;
+            loader.setStage('Preparing VibeScore…', {
+                counting: true,
+                hint: 'This can take a few minutes on phones and tablets.',
+                hintAfterMs: VS_PREPARE_HINT_MS,
+                stallMs: VS_PREPARE_STALL_MS,
+            });
+        })();
+        counted.catch(() => {}); // a failed download fails the compilation too
 
-        if (typeof WebAssembly.compileStreaming === 'function') {
-            return await WebAssembly.compileStreaming(counted);
+        const isWasm = (response.headers.get('Content-Type') || '').startsWith('application/wasm');
+        if (typeof WebAssembly.compileStreaming === 'function' && isWasm) {
+            return await WebAssembly.compileStreaming(response);
         }
-        return await WebAssembly.compile(await counted.arrayBuffer());
+        return await WebAssembly.compile(await response.arrayBuffer());
     } finally {
         clearInterval(stallCheck);
     }
