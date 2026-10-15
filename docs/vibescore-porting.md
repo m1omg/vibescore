@@ -73,6 +73,7 @@ build workflows) and publishes them on GitHub Releases, with checksums and the n
 `buildscripts/release/release_notes.md`. Android installs an update only when it is signed with the same key as the
 installed app, so releases need the release key in the repository's secrets `ANDROID_KEYSTORE_BASE64` (the keystore,
 base64-encoded; key alias `vibescore`) and `ANDROID_KEYSTORE_PASS`. The version is set in `MobileBranding.cmake`.
+Tag a commit without `[skip ci]` in its message: GitHub runs no workflow for a pushed tag that points to one.
 
 ### Unit tests
 
