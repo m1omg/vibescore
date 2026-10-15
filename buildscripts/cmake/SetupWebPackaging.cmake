@@ -22,8 +22,8 @@ function(vs_setup_web_packaging target)
         COMMAND ${CMAKE_COMMAND} --install "${CMAKE_BINARY_DIR}" --prefix "${stage_dir}"
         COMMAND ${Python3_EXECUTABLE} "${web_src}/pack_share.py" "${stage_dir}/share" "${web_dir}"
                 --exclude locale --exclude sound --exclude autobotscripts --exclude extensions --exclude plugins
-        COMMAND ${CMAKE_COMMAND} -E copy "${web_src}/index.html" "${web_src}/vibescore-web.js" "${web_src}/manifest.json"
-                "${web_dir}/"
+        COMMAND ${CMAKE_COMMAND} -E copy "${web_src}/index.html" "${web_src}/vibescore-web.js" "${web_src}/vibescore-sw.js"
+                "${web_src}/manifest.json" "${web_dir}/"
         COMMAND ${Python3_EXECUTABLE} "${web_src}/stamp_page.py" "${web_dir}"
         COMMAND ${CMAKE_COMMAND} -E copy
                 "${PROJECT_SOURCE_DIR}/src/appshell/qml/MuseScore/AppShell/resources/vibescore_logo.svg"

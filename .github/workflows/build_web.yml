@@ -1,4 +1,5 @@
-# VibeScore: web app (Qt for WebAssembly, single thread), published on GitHub Pages
+# VibeScore: web app (Qt for WebAssembly), published on GitHub Pages: the app without threads, and the one with threads
+# (Qt for WebAssembly multithread) in threads/; the page chooses (buildscripts/web/index.html)
 name: 'Build: Web'
 
 on:
@@ -25,6 +26,10 @@ permissions:
 
 jobs:
   build_web:
+    strategy:
+      fail-fast: true
+      matrix:
+        variant: [single, threads]
     runs-on: ubuntu-24.04
     timeout-minutes: 300
     steps:
@@ -57,11 +62,11 @@ jobs:
           version: ${{ env.QT_VERSION }}
           host: 'all_os'
           target: 'wasm'
-          arch: 'wasm_singlethread'
+          arch: ${{ matrix.variant == 'threads' && 'wasm_multithread' || 'wasm_singlethread' }}
           modules: ${{ env.QT_MODULES }}
           dir: ${{ runner.temp }}/qt-wasm
           cache: true
-          cache-key-prefix: 'qt-wasm'
+          cache-key-prefix: qt-wasm-${{ matrix.variant }}
 
       - name: Install Emscripten
         run: |
@@ -73,7 +78,7 @@ jobs:
       - name: Set up ccache
         uses: hendrikmuhs/ccache-action@v1.2
         with:
-          key: web
+          key: web-${{ matrix.variant }}
           max-size: 4G
 
       - name: Configure
@@ -82,6 +87,7 @@ jobs:
           chmod +x "$QT_ROOT_DIR"/bin/qt-cmake*
           "$QT_ROOT_DIR/bin/qt-cmake" -S . -B build-web -G Ninja \
             -DMUSESCORE_BUILD_CONFIGURATION=app-web \
+            -DVS_WEB_THREADS=${{ matrix.variant == 'threads' && 'ON' || 'OFF' }} \
             -DMUSE_APP_BUILD_MODE=release \
             -DCMAKE_BUILD_TYPE=${BUILD_TYPE} \
             -DQT_HOST_PATH="$VS_QT_HOST_PATH" \
@@ -103,17 +109,42 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: build-web-log
+          name: build-web-log-${{ matrix.variant }}
           path: build-web.log
           retention-days: 14
 
       - name: Upload the web app
+        uses: actions/upload-artifact@v4
+        with:
+          name: webapp-${{ matrix.variant }}
+          path: build-web/webapp
+          retention-days: 3
+
+  # The site: the app without threads, with the one with threads in threads/
+  assemble:
+    needs: build_web
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          sparse-checkout: buildscripts/web
+
+      - name: Download the web apps
+        uses: actions/download-artifact@v4
+        with:
+          pattern: webapp-*
+
+      - name: Put the app with threads into the site
+        run: python3 buildscripts/web/add_threads_app.py webapp-single webapp-threads
+
+      - name: Upload the site
         uses: actions/upload-pages-artifact@v3
         with:
-          path: build-web/webapp
+          path: webapp-single
 
   deploy:
-    needs: build_web
+    needs: assemble
     if: github.ref == 'refs/heads/vibescore'
     runs-on: ubuntu-24.04
     permissions:

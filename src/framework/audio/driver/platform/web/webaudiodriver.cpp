@@ -17,13 +17,17 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 #include "webaudiodriver.h"
+#include "webaudiodriver.h"
 
 #include <algorithm>
+#include <chrono>
 #include <cmath>
+#include <cstring>
 
 #include <emscripten.h>
 
 #include "global/defer.h"
+#include "global/runtime.h"
 
 #include "log.h"
 
@@ -32,6 +36,17 @@ using namespace muse::audio;
 
 static const AudioDeviceID DEFAULT_DEVICE_ID = "default";
 
+#ifdef MUSE_THREADS_SUPPORT
+//! Frames in the ring (a power of two, so that the positions stay right when the counters wrap around)
+static constexpr uint32_t RING_FRAMES = 8192;
+//! Frames the engine renders per call
+static constexpr samples_t BLOCK_FRAMES = 512;
+//! How far ahead of the player the ring is kept filled: more is safer against a thread that runs late, less makes
+//! the sound follow the user sooner (~64 ms)
+static constexpr uint32_t AHEAD_FRAMES = 3072;
+//! How often the thread looks whether the player took audio (a block of 512 frames lasts ~11 ms)
+static constexpr int RENDER_INTERVAL_MS = 3;
+#else
 //! How far ahead of the playback the engine renders (seconds): more is safer against a busy main thread,
 //! less makes playback start and stop sooner
 static constexpr double RENDER_AHEAD_SECONDS = 0.15;
@@ -41,63 +56,26 @@ static constexpr double RESTART_AHEAD_SECONDS = 0.06;
 static constexpr int SEND_MARGIN_FRAMES = 256;
 //! Each wake-up of the page costs: a block (1024 frames) lasts ~21 ms
 static constexpr int RENDER_INTERVAL_MS = 20;
+#endif
 
-// Creates the AudioContext and the player (an AudioWorklet), and returns the sample rate of the browser's output
-EM_JS(int, vs_audio_open, (), {
+// Creates the AudioContext and the player (an AudioWorklet) from the given code (a class VibeScorePlayer), and
+// returns the sample rate of the browser's output
+EM_JS(int, vs_audio_create, (const char* playerCodePtr), {
     if (!Module.vibescoreAudio) {
         const AudioContextClass = window.AudioContext || window.webkitAudioContext;
         const ctx = new AudioContextClass({ latencyHint: 'playback' });
-        const audio = { ctx: ctx, node: null };
+        const audio = { ctx: ctx, node: null, onNodeCreated: [] };
         Module.vibescoreAudio = audio;
 
-        // Plays the blocks of interleaved stereo audio it is sent, each at its frame of the AudioContext's time
-        // (currentFrame), and silence where it has none: the page sends no silence, and the player sends nothing
-        // back (the page follows its time with the context's currentTime). A block that comes too late is dropped.
-        const processor = `
-            class VibeScorePlayer extends AudioWorkletProcessor {
-                constructor() {
-                    super();
-                    this.queue = [];
-                    this.port.onmessage = (event) => this.queue.push(event.data);
-                }
-                process(inputs, outputs) {
-                    const left = outputs[0][0];
-                    const right = outputs[0][1] || left;
-                    const n = left.length;
-                    left.fill(0);
-                    right.fill(0);
-                    let i = 0;
-                    while (i < n && this.queue.length > 0) {
-                        const block = this.queue[0];
-                        const frames = block.data.length / 2;
-                        const frame = currentFrame + i;
-                        if (block.frame + frames <= frame) {
-                            this.queue.shift();
-                            continue;
-                        }
-                        if (block.frame > frame) {
-                            i += Math.min(n - i, block.frame - frame);
-                            continue;
-                        }
-                        let offset = frame - block.frame;
-                        for (; i < n && offset < frames; ++i, ++offset) {
-                            left[i] = block.data[2 * offset];
-                            right[i] = block.data[2 * offset + 1];
-                        }
-                        if (offset >= frames) {
-                            this.queue.shift();
-                        }
-                    }
-                    return true;
-                }
-            }
-            registerProcessor('vibescore-player', VibeScorePlayer);
-        `;
+        const processor = UTF8ToString(playerCodePtr) + "\nregisterProcessor('vibescore-player', VibeScorePlayer);";
         const url = URL.createObjectURL(new Blob([processor], { type: 'application/javascript' }));
         ctx.audioWorklet.addModule(url).then(() => {
             audio.node = new AudioWorkletNode(ctx, 'vibescore-player',
                                               { numberOfInputs: 0, numberOfOutputs: 1, outputChannelCount: [2] });
             audio.node.connect(ctx.destination);
+            for (const callback of audio.onNodeCreated) {
+                callback(audio.node);
+            }
         }).catch((error) => console.error('VibeScore: no audio output', error));
 
         // Browsers let a page play audio after the user interacted with it
@@ -114,6 +92,127 @@ EM_JS(int, vs_audio_open, (), {
     return Module.vibescoreAudio.ctx.sampleRate;
 });
 
+EM_JS(void, vs_audio_suspend, (), {
+    const audio = Module.vibescoreAudio;
+    if (audio) {
+        audio.ctx.suspend();
+    }
+});
+
+#ifdef MUSE_THREADS_SUPPORT
+
+// Plays the ring of interleaved stereo audio in the shared memory: takes what the render thread wrote (the counters
+// are frames: [0] written, [1] taken), and plays silence where there is nothing yet ([2] counts those frames: the
+// render thread was late)
+static const char* RING_PLAYER_CODE = R"JS(
+class VibeScorePlayer extends AudioWorkletProcessor {
+    constructor() {
+        super();
+        this.ring = null;
+        this.port.onmessage = (event) => {
+            const d = event.data;
+            this.ring = new Float32Array(d.memory, d.ring, d.frames * 2);
+            this.counters = new Uint32Array(d.memory, d.counters, 3);
+            this.mask = d.frames - 1;
+        };
+    }
+    process(inputs, outputs) {
+        const left = outputs[0][0];
+        const right = outputs[0][1] || left;
+        const n = left.length;
+        let i = 0;
+        if (this.ring) {
+            const written = Atomics.load(this.counters, 0);
+            const taken = Atomics.load(this.counters, 1);
+            const count = Math.min(n, (written - taken) >>> 0);
+            for (; i < count; ++i) {
+                const p = ((taken + i) & this.mask) * 2;
+                left[i] = this.ring[p];
+                right[i] = this.ring[p + 1];
+            }
+            Atomics.store(this.counters, 1, (taken + count) >>> 0);
+            if (count < n) {
+                Atomics.add(this.counters, 2, n - count);
+            }
+        }
+        for (; i < n; ++i) {
+            left[i] = 0;
+            right[i] = 0;
+        }
+        return true;
+    }
+}
+)JS";
+
+// Gives the player the ring, and tells the render thread whether the browser plays the audio
+EM_JS(void, vs_audio_share_ring, (const float* ring, int frames, const uint32_t* counters, int32_t* isPlaying), {
+    const audio = Module.vibescoreAudio;
+    // The memory of the app as it is now (HEAPU8 may be a view of it from before it grew)
+    const memory = typeof wasmMemory !== 'undefined' ? wasmMemory.buffer : HEAPU8.buffer;
+    const playing = new Int32Array(memory, isPlaying, 1);
+    const update = () => Atomics.store(playing, 0, audio.node && audio.ctx.state === 'running' ? 1 : 0);
+
+    const share = (node) => {
+        node.port.postMessage({ memory: memory, ring: ring, frames: frames, counters: counters });
+        update();
+    };
+    if (audio.node) {
+        share(audio.node);
+    } else {
+        audio.onNodeCreated.push(share);
+    }
+    // For diagnostics (the browser's console): the frames of silence the player played because the ring was empty
+    const ringCounters = new Uint32Array(memory, counters, 3);
+    audio.underrunFrames = () => Atomics.load(ringCounters, 2);
+    audio.ctx.addEventListener('statechange', update);
+    update();
+});
+
+#else
+
+// Plays the blocks of interleaved stereo audio it is sent, each at its frame of the AudioContext's time
+// (currentFrame), and silence where it has none: the page sends no silence, and the player sends nothing
+// back (the page follows its time with the context's currentTime). A block that comes too late is dropped.
+static const char* BLOCK_PLAYER_CODE = R"JS(
+class VibeScorePlayer extends AudioWorkletProcessor {
+    constructor() {
+        super();
+        this.queue = [];
+        this.port.onmessage = (event) => this.queue.push(event.data);
+    }
+    process(inputs, outputs) {
+        const left = outputs[0][0];
+        const right = outputs[0][1] || left;
+        const n = left.length;
+        left.fill(0);
+        right.fill(0);
+        let i = 0;
+        while (i < n && this.queue.length > 0) {
+            const block = this.queue[0];
+            const frames = block.data.length / 2;
+            const frame = currentFrame + i;
+            if (block.frame + frames <= frame) {
+                this.queue.shift();
+                continue;
+            }
+            if (block.frame > frame) {
+                i += Math.min(n - i, block.frame - frame);
+                continue;
+            }
+            let offset = frame - block.frame;
+            for (; i < n && offset < frames; ++i, ++offset) {
+                left[i] = block.data[2 * offset];
+                right[i] = block.data[2 * offset + 1];
+            }
+            if (offset >= frames) {
+                this.queue.shift();
+            }
+        }
+        return true;
+    }
+}
+)JS";
+
 // The frame that the browser plays now (of the AudioContext's time), or -1 when the browser does not play audio yet
 EM_JS(double, vs_audio_current_frame, (), {
     const audio = Module.vibescoreAudio;
@@ -129,19 +228,16 @@ EM_JS(void, vs_audio_play, (const float* data, int frames, double frame), {
     Module.vibescoreAudio.node.port.postMessage({ frame: frame, data: block }, [block.buffer]);
 });
 
-EM_JS(void, vs_audio_suspend, (), {
-    const audio = Module.vibescoreAudio;
-    if (audio) {
-        audio.ctx.suspend();
-    }
-});
+#endif
 
 WebAudioDriver::WebAudioDriver()
 {
+#ifndef MUSE_THREADS_SUPPORT
     m_timer.setInterval(RENDER_INTERVAL_MS);
     QObject::connect(&m_timer, &QTimer::timeout, [this]() {
         renderAhead();
     });
+#endif
 }
 
 WebAudioDriver::~WebAudioDriver()
@@ -165,7 +261,11 @@ AudioDeviceID WebAudioDriver::defaultDevice() const
 
 bool WebAudioDriver::open(const Spec& spec, Spec* activeSpec)
 {
-    const int sampleRate = vs_audio_open();
+#ifdef MUSE_THREADS_SUPPORT
+    const int sampleRate = vs_audio_create(RING_PLAYER_CODE);
+#else
+    const int sampleRate = vs_audio_create(BLOCK_PLAYER_CODE);
+#endif
     if (sampleRate <= 0) {
         LOGE() << "No audio output in this browser";
         return false;
@@ -175,6 +275,9 @@ bool WebAudioDriver::open(const Spec& spec, Spec* activeSpec)
     m_activeSpec.deviceId = DEFAULT_DEVICE_ID;
     m_activeSpec.output.sampleRate = static_cast<sample_rate_t>(sampleRate);
     m_activeSpec.output.audioChannelCount = 2;
+#ifdef MUSE_THREADS_SUPPORT
+    m_activeSpec.output.samplesPerChannel = BLOCK_FRAMES;
+#endif
 
     m_block.resize(static_cast<size_t>(m_activeSpec.output.samplesPerChannel) * 2);
 
@@ -183,7 +286,23 @@ bool WebAudioDriver::open(const Spec& spec, Spec* activeSpec)
     }
 
     m_opened = true;
+
+#ifdef MUSE_THREADS_SUPPORT
+    m_ring.assign(static_cast<size_t>(RING_FRAMES) * 2, 0.f);
+    m_ringCounters[0] = 0;
+    m_ringCounters[1] = 0;
+    m_ringCounters[2] = 0;
+    vs_audio_share_ring(m_ring.data(), static_cast<int>(RING_FRAMES),
+                        reinterpret_cast<const uint32_t*>(m_ringCounters), reinterpret_cast<int32_t*>(&m_isPlaying));
+
+    m_running = true;
+    m_thread = std::make_unique<std::thread>([this]() {
+        th_render();
+    });
+#else
     m_timer.start();
+#endif
+
     m_activeSpecChanged.send(m_activeSpec);
 
     LOGI() << "Opened web audio output: " << m_activeSpec.output;
@@ -196,7 +315,16 @@ void WebAudioDriver::close()
         return;
     }
 
+#ifdef MUSE_THREADS_SUPPORT
+    m_running = false;
+    if (m_thread) {
+        m_thread->join();
+        m_thread.reset();
+    }
+#else
     m_timer.stop();
+#endif
+
     vs_audio_suspend();
     m_opened = false;
 }
@@ -218,7 +346,11 @@ async::Channel<IAudioDriver::Spec> WebAudioDriver::activeSpecChanged() const
 
 std::vector<samples_t> WebAudioDriver::availableOutputDeviceBufferSizes() const
 {
+#ifdef MUSE_THREADS_SUPPORT
+    return { BLOCK_FRAMES };
+#else
     return { 256, 512, 1024, 2048 };
+#endif
 }
 
 std::vector<sample_rate_t> WebAudioDriver::availableOutputDeviceSampleRates() const
@@ -236,6 +368,66 @@ async::Notification WebAudioDriver::availableOutputDevicesChanged() const
 {
     return m_availableOutputDevicesChanged;
 }
+
+#ifdef MUSE_THREADS_SUPPORT
+
+void WebAudioDriver::th_render()
+{
+    runtime::setThreadName("audio_driver");
+
+    using clock = std::chrono::steady_clock;
+    clock::time_point lastTime = clock::now();
+    double unheardFrames = 0;
+
+    while (m_running) {
+        const clock::time_point now = clock::now();
+
+        if (m_isPlaying.load(std::memory_order_acquire)) {
+            unheardFrames = 0;
+            th_fillRing();
+        } else {
+            // The browser does not play audio (yet): the engine goes on in real time (it also handles its messages
+            // in the callback), and what it renders is dropped
+            unheardFrames += std::chrono::duration<double>(now - lastTime).count() * m_activeSpec.output.sampleRate;
+            th_renderUnheard(unheardFrames);
+        }
+
+        lastTime = now;
+        std::this_thread::sleep_for(std::chrono::milliseconds(RENDER_INTERVAL_MS));
+    }
+}
+
+void WebAudioDriver::th_fillRing()
+{
+    const uint32_t blockFrames = static_cast<uint32_t>(m_block.size() / 2);
+    uint32_t written = m_ringCounters[0].load(std::memory_order_relaxed);
+
+    while (written - m_ringCounters[1].load(std::memory_order_acquire) + blockFrames <= AHEAD_FRAMES) {
+        m_activeSpec.callback(reinterpret_cast<uint8_t*>(m_block.data()), static_cast<int>(m_block.size() * sizeof(float)));
+
+        // Into the ring, in two parts where it wraps around
+        const uint32_t pos = written & (RING_FRAMES - 1);
+        const uint32_t firstFrames = std::min(blockFrames, RING_FRAMES - pos);
+        std::memcpy(m_ring.data() + pos * 2, m_block.data(), firstFrames * 2 * sizeof(float));
+        std::memcpy(m_ring.data(), m_block.data() + firstFrames * 2, (blockFrames - firstFrames) * 2 * sizeof(float));
+
+        written += blockFrames;
+        m_ringCounters[0].store(written, std::memory_order_release);
+    }
+}
+
+void WebAudioDriver::th_renderUnheard(double& framesDue)
+{
+    const double blockFrames = static_cast<double>(m_block.size() / 2);
+    framesDue = std::min(framesDue, 4 * blockFrames); // after a long pause, not all at once
+
+    while (framesDue >= blockFrames) {
+        m_activeSpec.callback(reinterpret_cast<uint8_t*>(m_block.data()), static_cast<int>(m_block.size() * sizeof(float)));
+        framesDue -= blockFrames;
+    }
+}
+
+#else
 
 void WebAudioDriver::renderAhead()
 {
@@ -281,3 +473,5 @@ void WebAudioDriver::renderAhead()
         m_nextFrame += blockFrames;
     }
 }
+
+#endif

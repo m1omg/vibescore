@@ -2,22 +2,29 @@
 #
 # CONFIGURE: Web App (VibeScore in the browser) - MUSESCORE_BUILD_CONFIGURATION=app-web
 #
-# The web app is the mobile app (the same shell, single window, touch-ready) built with Qt for WebAssembly
-# (single thread), with the parts of the mobile app that a browser does not have turned off.
+# The web app is the mobile app (the same shell, single window, touch-ready) built with Qt for WebAssembly, with the
+# parts of the mobile app that a browser does not have turned off.
+#
+# Two builds: with threads (VS_WEB_THREADS, Qt for WebAssembly multithread), where the audio engine renders in its own
+# threads, and with one thread, for browsers that do not give the page threads (it must be cross-origin isolated:
+# see buildscripts/web/vibescore-sw.js). The page chooses (see buildscripts/web/index.html).
 
 include(SetupConfigureMobile)
 
 set(MUE_CONFIGURATION_IS_APPWEB ON)
 set(MUSE_CONFIGURATION_IS_WEB ON)
 
-# Single thread: no worker thread, no QtConcurrent, no processes
-set(MUSE_THREADS_SUPPORT OFF)
+option(VS_WEB_THREADS "Web app with threads (needs Qt for WebAssembly multithread)" OFF)
+
+# No QtConcurrent, no processes
 set(QT_ADD_LINGUISTTOOLS OFF)
 set(QT_ADD_CONCURRENT OFF)
 set(QT_CONCURRENT_SUPPORTED OFF)
 set(QT_QPROCESS_SUPPORTED OFF)
 
-# The audio engine runs in the driver callback (no worker thread)
+# The audio engine runs in the driver's callback: with threads, the driver calls it from a thread of its own (and the
+# mixer renders the instruments in a pool of threads); with one thread, from a timer of the app
+set(MUSE_THREADS_SUPPORT ${VS_WEB_THREADS})
 set(MUSE_MODULE_AUDIO_WORKMODE 2)
 
 # Not available in a browser (yet)

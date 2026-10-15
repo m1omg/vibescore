@@ -7,12 +7,16 @@
 //   the browser's IndexedDB (Emscripten IDBFS): they are read before the app starts and written back regularly,
 //   when the page is hidden, and when the app asks for it (vibescoreSyncFileSystem, after saving a score).
 // - /files/share (templates, styles, ...) is unpacked from share.data (see buildscripts/web/pack_share.py).
-// - The sound font is downloaded once into /files/share/sound, which is kept in IndexedDB too: later the app
-//   finds it when it starts (the instruments of a score that is opened at the start get their sounds).
+// - The sound font is downloaded once into /files/share/sound, which is kept in IndexedDB too: later it is read from
+//   there after the app started (instruments without a sound font wait for one, see EventAudioSource).
+// - The service worker (vibescore-sw.js) makes the page cross-origin isolated, for the app with threads (in threads/),
+//   and keeps the app's files; the page uses the app without threads where that does not work (vibescoreChooseApp).
 
 const VS_SHARE_FOLDER = '/files/share';
 const VS_SOUND_FOLDER = VS_SHARE_FOLDER + '/sound';
 const VS_PERSISTENT_FOLDERS = ['/home/web_user', '/files/data', VS_SOUND_FOLDER];
+// Read from IndexedDB before the app starts; the sound font (~50 MB) is read after it started (vibescoreLoadSoundFont)
+const VS_STARTUP_FOLDERS = ['/home/web_user', '/files/data'];
 const VS_SYNC_INTERVAL_MS = 30000;
 // Opening an IndexedDB database takes a moment; when the browser does not answer (seen in some browser profiles),
 // the app starts without it (without the saved data) instead of waiting for good
@@ -24,6 +28,7 @@ const VS_STALL_MS = 30000;
 // The download of the app is started again when no data arrives for this long
 const VS_DOWNLOAD_STALL_MS = 20000;
 const VS_DOWNLOAD_ATTEMPTS = 3;
+const VS_PROGRESS_INTERVAL_MS = 150;
 // Preparing the app (the browser compiles it) can take minutes on phones and tablets: the user is told so after this
 // time, and that something is wrong only after the longer one
 const VS_PREPARE_HINT_MS = 10000;
@@ -231,6 +236,11 @@ function vibescoreLoader(elements) {
             };
         },
 
+        // A note in the timings (for the reports of problems)
+        note(text) {
+            noteTiming(text);
+        },
+
         // The last step: the app starts (the page cannot show anything else until the app shows itself)
         starting() {
             loader.setStage('Starting…', { hint: 'This can take a minute on phones and tablets.' });
@@ -310,6 +320,7 @@ async function vsCompileWasm(url, expectedSize, loader, isRetry, onStall) {
         const counted = (async () => {
             const reader = counting.body.getReader();
             let received = 0;
+            let lastShownTime = 0;
             for (;;) {
                 const { done, value } = await reader.read();
                 if (done) {
@@ -317,9 +328,13 @@ async function vsCompileWasm(url, expectedSize, loader, isRetry, onStall) {
                 }
                 received += value.byteLength;
                 lastDataTime = Date.now();
-                loader.setProgress(expectedSize > 0 ? received / expectedSize : null,
-                                   expectedSize > 0 ? `${vsMB(received)} of ${vsMB(expectedSize)} MB`
-                                                    : `${vsMB(received)} MB`);
+                // Shown a few times a second (not for each of the thousands of pieces: that took the page's thread)
+                if (lastDataTime - lastShownTime >= VS_PROGRESS_INTERVAL_MS) {
+                    lastShownTime = lastDataTime;
+                    loader.setProgress(expectedSize > 0 ? received / expectedSize : null,
+                                       expectedSize > 0 ? `${vsMB(received)} of ${vsMB(expectedSize)} MB`
+                                                        : `${vsMB(received)} MB`);
+                }
             }
             // The browser finishes compiling it (it compiled what arrived while it was downloading)
             isDownloaded = true;
@@ -380,16 +395,21 @@ async function vsLoadShare(FS) {
     }
 }
 
-function vsSyncFileSystem(FS, populate) {
-    return new Promise(resolve => {
-        FS.syncfs(populate, error => {
+// Reads the given persistent folders from IndexedDB (populate) or writes them to it, one after the other
+function vsSyncFileSystem(FS, populate, folders) {
+    const IDBFS = FS.filesystems.IDBFS;
+    return folders.reduce((previous, folder) => previous.then(ok => new Promise(resolve => {
+        IDBFS.syncfs(FS.lookupPath(folder).node.mount, populate, error => {
             if (error) {
-                console.error('VibeScore: could not sync the file system with IndexedDB', error);
+                console.error('VibeScore: could not sync', folder, 'with IndexedDB', error);
             }
-            resolve(!error);
+            resolve(ok && !error);
         });
-    });
+    })), Promise.resolve(true));
 }
+
+// Reads the folder of the sound font from IndexedDB (set by vibescorePreRun): a promise of whether it worked
+let vsRestoreSoundFolder = null;
 
 // Writes the persistent folders to IndexedDB (set by vibescorePreRun)
 let vsSyncFileSystemNow = null;
@@ -425,7 +445,7 @@ function vibescorePreRun(module, loader) {
     // and does not save it (that could overwrite the data that the browser still has)
     let canPersist = true;
     const restore = Promise.race([
-        vsSyncFileSystem(FS, true),
+        vsSyncFileSystem(FS, true, VS_STARTUP_FOLDERS),
         new Promise(resolve => setTimeout(() => resolve('timeout'), VS_RESTORE_TIMEOUT_MS)),
     ]).then(result => {
         if (result !== true) {
@@ -439,6 +459,19 @@ function vibescorePreRun(module, loader) {
         module.removeRunDependency('vibescore-files');
     }).catch(error => loader.failed(error));
 
+    // The sound font's folder, after the start; until it was read, it is not written (that would remove the sound font
+    // that IndexedDB has)
+    let isSoundFolderRestored = false;
+    vsRestoreSoundFolder = async () => {
+        await restore;
+        if (!canPersist) {
+            return false;
+        }
+        const ok = await vsSyncFileSystem(FS, true, [VS_SOUND_FOLDER]);
+        isSoundFolderRestored = ok;
+        return ok;
+    };
+
     // Written back to IndexedDB: regularly, when the page is hidden (a tab change, the app is closed)
     let syncing = false;
     const sync = async () => {
@@ -446,7 +479,7 @@ function vibescorePreRun(module, loader) {
             return;
         }
         syncing = true;
-        await vsSyncFileSystem(FS, false);
+        await vsSyncFileSystem(FS, false, isSoundFolderRestored ? VS_PERSISTENT_FOLDERS : VS_STARTUP_FOLDERS);
         syncing = false;
     };
 
@@ -473,10 +506,143 @@ function vibescorePreRun(module, loader) {
 
 // The sound font (about 50 MB) is downloaded after the app started, so that the app shows up sooner;
 // playback is silent until it is loaded
+// localStorage, where the browser has it
+function vsStorageGet(key) {
+    try {
+        return window.localStorage.getItem(key);
+    } catch (e) {
+        return null;
+    }
+}
+
+function vsStorageSet(key, value) {
+    try {
+        if (value === null) {
+            window.localStorage.removeItem(key);
+        } else {
+            window.localStorage.setItem(key, value);
+        }
+    } catch (e) {
+        // no storage: nothing is remembered
+    }
+}
+
+// The browser did not make the page cross-origin isolated with the service worker's headers (remembered per browser,
+// so that the page is not loaded twice every time)
+const VS_ISOLATION_FAILED_KEY = 'vibescore-isolation-failed';
+// The app with threads did not start with this build: the page uses the one without threads
+const VS_THREADS_FAILED_KEY = 'vibescore-threads-failed';
+const VS_SERVICE_WORKER_WAIT_MS = 10000;
+
+// Registers the service worker (vibescore-sw.js), which keeps the app's files and makes the page cross-origin isolated.
+// Returns true when the page is loaded again to be isolated (the first time).
+async function vibescoreIsolatePage() {
+    if (!('serviceWorker' in navigator) || !window.isSecureContext) {
+        return false;
+    }
+
+    let registration;
+    try {
+        registration = await navigator.serviceWorker.register('vibescore-sw.js');
+    } catch (error) {
+        console.warn('VibeScore: no service worker', error);
+        return false;
+    }
+
+    if (window.crossOriginIsolated) {
+        vsStorageSet(VS_ISOLATION_FAILED_KEY, null);
+        try {
+            sessionStorage.removeItem(VS_ISOLATION_FAILED_KEY);
+        } catch (e) {
+            // no session storage
+        }
+        return false;
+    }
+    if (!window.VS_THREADS_WASM_SIZE || vsStorageGet(VS_ISOLATION_FAILED_KEY) === navigator.userAgent) {
+        return false;
+    }
+
+    // Loaded again already in this tab, and still not isolated: the browser does not do it this way
+    let reloaded = false;
+    try {
+        reloaded = sessionStorage.getItem(VS_ISOLATION_FAILED_KEY) !== null;
+        sessionStorage.setItem(VS_ISOLATION_FAILED_KEY, '1');
+    } catch (e) {
+        return false; // no session storage: the page could be loaded again and again
+    }
+    if (reloaded) {
+        vsStorageSet(VS_ISOLATION_FAILED_KEY, navigator.userAgent);
+        return false;
+    }
+
+    // The first time, the service worker is installed first
+    await new Promise(resolve => {
+        const worker = registration.installing || registration.waiting;
+        if (registration.active || !worker) {
+            resolve();
+            return;
+        }
+        worker.addEventListener('statechange', () => {
+            if (worker.state === 'activated' || worker.state === 'redundant') {
+                resolve();
+            }
+        });
+        setTimeout(resolve, VS_SERVICE_WORKER_WAIT_MS);
+    });
+    if (!registration.active) {
+        return false;
+    }
+
+    location.reload();
+    return true;
+}
+
+// The app with threads (in threads/) where the browser gives the page shared memory, else the one without threads.
+// ?threads=0 or ?threads=1 in the page's address chooses.
+function vibescoreChooseApp(loader) {
+    const wanted = new URLSearchParams(location.search).get('threads');
+    const canUseThreads = window.crossOriginIsolated === true && typeof SharedArrayBuffer === 'function'
+                          && window.VS_THREADS_WASM_SIZE > 0;
+    const failedBefore = vsStorageGet(VS_THREADS_FAILED_KEY) === window.VS_BUILD;
+    const threads = canUseThreads && wanted !== '0' && (!failedBefore || wanted === '1');
+
+    loader.note(threads ? 'with threads' : `without threads (isolated: ${window.crossOriginIsolated === true}`
+                + `${failedBefore ? ', failed before' : ''})`);
+    return {
+        threads: threads,
+        dir: threads ? 'threads/' : '',
+        wasmSize: threads ? window.VS_THREADS_WASM_SIZE : window.VS_WASM_SIZE,
+    };
+}
+
+// The app with threads did not start: the page is loaded again without them (for this build)
+function vibescoreThreadsFailed(app, loader, error) {
+    if (!app.threads) {
+        return false;
+    }
+    console.error('VibeScore: the app with threads did not start; starting the one without threads', error);
+    vsStorageSet(VS_THREADS_FAILED_KEY, window.VS_BUILD);
+    location.reload();
+    return true;
+}
+
+function vibescoreLoadScript(src) {
+    return new Promise((resolve, reject) => {
+        const script = document.createElement('script');
+        script.src = src;
+        script.onload = () => resolve();
+        script.onerror = () => reject(new Error('Could not load ' + src));
+        document.head.appendChild(script);
+    });
+}
+
 async function vibescoreLoadSoundFont(instance, onStatus) {
     const name = 'MS Basic.sf3';
-    if (instance.FS.analyzePath(VS_SOUND_FOLDER + '/' + name).exists) {
-        return; // kept from an earlier visit
+    // Kept from an earlier visit: read from the browser's storage now (after the start, which does not need it)
+    if (vsRestoreSoundFolder && await vsRestoreSoundFolder()
+        && instance.FS.analyzePath(VS_SOUND_FOLDER + '/' + name).exists) {
+        instance.vibescoreSoundFontsChanged();
+        return;
     }
 
     try {

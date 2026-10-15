@@ -20,13 +20,24 @@
 
 #include <vector>
 
+#include "muse_framework_config.h"
+
+#ifdef MUSE_THREADS_SUPPORT
+#include <atomic>
+#include <memory>
+#include <thread>
+#else
 #include <QTimer>
+#endif
 
 #include "iaudiodriver.h"
 
 namespace muse::audio {
-//! Audio output in the browser (single-threaded WebAssembly): the engine renders on the main thread, a little ahead
-//! of time (driven by a timer), and the blocks are sent to an AudioWorklet that plays them.
+//! Audio output in the browser: an AudioWorklet plays what the engine rendered.
+//! - With threads: a thread of its own calls the engine (which renders in its threads) and keeps a ring of audio in
+//!   the shared memory filled a little ahead; the player reads it there. The app's (main) thread does nothing for it.
+//! - With one thread: the engine renders on the main thread, a little ahead of time (driven by a timer), and the
+//!   blocks are sent to the player.
 //! Browsers start audio after a user gesture; until then the rendered audio is dropped (the engine still runs).
 class WebAudioDriver : public IAudioDriver
 {
@@ -53,16 +64,36 @@ public:
     async::Notification availableOutputDevicesChanged() const override;
 
 private:
+#ifdef MUSE_THREADS_SUPPORT
+    void th_render();
+    void th_fillRing();
+    void th_renderUnheard(double& framesDue);
+#else
     void renderAhead();
+#endif
 
     bool m_opened = false;
-    bool m_inCallback = false;
-    double m_nextFrame = 0; // the frame of the player's time at which the next rendered block plays
     Spec m_activeSpec;
     async::Channel<Spec> m_activeSpecChanged;
     async::Notification m_availableOutputDevicesChanged;
 
-    QTimer m_timer;
     std::vector<float> m_block;
+
+#ifdef MUSE_THREADS_SUPPORT
+    std::unique_ptr<std::thread> m_thread;
+    std::atomic<bool> m_running = false;
+
+    //! Rendered audio (interleaved stereo) that the player reads from the shared memory
+    std::vector<float> m_ring;
+    //! [0]: the frames written to the ring, [1]: the frames the player took from it (counters that wrap around),
+    //! [2]: the frames of silence the player played because the ring was empty
+    std::atomic<uint32_t> m_ringCounters[3] = { 0, 0, 0 };
+    //! Whether the browser plays the audio (set by the page)
+    std::atomic<int32_t> m_isPlaying = 0;
+#else
+    bool m_inCallback = false;
+    double m_nextFrame = 0; // the frame of the player's time at which the next rendered block plays
+    QTimer m_timer;
+#endif
 };
 }

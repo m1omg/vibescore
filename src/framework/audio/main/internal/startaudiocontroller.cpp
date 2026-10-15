@@ -244,6 +244,12 @@ void StartAudioController::startAudioProcessing(const IApplication::RunMode& mod
                 once = true;
             }
 
+#ifdef MUSE_THREADS_SUPPORT
+            //! NOTE As in the worker mode: the mixer's channels can send messages from the threads of its pool
+            static const std::thread::id thisThId = std::this_thread::get_id();
+            async::processMessages(thisThId);
+#endif
+
             m_rpcChannel->process();
             m_engineController->process(procDest, (unsigned)procSamplesPerChannel);
         }

@@ -104,6 +104,11 @@ if(CC_IS_EMCC)
     set(EMCC_COMPILE_FLAGS "-s USE_ZLIB=1 -O2")
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${EMCC_COMPILE_FLAGS}")
 
+    if (VS_WEB_THREADS)
+        # Shared memory: every object file, also those of the libraries that do not use Qt (Qt adds it to its users)
+        add_compile_options(-pthread)
+    endif()
+
     if (BUILD_IS_DEBUG)
         set(EMCC_LINKER_FLAGS -O0)
     else()

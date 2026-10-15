@@ -149,8 +149,8 @@ else()
         internal/codecs/vorbisdecoder.h
     )
 
-    # A worker thread: not on the web (single thread), where the engine runs in the driver's callback
-    if (NOT OS_IS_WASM)
+    # A worker thread, where there are threads (the web app with one thread runs the engine in the driver's callback)
+    if (MUSE_THREADS_SUPPORT)
         target_sources(muse_audio_engine PRIVATE
             platform/general/generalaudioworker.cpp
             platform/general/generalaudioworker.h

@@ -1,5 +1,5 @@
 # VibeScore: starts the published web app in Chromium and Firefox, on x86-64 and on ARM64 (like phones and tablets),
-# and reports how the start went (buildscripts/web/smoke_test.py)
+# with threads and without, and reports how the start went (buildscripts/web/smoke_test.py)
 name: 'Test: Web start'
 
 on:
@@ -23,7 +23,7 @@ jobs:
       matrix:
         os: [ubuntu-24.04, ubuntu-24.04-arm]
         engine: [chromium, firefox]
-        variant: ['']
+        variant: ['', 'no-threads']
         include:
           # A slower ARM64 device, with a touch screen
           - os: ubuntu-24.04-arm
@@ -50,8 +50,9 @@ jobs:
           URL: ${{ inputs.url || 'https://m1omg.github.io/vibescore/' }}
         run: |
           # The page's process must stay well below what phones and tablets give a tab
+          # no-threads: the app without threads (the page uses it where the browser gives no shared memory)
           ${{ matrix.engine == 'firefox' && 'xvfb-run -a' || '' }} "$RUNNER_TEMP/venv/bin/python" buildscripts/web/smoke_test.py \
-            "$URL" out --engine ${{ matrix.engine }} ${{ matrix.engine == 'firefox' && '--headed' || '' }} \
+            "$URL${{ matrix.variant == 'no-threads' && '?threads=0' || '' }}" out --engine ${{ matrix.engine }} ${{ matrix.engine == 'firefox' && '--headed' || '' }} \
             --timeout 600 --max-memory 1400 ${{ matrix.variant == 'slow-tablet' && '--tablet --cpu-slowdown 4' || '' }}
 
       - name: Upload the report

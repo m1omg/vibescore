@@ -14,7 +14,7 @@ behind `MUE_CONFIGURATION_IS_APPMOBILE`, `MUE_CONFIGURATION_IS_APPWEB`, `MUSE_CO
 | Configuration | `MUSESCORE_BUILD_CONFIGURATION` | CMake setup | Platforms |
 |---|---|---|---|
 | Mobile app | `app-mobile` | `buildscripts/cmake/SetupConfigureMobile.cmake` | Android, iOS (also the desktop, to try the touch UI) |
-| Web app | `app-web` | `buildscripts/cmake/SetupConfigureWeb.cmake` (the mobile app, minus what browsers lack) | Qt for WebAssembly, single thread |
+| Web app | `app-web` | `buildscripts/cmake/SetupConfigureWeb.cmake` (the mobile app, minus what browsers lack) | Qt for WebAssembly: multithread (`VS_WEB_THREADS=ON`) and single thread |
 
 Branding (name, identifiers, URLs, version) is in one place: `buildscripts/cmake/MobileBranding.cmake`.
 
@@ -54,14 +54,19 @@ as an artifact.
 ### Web
 
 Toolchain: Emscripten 4.0.7 (the version Qt 6.10 is built with) in `~/osm/toolchain/emsdk`, and Qt 6.10.2 for
-`wasm_singlethread` (with `qt5compat`, `qtshadertools`).
+`wasm_singlethread` and `wasm_multithread` (with `qt5compat`, `qtshadertools`).
 
 ```sh
 buildscripts/web/web_build.sh [Release|Debug]   # configure (first time) and build into ~/osm/build/web/webapp
+VS_WEB_THREADS=1 buildscripts/web/web_build.sh  # the app with threads (~/osm/build/web-threads), put into webapp/threads
 buildscripts/web/serve.sh [port]                # http://localhost:8000/
 ```
 
-CI: `.github/workflows/build_web.yml` builds the web app and publishes it on GitHub Pages; then
+The site is the app without threads, with the app with threads in `threads/` (`add_threads_app.py`); the page
+chooses (`?threads=0` or `?threads=1` in its address forces one).
+
+CI: `.github/workflows/build_web.yml` builds both apps (in parallel), puts them together and publishes them on GitHub
+Pages; then
 `.github/workflows/test_web.yml` starts the published app in Chromium and Firefox on x86-64 and ARM64 (and on a
 slowed-down ARM64 tablet) with `buildscripts/web/smoke_test.py`, which notes the time of each step of the start and
 fails when the page's process needs more than 1.4 GB of memory.
@@ -154,8 +159,11 @@ scores (rename, duplicate, delete, share).
   Apple's panel (`CABTMIDICentralViewController`).
 - Both: Preferences → Audio & MIDI → "Connect Bluetooth MIDI device…" runs the action `midi-connect-bluetooth`
   (`BluetoothMidiController` in the mobile module).
-- Web: `WebAudioDriver`. There is no audio thread: the engine renders on the main thread, a little ahead of time,
-  and the blocks are played by an AudioWorklet. Browsers play audio after a user gesture. The page downloads the
+- Web: `WebAudioDriver`. With threads, the engine runs in the driver mode on a thread of the driver, which keeps a
+  ring of audio in the shared memory filled ~64 ms ahead; the AudioWorklet plays it from there (the page's thread does
+  nothing for the audio), and the mixer renders the instruments in a pool of up to 4 threads. Without threads the
+  engine renders on the main thread, a little ahead of time, and the blocks are sent to the AudioWorklet. Browsers
+  play audio after a user gesture; until then the engine runs in real time and its audio is dropped. The page downloads the
   sound font after the app started (once: it is kept in IndexedDB); instruments that find no sound font wait for
   one (`EventAudioSource`), so a score opened before the download finished gets its sounds then. An audio export
   renders in the driver's callback too: every 150 ms `SoundTrackWriter` hands the app what the engine sent it and
@@ -178,7 +186,30 @@ and says so. The app is linked with Asyncify, so that dialogs that wait for an a
 (nested event loops) work; `web::fixNestedEventLoops()` works around a Qt 6.10 bug that stopped the event processing
 after such a dialog.
 
-Memory (what phones and tablets give a tab is limited): the module is ~140 MB, ~100 MB of it code. The link keeps
+Threads: the app with threads needs shared memory (SharedArrayBuffer), which browsers give only to a cross-origin
+isolated page (headers COOP/COEP, which GitHub Pages does not send). The service worker `vibescore-sw.js` adds them
+to the page and to the workers' scripts; the first time, the page registers it and loads itself again. Where that
+does not work (no service workers, e.g. Firefox's private windows), or the app with threads failed to start with this
+build, the page starts the one without threads. The service worker also keeps the app's files of the current build
+in Cache Storage (the browser's own cache may not keep files this big), so later starts do not download them, and the
+app starts offline; the page itself comes from the network when there is one. Each thread is a Web Worker with an
+instance of the app's code (a pool of 8 is started with the app, `QT_WASM_PTHREAD_POOL_SIZE`), the shared memory is
+reserved up to 2 GB, and the threads get 1 MB stacks. File access from a thread is done by the page's thread.
+
+Start (measured in Chromium slowed down 4x): `main.cpp` set `QML_DISABLE_DISK_CACHE`, which in Qt 6 also turns off
+the QML compiled when the app is built, so all the QML was compiled at every start; on mobile platforms and the web
+it sets `QML_DISK_CACHE=aot`, and the QML modules are compiled to byte code only (`--only-bytecode`, see
+`muse_create_qml_module`: the same byte code as at run time, without the C++ that qmlcachegen can generate; the module
+is 18 MB smaller). The music fonts are added to the font database at the start, but a font reads its metadata when
+it is used first, and each glyph is measured when its symbol is used first (measuring the thousands of glyphs of all
+the fonts was a third of the start). The palettes with all the elements and the default ones (for "Reset palette")
+are made when they are needed. The sound font is read from IndexedDB after the start. The download's progress is
+shown a few times a second.
+
+Opening a big score: a lyrics line (the hyphens and melismas, which the layout makes) made the score's map of spanners
+rebuild its lookup tree at its next search, for every sung syllable; now only spanners that are in the map do.
+
+Memory (what phones and tablets give a tab is limited): the module is ~115 MB, ~90 MB of it code. The link keeps
 functions with a single caller apart when they are big (`--one-caller-inline-max-function-size`): otherwise all the
 static initializers end up in `__wasm_call_ctors` (1.9 MB), which Chromium's optimizing compiler compiles again after
 the start for more than a gigabyte of memory (the page's process went from ~0.65 GB to ~1.9 GB; the start froze on a
@@ -203,8 +234,8 @@ around the pages; the note input bar does not make its Add menu again (and leak 
 slowed-down tablet, from a key press to the new frame: a note entered 192 -> 120 ms, a pitch change 200 -> 120 ms, a
 selection change 128 -> 48 ms; on the desktop CPU an edit takes 35-50% less of the CPU. What remains per edit: the
 layout (no single hot spot; Asyncify makes it ~30% slower than without), the audio engine while notes sound (~25% of
-the CPU, but spread over time), QML updates. Bigger steps would be the audio engine in a Web Worker (upstream's split
-engine, `WEBENGINE_FACADE_MODE`) and JSPI (above). Measuring: a CPU profile of the page per group of actions (Chrome
+the CPU, but spread over time; with threads it runs off the page's thread), QML updates. A bigger step would be JSPI
+(above). Measuring: a CPU profile of the page per group of actions (Chrome
 DevTools Protocol), with the Event Timing API for the latency; the wasm functions' names come from a link with
 `--emit-symbol-map`.
 

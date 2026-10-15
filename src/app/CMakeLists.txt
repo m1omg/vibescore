@@ -326,6 +326,17 @@ if (CC_IS_EMCC)
     # compiler then compiles it again in the background: >1 GB of memory and ~20 s of a desktop CPU (minutes on a
     # phone or tablet), which froze the start on tablets
     target_link_options(MuseScoreStudio PRIVATE "SHELL:-s BINARYEN_EXTRA_PASSES=--one-caller-inline-max-function-size=1000")
+
+    if (VS_WEB_THREADS)
+        # The threads (web workers) are started with the app: the audio engine's (its driver and its mixer's pool,
+        # see WebAudioDriver and AudioEngineConfiguration), Qt's QML loader and a few spare. The browser starts a
+        # worker only while the page's thread is idle, so a thread that the page's thread waits for must be ready.
+        set_target_properties(MuseScoreStudio PROPERTIES QT_WASM_PTHREAD_POOL_SIZE 8)
+        # Memory shared between threads is reserved up to its maximum when the app starts (Qt's default is 4 GB)
+        set_target_properties(MuseScoreStudio PROPERTIES QT_WASM_MAXIMUM_MEMORY 2GB)
+        # The threads' stacks (Emscripten's default is 64 KB; threads on the desktop get megabytes)
+        target_link_options(MuseScoreStudio PRIVATE "SHELL:-s DEFAULT_PTHREAD_STACK_SIZE=1MB")
+    endif()
 endif()
 
 

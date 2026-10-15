@@ -21,6 +21,9 @@
  */
 #include "audioengineconfiguration.h"
 
+#include <algorithm>
+#include <thread>
+
 #include "audio/common/audiosanitizer.h"
 #include "audio/common/soundfonttypes.h"
 #include "audio/common/rpc/rpcpacker.h"
@@ -111,7 +114,12 @@ AudioInputParams AudioEngineConfiguration::defaultAudioInputParams() const
 
 size_t AudioEngineConfiguration::desiredAudioThreadNumber() const
 {
+#ifdef Q_OS_WASM
+    // Each thread of a web page is a worker that keeps an instance of the app's code: not too many
+    return std::clamp<size_t>(std::thread::hardware_concurrency() / 2, 1, 4);
+#else
     return 0;
+#endif
 }
 
 size_t AudioEngineConfiguration::minTrackCountForMultithreading() const

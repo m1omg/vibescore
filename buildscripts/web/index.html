@@ -57,13 +57,13 @@
     <div id="banner" role="alert"><span></span><button onclick="this.parentElement.style.display = 'none'">OK</button></div>
 
     <!-- The build: makes the browser load the files of this build, not ones it kept from an earlier one
-         (written by buildscripts/web/stamp_page.py) -->
+         (written by buildscripts/web/stamp_page.py). The app with threads is in threads/ (when it was built). -->
     <script>
         window.VS_BUILD = '@VS_BUILD@';
         window.VS_WASM_SIZE = Number('@VS_WASM_SIZE@') || 0;
+        window.VS_THREADS_WASM_SIZE = Number('@VS_THREADS_WASM_SIZE@') || 0;
     </script>
     <script src="vibescore-web.js?v=@VS_BUILD@"></script>
-    <script src="VibeScore.js?v=@VS_BUILD@"></script>
     <script src="qtloader.js?v=@VS_BUILD@"></script>
     <script>
         async function vibescoreStart() {
@@ -79,11 +79,19 @@
             if (!loader.checkBrowser()) {
                 return;
             }
+
+            // The service worker makes the page cross-origin isolated, which the app with threads needs: the page is
+            // loaded again once it is there (only the first time)
+            if (await vibescoreIsolatePage()) {
+                return;
+            }
+            const app = vibescoreChooseApp(loader);
             vibescorePrefetchShare();
 
             try {
+                await vibescoreLoadScript(app.dir + 'VibeScore.js?v=' + window.VS_BUILD);
                 const instance = await qtLoad({
-                    instantiateWasm: loader.instantiateWasm('VibeScore.wasm?v=' + window.VS_BUILD, window.VS_WASM_SIZE),
+                    instantiateWasm: loader.instantiateWasm(app.dir + 'VibeScore.wasm?v=' + window.VS_BUILD, app.wasmSize),
                     preRun: [module => vibescorePreRun(module, loader)],
                     qt: {
                         onLoaded: () => {
@@ -104,7 +112,9 @@
                 window.vibescoreInstance = instance; // for debugging in the browser's console
                 vibescoreLoadSoundFont(instance, console.warn);
             } catch (error) {
-                loader.failed(error);
+                if (!vibescoreThreadsFailed(app, loader, error)) {
+                    loader.failed(error);
+                }
             }
         }
 

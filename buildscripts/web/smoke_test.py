@@ -161,6 +161,10 @@ async def main():
                 note("the page does not answer (its thread is busy)")
                 continue
             except Exception as e:
+                # The page loads itself again once, the first time (see vibescoreIsolatePage in vibescore-web.js)
+                if "context was destroyed" in str(e) or "navigat" in str(e):
+                    note("the page loads again")
+                    continue
                 note(f"could not read the page: {e}")
                 break
             status = re.sub(r"[0-9.]+ of", "# of", state.get("status") or "")
