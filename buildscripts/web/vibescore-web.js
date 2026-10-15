@@ -394,8 +394,22 @@ function vsSyncFileSystem(FS, populate) {
 // Writes the persistent folders to IndexedDB (set by vibescorePreRun)
 let vsSyncFileSystemNow = null;
 
+// Qt for WebAssembly arms one browser timer for its next timer, with the wait rounded down to whole milliseconds,
+// and arms it again only if a timer of Qt was due when it fired (QEventDispatcherWasm::sendTimerEvents). Firefox's
+// clock is coarser, so the browser's timer often fired just before Qt's timer was due: then Qt's timers stopped
+// until the next input event (the audio stopped, deferred updates waited). The browser's timers that Qt asks for
+// are made 2 ms longer, so that they are not early.
+const VS_TIMER_MARGIN_MS = 2;
+function vsLengthenQtTimers() {
+    const setTimeoutOriginal = window.setTimeout.bind(window);
+    window.setTimeout = (handler, timeout, ...args) =>
+        setTimeoutOriginal(handler, timeout > 0 ? timeout + VS_TIMER_MARGIN_MS : timeout, ...args);
+}
+
 // The preRun step of the Emscripten module: runs before main(), and main() waits for the run dependencies
 function vibescorePreRun(module, loader) {
+    vsLengthenQtTimers();
+
     const FS = module.FS;
     const IDBFS = FS.filesystems.IDBFS;
 
