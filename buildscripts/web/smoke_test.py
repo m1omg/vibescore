@@ -6,8 +6,9 @@ Usage: smoke_test.py URL OUT_DIR [--engine chromium|firefox] [--timeout SECONDS]
                      [--max-memory MB] [--headed]
 
 Writes to OUT_DIR, with the engine as prefix: the loading steps with their times (timeline.txt), the browser's console
-(console.log) and screenshots. Exits with 1 when the app did not start in time, or (on Linux) when the page's process
-used more memory than --max-memory.
+(console.log) and screenshots. After the app started, the page is loaded again (the second start), which must not
+download the app again (the browser keeps it). Exits with 1 when the app did not start in time (either time), when the
+second start downloaded the app, or (on Linux) when the page's process used more memory than --max-memory.
 - --cpu-slowdown N (Chromium): runs the page N times slower, like a slower device.
 - --tablet (Chromium): a touch tablet (mobile viewport).
 """
@@ -145,71 +146,97 @@ async def main():
             await cdp.send("Emulation.setCPUThrottlingRate", {"rate": args.cpu_slowdown})
             note(f"CPU slowed down {args.cpu_slowdown:g} times")
 
+        async def screenshot(name):
+            try:
+                await asyncio.wait_for(page.screenshot(path=prefix + name), 30)
+            except Exception as e:
+                note(f"no screenshot: {e}")
+
+        def note_steps(state, title):
+            timeline.append(title)
+            for at, text in state.get("steps") or []:
+                timeline.append(f"  page step at {at / 1000:7.1f}s: {text}")
+            timeline.append(f"  longest time the page's thread was busy: {state.get('longestBusyMs')} ms")
+            timeline.append(f"  problem shown: {state.get('problem')!r}")
+
+        async def wait_for_start(start_time):
+            """Waits until the app started (True) or could not start (False); returns it with the page's last state."""
+            nonlocal peak_memory
+            last_status = None
+            state = {}
+            started = False
+            while time.time() - start_time < args.timeout:
+                await asyncio.sleep(1)
+                if has_proc:
+                    peak_memory = max(peak_memory, page_process_memory_mb())
+                try:
+                    state = json.loads(await asyncio.wait_for(page.evaluate(STATE), 5))
+                except asyncio.TimeoutError:
+                    note("the page does not answer (its thread is busy)")
+                    continue
+                except Exception as e:
+                    # The page loads itself again once, the first time (see vibescoreIsolatePage in vibescore-web.js)
+                    if "context was destroyed" in str(e) or "navigat" in str(e):
+                        note("the page loads again")
+                        continue
+                    note(f"could not read the page: {e}")
+                    break
+                status = re.sub(r"[0-9.]+ of", "# of", state.get("status") or "")
+                if status != last_status:
+                    last_status = status
+                    note(f"status: {state.get('status')!r}  problem: {state.get('problem')!r}  heap: {state.get('heapMB')} MB")
+                if "could not start" in (state.get("status") or ""):
+                    note("the page says that the app could not start")
+                    break
+                if state.get("started"):
+                    started = True
+                    note(f"the app started in {time.time() - start_time:.1f} s")
+                    # The memory is watched a while longer (the browser keeps compiling in the background, and keeps
+                    # the app's files)
+                    for _ in range(20):
+                        await asyncio.sleep(1)
+                        if has_proc:
+                            peak_memory = max(peak_memory, page_process_memory_mb())
+                    break
+            if not started:
+                note(f"the app did not start in {args.timeout:g} s")
+            try:
+                state = json.loads(await asyncio.wait_for(page.evaluate(STATE), 10))
+            except Exception:
+                pass
+            return started, state
+
         await page.goto(args.url, wait_until="commit")
         note("page requested")
+        started, state = await wait_for_start(t0)
+        note_steps(state, "The first start:")
 
-        started = False
-        last_status = None
-        state = {}
-        while time.time() - t0 < args.timeout:
-            await asyncio.sleep(1)
-            if has_proc:
-                peak_memory = max(peak_memory, page_process_memory_mb())
-            try:
-                state = json.loads(await asyncio.wait_for(page.evaluate(STATE), 5))
-            except asyncio.TimeoutError:
-                note("the page does not answer (its thread is busy)")
-                continue
-            except Exception as e:
-                # The page loads itself again once, the first time (see vibescoreIsolatePage in vibescore-web.js)
-                if "context was destroyed" in str(e) or "navigat" in str(e):
-                    note("the page loads again")
-                    continue
-                note(f"could not read the page: {e}")
-                break
-            status = re.sub(r"[0-9.]+ of", "# of", state.get("status") or "")
-            if status != last_status:
-                last_status = status
-                note(f"status: {state.get('status')!r}  problem: {state.get('problem')!r}  heap: {state.get('heapMB')} MB")
-            if "could not start" in (state.get("status") or ""):
-                note("the page says that the app could not start")
-                break
-            if state.get("started"):
-                started = True
-                note("the app started")
-                # The memory is watched a while longer (the browser keeps compiling in the background)
-                for _ in range(20):
-                    await asyncio.sleep(1)
-                    if has_proc:
-                        peak_memory = max(peak_memory, page_process_memory_mb())
-                break
+        # The second start: the browser kept the app (vsFetchKept in vibescore-web.js), so it is not downloaded again
+        is_second_start = started
+        downloaded_again = False
+        if is_second_start:
+            await screenshot("screen.png")
+            note("the page is loaded again (the second start)")
+            await page.reload(wait_until="commit")
+            started, state = await wait_for_start(time.time())
+            note_steps(state, "The second start:")
+            downloaded_again = any("Downloading VibeScore" in text for _, text in state.get("steps") or [])
+            if downloaded_again:
+                note("the second start downloaded the app again: the browser did not keep it")
 
-        try:
-            state = json.loads(await asyncio.wait_for(page.evaluate(STATE), 10))
-        except Exception:
-            pass
-        for at, text in state.get("steps") or []:
-            timeline.append(f"  page step at {at / 1000:7.1f}s: {text}")
-        timeline.append(f"  longest time the page's thread was busy: {state.get('longestBusyMs')} ms")
-        timeline.append(f"  problem shown: {state.get('problem')!r}")
         if has_proc:
             note(f"peak memory of the page's process: {peak_memory} MB")
-        if not started:
-            note(f"the app did not start in {args.timeout:g} s")
         too_much_memory = args.max_memory and peak_memory > args.max_memory
         if too_much_memory:
             note(f"the page used more than {args.max_memory:g} MB")
-        try:
-            await asyncio.wait_for(page.screenshot(path=prefix + "screen.png"), 30)
-        except Exception as e:
-            note(f"no screenshot: {e}")
+        await screenshot("screen-second.png" if is_second_start else "screen.png")
 
         with open(prefix + "timeline.txt", "w") as f:
             f.write("\n".join(timeline) + "\n")
         with open(prefix + "console.log", "w") as f:
             f.write("\n".join(console) + "\n")
         await browser.close()
-    return 0 if started and not too_much_memory else 1
+    return 0 if started and not downloaded_again and not too_much_memory else 1
 
 
 if __name__ == "__main__":

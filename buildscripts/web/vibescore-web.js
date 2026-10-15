@@ -10,7 +10,10 @@
 // - The sound font is downloaded once into /files/share/sound, which is kept in IndexedDB too: later it is read from
 //   there after the app started (instruments without a sound font wait for one, see EventAudioSource).
 // - The service worker (vibescore-sw.js) makes the page cross-origin isolated, for the app with threads (in threads/),
-//   and keeps the app's files; the page uses the app without threads where that does not work (vibescoreChooseApp).
+//   and keeps the app's scripts; the page uses the app without threads where that does not work (vibescoreChooseApp).
+// - The page keeps the app itself (the wasm, share.data) in the browser's Cache Storage (vsFetchKept): later starts do
+//   not download it. The address of each file has its version (vibescoreFileUrl), so a new build downloads only the
+//   files that changed.
 
 const VS_SHARE_FOLDER = '/files/share';
 const VS_SOUND_FOLDER = VS_SHARE_FOLDER + '/sound';
@@ -33,6 +36,10 @@ const VS_PROGRESS_INTERVAL_MS = 150;
 // time, and that something is wrong only after the longer one
 const VS_PREPARE_HINT_MS = 10000;
 const VS_PREPARE_STALL_MS = 240000;
+// The browser's Cache Storage, where the files of the app are kept (by the page and by the service worker)
+const VS_CACHE = 'vibescore-app';
+// When the browser does not answer (like IndexedDB in some browser profiles), the app is downloaded instead
+const VS_CACHE_TIMEOUT_MS = 5000;
 
 const vsMB = bytes => (bytes / 1e6).toFixed(0);
 
@@ -290,9 +297,78 @@ function vibescoreLoader(elements) {
     return loader;
 }
 
+// The address of a file of the app with its version (a hash of its content, see stamp_page.py): the browser keeps the
+// file until it changes
+function vibescoreFileUrl(name) {
+    const version = window.VS_VERSIONS?.[name];
+    return version ? name + '?v=' + version : name;
+}
+
+// The promise, or an error when it did not settle in time
+function vsWithin(promise, ms) {
+    return Promise.race([promise, new Promise((_, reject) =>
+        setTimeout(() => reject(new Error(`no answer in ${ms / 1000} s`)), ms))]);
+}
+
+// Cache Storage, or null where the browser has none (e.g. Firefox's private windows) or does not answer
+let vsCacheOpening = null;
+function vsOpenCache() {
+    vsCacheOpening ??= (async () => {
+        try {
+            return await vsWithin(window.caches.open(VS_CACHE), VS_CACHE_TIMEOUT_MS);
+        } catch (error) {
+            console.warn('VibeScore: the browser does not keep the app (no Cache Storage)', error);
+            return null;
+        }
+    })();
+    return vsCacheOpening;
+}
+
+// The versions of a file of earlier builds are removed once this one is kept
+async function vsRemoveOtherVersions(cache, url) {
+    const kept = new URL(url, location.href);
+    for (const request of await cache.keys()) {
+        const other = new URL(request.url);
+        if (other.pathname === kept.pathname && other.search !== kept.search) {
+            await cache.delete(request);
+        }
+    }
+}
+
+// A file of the app (its address has its version): from Cache Storage, or downloaded and kept there. Returns
+// { response, isKept }; fresh: downloaded again, from no cache.
+// The page keeps the files itself, not the service worker: the browser stops a service worker that works too long
+// (Firefox a minute after the page's last request, with or without waitUntil), and a download of the app often takes
+// longer, so it was not kept and every start downloaded the app again.
+async function vsFetchKept(url, { fresh = false, signal } = {}) {
+    const cache = await vsOpenCache();
+    if (cache && !fresh) {
+        const kept = await vsWithin(cache.match(url, { ignoreVary: true }), VS_CACHE_TIMEOUT_MS).catch(() => null);
+        if (kept) {
+            // Through the service worker, which gives it from the cache too: Chromium keeps the compiled code of a wasm
+            // only with a response from a service worker (or the network), not with one that the page took from the cache
+            const response = navigator.serviceWorker?.controller ? await fetch(url, { signal }) : kept;
+            return { response, isKept: true };
+        }
+    }
+
+    // Kept by the page: past the service worker (it leaves downloads that bypass the caches alone) and past the
+    // browser's HTTP cache (it would only keep a second copy)
+    const response = await fetch(url, { signal, cache: cache ? 'no-store' : fresh ? 'reload' : 'default' });
+    if (cache && response.status === 200) {
+        // Kept once it arrived completely (the page reads the response meanwhile)
+        cache.put(url, response.clone())
+            .then(() => vsRemoveOtherVersions(cache, url))
+            .catch(error => console.warn('VibeScore: the browser did not keep', url, error));
+    }
+    return { response, isKept: false };
+}
+
 // Downloads and compiles the app (loader.compile). onStall is called before a download that stopped is cancelled.
 async function vsCompileWasm(url, expectedSize, loader, isRetry, onStall) {
-    loader.setStage(isRetry ? 'The download stopped. Downloading VibeScore again…' : 'Downloading VibeScore…');
+    if (isRetry) {
+        loader.setStage('The download stopped. Downloading VibeScore again…');
+    }
 
     // No data for VS_DOWNLOAD_STALL_MS: the download is cancelled (the compilation then fails)
     const abort = new AbortController();
@@ -307,10 +383,13 @@ async function vsCompileWasm(url, expectedSize, loader, isRetry, onStall) {
     }, 1000);
 
     try {
-        const response = await fetch(url, { credentials: 'same-origin', signal: abort.signal,
-                                            cache: isRetry ? 'reload' : 'default' });
+        const { response, isKept } = await vsFetchKept(url, { fresh: isRetry, signal: abort.signal });
         if (!response.ok) {
             throw new Error(`Could not download the app (${url}: ${response.status} ${response.statusText})`);
+        }
+        if (!isRetry) {
+            // Kept from an earlier start: read from the browser's storage
+            loader.setStage(isKept ? 'Loading VibeScore…' : 'Downloading VibeScore…');
         }
 
         // The bytes are counted as they arrive (decompressed: the size of the wasm), on a copy of the response: the
@@ -373,13 +452,13 @@ function vsMakeTree(FS, path) {
 let vsShareDownload = null;
 
 function vibescorePrefetchShare() {
-    const version = '?v=' + (window.VS_BUILD ?? '');
-    vsShareDownload ??= Promise.all([fetch('share.json' + version), fetch('share.data' + version)])
-        .then(async ([indexResponse, dataResponse]) => {
-            if (!indexResponse.ok || !dataResponse.ok) {
+    vsShareDownload ??= Promise.all([vsFetchKept(vibescoreFileUrl('share.json')),
+                                     vsFetchKept(vibescoreFileUrl('share.data'))])
+        .then(async ([index, data]) => {
+            if (!index.response.ok || !data.response.ok) {
                 throw new Error('Could not download the application data (share.data)');
             }
-            return [await indexResponse.json(), new Uint8Array(await dataResponse.arrayBuffer())];
+            return [await index.response.json(), new Uint8Array(await data.response.arrayBuffer())];
         });
     vsShareDownload.catch(() => {}); // reported by vsLoadShare
     return vsShareDownload;
@@ -472,15 +551,27 @@ function vibescorePreRun(module, loader) {
         return ok;
     };
 
-    // Written back to IndexedDB: regularly, when the page is hidden (a tab change, the app is closed)
-    let syncing = false;
-    const sync = async () => {
-        if (syncing || !canPersist) {
-            return;
+    // Written back to IndexedDB: regularly, when the page is hidden (a tab change, the app is closed). Asked for while
+    // it is being written (e.g. after a score was saved, or the sound font was downloaded), it is written again after
+    // that: the running sync may have missed the change.
+    let syncing = null;
+    let isSyncAgain = false;
+    const sync = () => {
+        if (!canPersist) {
+            return Promise.resolve();
         }
-        syncing = true;
-        await vsSyncFileSystem(FS, false, isSoundFolderRestored ? VS_PERSISTENT_FOLDERS : VS_STARTUP_FOLDERS);
-        syncing = false;
+        if (syncing) {
+            isSyncAgain = true;
+            return syncing;
+        }
+        syncing = (async () => {
+            do {
+                isSyncAgain = false;
+                await vsSyncFileSystem(FS, false, isSoundFolderRestored ? VS_PERSISTENT_FOLDERS : VS_STARTUP_FOLDERS);
+            } while (isSyncAgain);
+            syncing = null;
+        })();
+        return syncing;
     };
 
     vsSyncFileSystemNow = sync;

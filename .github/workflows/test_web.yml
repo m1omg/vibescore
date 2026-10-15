@@ -1,5 +1,6 @@
 # VibeScore: starts the published web app in Chromium and Firefox, on x86-64 and on ARM64 (like phones and tablets),
-# with threads and without, and reports how the start went (buildscripts/web/smoke_test.py)
+# with threads and without, and reports how the start went, and that a second start does not download the app again
+# (buildscripts/web/smoke_test.py)
 name: 'Test: Web start'
 
 on:

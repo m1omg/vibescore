@@ -5,10 +5,14 @@
 //   Cross-Origin-Embedder-Policy to the page and to the scripts of its workers (GitHub Pages cannot send headers).
 //   Browsers give shared memory, which the app's threads need, only to such pages; without it the page starts the
 //   app without threads.
-// - It keeps the files of the app in the browser (Cache Storage): later starts do not download them again (the
+// - It gives the files of the app from the browser's Cache Storage: later starts do not download them again (the
 //   browser's own cache may not keep files this big, especially on phones), and the app also starts offline.
-//   The files of a build have its id in their address (?v=..., see stamp_page.py); those of earlier builds are
-//   removed when a new build is cached. The page itself is taken from the network when there is one.
+//   It keeps the scripts there; the page keeps the files that it fetches itself (the wasm, share.data: vsFetchKept in
+//   vibescore-web.js), because the browser stops a service worker that works too long, and a download of the app can
+//   take longer (Firefox stops it a minute after the page's last request): it was not kept then. The page downloads
+//   them past the service worker (cache: 'no-store').
+//   The address of a file has its version (?v=..., see stamp_page.py); the other versions of a file are removed when
+//   it is kept. The page itself is taken from the network when there is one.
 // - The sound font is not kept here: the app keeps it in its own storage (IndexedDB).
 
 const VS_CACHE = 'vibescore-app';
@@ -38,16 +42,16 @@ async function vsRemoveOtherVersions(cache, url) {
     }
 }
 
-// A file of a build: from the cache, or downloaded and kept
+// A file of a build: from the cache, or downloaded (and kept, if it is a script: the page keeps what it fetches)
 async function vsVersioned(event, url) {
     const cache = await caches.open(VS_CACHE);
-    const cached = await cache.match(event.request);
+    const cached = await cache.match(event.request, { ignoreVary: true });
     if (cached) {
         return cached;
     }
 
     const response = await fetch(event.request);
-    if (response.ok && response.status === 200) {
+    if (response.status === 200 && event.request.destination !== '') {
         // Kept when it arrived completely (the page reads the response meanwhile)
         const copy = response.clone();
         event.waitUntil(cache.put(event.request, copy)
@@ -93,6 +97,9 @@ self.addEventListener('fetch', event => {
     }
     if (url.pathname.includes('/sound/')) {
         return; // the sound font: kept by the app
+    }
+    if (request.cache === 'no-store') {
+        return; // a download that the page keeps itself
     }
 
     const isVersioned = url.searchParams.has('v');
