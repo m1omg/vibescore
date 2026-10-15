@@ -208,6 +208,13 @@ engine, `WEBENGINE_FACADE_MODE`) and JSPI (above). Measuring: a CPU profile of t
 DevTools Protocol), with the Event Timing API for the latency; the wasm functions' names come from a link with
 `--emit-symbol-map`.
 
+Two traps of the WebAssembly build: `size_t` has 32 bits, and the queues' `nextPowerOfTwo()` shifted it by 32
+(undefined; Clang made every queue's capacity 1, so a score with many instruments queued its playback for minutes);
+and Qt arms its browser timer again only when a Qt timer was due when it fired, which Firefox's coarser clock made
+fail (Qt's timers stopped until the next input event): `vsLengthenQtTimers()` makes the page's timers 2 ms longer.
+Chromium keeps the compiled app in its code cache only when the fetched response itself is compiled (the loader
+counts the download on a copy).
+
 Keyboard focus: Qt for WebAssembly can leave the browser's focus on the page itself (seen when the Properties
 panel was opened), and the app then got no keys; `vibescoreKeepKeyboardFocus` gives the focus back to the
 window that is clicked, or that lost it to no element.
