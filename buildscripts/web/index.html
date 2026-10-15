@@ -56,15 +56,17 @@
     <!-- Problems found while starting (e.g. no saved data) that the app does not know about -->
     <div id="banner" role="alert"><span></span><button onclick="this.parentElement.style.display = 'none'">OK</button></div>
 
-    <!-- The build: makes the browser load the files of this build, not ones it kept from an earlier one
-         (written by buildscripts/web/stamp_page.py). The app with threads is in threads/ (when it was built). -->
+    <!-- The build (written by buildscripts/web/stamp_page.py): the address of each file of the app has the file's
+         version (a hash of its content), so that the browser loads the files of this build, and keeps a file across
+         builds until it changes. The app with threads is in threads/ (when it was built). -->
     <script>
         window.VS_BUILD = '@VS_BUILD@';
+        window.VS_VERSIONS = @VS_VERSIONS@;
         window.VS_WASM_SIZE = Number('@VS_WASM_SIZE@') || 0;
         window.VS_THREADS_WASM_SIZE = Number('@VS_THREADS_WASM_SIZE@') || 0;
     </script>
-    <script src="vibescore-web.js?v=@VS_BUILD@"></script>
-    <script src="qtloader.js?v=@VS_BUILD@"></script>
+    <script src="vibescore-web.js?v=@VS_VERSION:vibescore-web.js@"></script>
+    <script src="qtloader.js?v=@VS_VERSION:qtloader.js@"></script>
     <script>
         async function vibescoreStart() {
             const loading = document.querySelector('#loading');
@@ -89,9 +91,9 @@
             vibescorePrefetchShare();
 
             try {
-                await vibescoreLoadScript(app.dir + 'VibeScore.js?v=' + window.VS_BUILD);
+                await vibescoreLoadScript(vibescoreFileUrl(app.dir + 'VibeScore.js'));
                 const instance = await qtLoad({
-                    instantiateWasm: loader.instantiateWasm(app.dir + 'VibeScore.wasm?v=' + window.VS_BUILD, app.wasmSize),
+                    instantiateWasm: loader.instantiateWasm(vibescoreFileUrl(app.dir + 'VibeScore.wasm'), app.wasmSize),
                     preRun: [module => vibescorePreRun(module, loader)],
                     qt: {
                         onLoaded: () => {

@@ -4,14 +4,20 @@
 
 Usage: stamp_page.py WEB_DIR [--template PAGE]
 Writes WEB_DIR/index.html from PAGE (default: WEB_DIR/index.html itself), replacing:
-- @VS_BUILD@: an id of this build (a hash of the app's files), which the page adds to the addresses of the files
-  it loads, so that the browser does not mix files that it kept from an earlier build with the ones of this build;
+- @VS_VERSIONS@: the version of each file of the app (a hash of its content), as a JSON object; the page adds it to
+  the file's address (vibescoreFileUrl in vibescore-web.js), so that the browser does not mix files that it kept from
+  an earlier build with the ones of this build, and keeps a file across builds until it changes (a new build downloads
+  only the files that changed);
+- @VS_VERSION:NAME@: the version of the file NAME (for the scripts in the page);
+- @VS_BUILD@: an id of this build (a hash of the app's files);
 - @VS_WASM_SIZE@: the size of VibeScore.wasm, for the progress of its download;
 - @VS_THREADS_WASM_SIZE@: the size of threads/VibeScore.wasm, the app with threads (0 when it is not there).
 """
 import argparse
 import hashlib
+import json
 import os
+import re
 import sys
 
 parser = argparse.ArgumentParser()
@@ -28,21 +34,37 @@ names = ["VibeScore.wasm", "VibeScore.js", "qtloader.js", "vibescore-web.js", "s
 if has_threads:
     names += ["threads/VibeScore.wasm", "threads/VibeScore.js"]
 
-digest = hashlib.sha256()
+versions = {}
+build_digest = hashlib.sha256()
 for name in names:
+    digest = hashlib.sha256()
     with open(os.path.join(web_dir, name), "rb") as f:
         for block in iter(lambda: f.read(1 << 20), b""):
             digest.update(block)
+    versions[name] = digest.hexdigest()[:12]
+    build_digest.update(digest.digest())
 
-build = digest.hexdigest()[:12]
+build = build_digest.hexdigest()[:12]
 wasm_size = os.path.getsize(os.path.join(web_dir, "VibeScore.wasm"))
 threads_wasm_size = os.path.getsize(threads_wasm) if has_threads else 0
 
+
+def version_of(match):
+    if match.group(1) not in versions:
+        sys.exit(f"stamp_page.py: the page asks for the version of {match.group(1)}, which is not one of the app's files")
+    return versions[match.group(1)]
+
+
 with open(args.template or page, encoding="utf-8") as f:
     text = f.read()
-text = (text.replace("@VS_BUILD@", build)
+text = re.sub(r"@VS_VERSION:([^@]+)@", version_of, text)
+text = (text.replace("@VS_VERSIONS@", json.dumps(versions, separators=(",", ":")))
+            .replace("@VS_BUILD@", build)
             .replace("@VS_WASM_SIZE@", str(wasm_size))
             .replace("@VS_THREADS_WASM_SIZE@", str(threads_wasm_size)))
+left = re.findall(r"@VS_[A-Z_]+(?::[^@]*)?@", text)
+if left:
+    sys.exit(f"stamp_page.py: not stamped: {', '.join(sorted(set(left)))}")
 with open(page, "w", encoding="utf-8") as f:
     f.write(text)
 

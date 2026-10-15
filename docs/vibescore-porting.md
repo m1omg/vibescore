@@ -175,8 +175,16 @@ The app pauses playback and stops the audio stream when it goes to the backgroun
 ### The web app
 
 `buildscripts/web/index.html` and `vibescore-web.js` download the app with a progress bar and say which step of
-the start takes too long or failed (the page is stamped with the build by `stamp_page.py`, so that the browser
-does not mix files of different builds). They prepare the file system before the app starts: the user's
+the start takes too long or failed. The page is stamped by `stamp_page.py` with the version of each file (a hash of
+its content), which is in the file's address (`?v=`): the browser does not mix files of different builds, and a new
+build downloads only the files that changed. The page keeps the app (the wasm, `share.data`) in Cache Storage itself
+(`vsFetchKept`), so later starts do not download it (the browser's own cache may not keep files this big, and GitHub
+Pages changes every file's ETag at every deployment). It downloads them past the service worker (`cache:
+'no-store'`): browsers stop a service worker that works too long (Firefox a minute after the page's last request,
+`dom.serviceWorkers.idle_timeout` + `idle_extended_timeout`), which stopped such a download, or the keeping of it, on
+slower connections. A file that is kept is still taken through the service worker, which gives it from the cache:
+Chromium keeps the compiled code of a wasm only with such a response. They prepare the file system before the app
+starts: the user's
 folders (`/home/web_user`, `/files/data`) and the downloaded sound font (`/files/share/sound`) are mounted from
 IndexedDB, and the application data (`/files/share`) is unpacked from `share.data` (made by `pack_share.py` at build
 time). The folders are written back to IndexedDB
@@ -190,9 +198,9 @@ Threads: the app with threads needs shared memory (SharedArrayBuffer), which bro
 isolated page (headers COOP/COEP, which GitHub Pages does not send). The service worker `vibescore-sw.js` adds them
 to the page and to the workers' scripts; the first time, the page registers it and loads itself again. Where that
 does not work (no service workers, e.g. Firefox's private windows), or the app with threads failed to start with this
-build, the page starts the one without threads. The service worker also keeps the app's files of the current build
-in Cache Storage (the browser's own cache may not keep files this big), so later starts do not download them, and the
-app starts offline; the page itself comes from the network when there is one. Each thread is a Web Worker with an
+build, the page starts the one without threads. The service worker also gives the app's files from Cache Storage
+(it keeps the scripts there; the page keeps the rest), so the app starts offline; the page itself comes from the
+network when there is one. Each thread is a Web Worker with an
 instance of the app's code (a pool of 8 is started with the app, `QT_WASM_PTHREAD_POOL_SIZE`), the shared memory is
 reserved up to 2 GB, and the threads get 1 MB stacks. File access from a thread is done by the page's thread.
 
