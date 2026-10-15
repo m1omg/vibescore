@@ -30,6 +30,10 @@
 #include <QMimeData>
 #include <QRegion>
 
+#ifdef Q_OS_WASM
+#include <emscripten.h>
+#endif
+
 #include "async/async.h"
 
 #include "actions/actiontypes.h"
@@ -48,6 +52,17 @@ using namespace muse::draw;
 using namespace muse::actions;
 
 static constexpr qreal SCROLL_LIMIT_OFF_OVERSCROLL_FACTOR = 0.75;
+
+#ifdef Q_OS_WASM
+// Whether the GPU paints the score (see the constructor); the page's address can choose: ?painting=gpu or =cpu
+EM_JS(int, vs_gpu_painting, (), {
+    const choice = new URLSearchParams(location.search).get('painting');
+    if (choice === 'cpu' || choice === 'gpu') {
+        return choice === 'gpu' ? 1 : 0;
+    }
+    return 1;
+});
+#endif
 
 static void compensateFloatPart(RectF& rect)
 {
@@ -68,8 +83,10 @@ AbstractNotationPaintView::AbstractNotationPaintView(QQuickItem* parent)
     // The GPU paints the score (Qt's OpenGL paint engine, on WebGL), instead of Qt's software rasterizer into an
     // image that is then uploaded: painting the view takes about half the time, and the image no longer takes
     // memory of the app (which phones and tablets give little). The result looks the same.
-    setRenderTarget(QQuickPaintedItem::FramebufferObject);
-    setAntialiasing(true);
+    if (vs_gpu_painting()) {
+        setRenderTarget(QQuickPaintedItem::FramebufferObject);
+        setAntialiasing(true);
+    }
 #endif
 
     connect(this, &QQuickPaintedItem::widthChanged, this, &AbstractNotationPaintView::onViewSizeChanged);
