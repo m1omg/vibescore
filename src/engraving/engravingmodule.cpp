@@ -119,7 +119,11 @@ void EngravingModule::registerExports()
     ioc()->registerExport<rendering::IEditModeRenderer>(moduleName(), new rendering::editmode::EditModeRenderer());
 
 #ifdef MUE_BUILD_ENGRAVING_DEVTOOLS
+#if !defined(Q_OS_ANDROID) && !defined(Q_OS_IOS) && !defined(Q_OS_WASM)
+    // Every object of a score registers itself there (and is counted by type): ~2% of opening a big score in the web
+    // app. Its panel is for developers on the desktop.
     ioc()->registerExport<IEngravingElementsProvider>(moduleName(), new EngravingElementsProvider());
+#endif
     ioc()->registerExport<IDiagnosticDrawProvider>(moduleName(), new DiagnosticDrawProvider(iocContext()));
 #endif
 }

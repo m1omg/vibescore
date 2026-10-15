@@ -196,7 +196,8 @@ QVariantMap EngravingElementsModel::makeData(const mu::engraving::EngravingObjec
     }
 
     QVariantMap d;
-    d["selected"] = elementsProvider()->isSelected(el);
+    // (no provider on mobile platforms and the web, see EngravingModule)
+    d["selected"] = elementsProvider() ? elementsProvider()->isSelected(el) : false;
     d["info"] = info;
 
 //    if (el->children().size() != size_t(el->treeChildCount())) {
@@ -219,6 +220,11 @@ void EngravingElementsModel::reload()
     m_allItems.clear();
     delete m_rootItem;
     m_rootItem = createItem(nullptr);
+
+    if (!elementsProvider()) {
+        endResetModel();
+        return;
+    }
 
     const EngravingObjectSet& elements = elementsProvider()->elements();
     EngravingObjectSet notpalettes;
@@ -308,6 +314,10 @@ void EngravingElementsModel::select(QModelIndex index, bool arg)
         return;
     }
 
+    if (!elementsProvider()) {
+        return;
+    }
+
     elementsProvider()->select(item->element(), arg);
     item->setData(QVariantMap());
 
@@ -341,6 +351,10 @@ void EngravingElementsModel::click1(QModelIndex index)
 
 void EngravingElementsModel::updateInfo()
 {
+    if (!elementsProvider()) {
+        return;
+    }
+
     const EngravingObjectSet& elements = elementsProvider()->elements();
     QHash<QString, int> els;
     for (const mu::engraving::EngravingObject* el : elements) {
