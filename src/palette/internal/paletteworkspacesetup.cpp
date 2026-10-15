@@ -87,7 +87,7 @@ void PaletteWorkspaceSetup::setup()
         return;
     }
 
-    paletteProvider()->setDefaultPaletteTree(PaletteCreator(iocContext()).newDefaultPaletteTree());
+    // The default palettes (for "Reset palette") are made by the palette provider when they are needed
 
     auto saveData = [this]() {
         PaletteTreePtr tree = paletteProvider()->userPaletteTree();
@@ -120,7 +120,11 @@ void PaletteWorkspaceSetup::setup()
         }
     };
 
-    workspacesDataProvider()->workspaceChanged().onNotify(this, loadData);
+    // Loaded when the palettes are needed first (making them took a good part of the start of the app on phones,
+    // tablets and in the browser), and again when the workspace changes after that
+    workspacesDataProvider()->workspaceChanged().onNotify(this, [this, loadData]() {
+        paletteProvider()->setUserPaletteTreeLoader(loadData);
+    });
 
-    loadData();
+    paletteProvider()->setUserPaletteTreeLoader(loadData);
 }

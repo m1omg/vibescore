@@ -22,6 +22,8 @@
 
 #pragma once
 
+#include <functional>
+
 #include "modularity/imoduleinterface.h"
 
 #include "async/notification.h"
@@ -41,6 +43,8 @@ public:
     virtual PaletteTreePtr userPaletteTree() const = 0;
     virtual muse::async::Notification userPaletteTreeChanged() const = 0;
     virtual void setUserPaletteTree(PaletteTreePtr tree) = 0;
+    //! The user's palettes are loaded by this when they are needed first (now when they were needed already)
+    virtual void setUserPaletteTreeLoader(std::function<void()> loader) = 0;
     virtual void setDefaultPaletteTree(PaletteTreePtr tree) = 0;
 
     virtual muse::async::Channel<mu::engraving::ElementPtr> addCustomItemRequested() const = 0;

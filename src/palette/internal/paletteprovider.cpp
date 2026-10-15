@@ -602,8 +602,6 @@ void PaletteProvider::init()
     m_userPaletteModel = new PaletteTreeModel(std::make_shared<PaletteTree>(), iocContext(), this);
     connect(m_userPaletteModel, &PaletteTreeModel::treeChanged, this, &PaletteProvider::notifyAboutUserPaletteChanged);
 
-    m_masterPaletteModel = new PaletteTreeModel(PaletteCreator(iocContext()).newMasterPaletteTree(), iocContext(), this);
-
     m_searchFilterModel = new PaletteCellFilterProxyModel(this);
     m_searchFilterModel->setFilterCaseSensitivity(Qt::CaseInsensitive);
 
@@ -636,7 +634,7 @@ void PaletteProvider::setFilter(const QString& filter)
     m_searchFilterModel->setSourceModel(nullptr);
     m_searchFilterModel->setFilterFixedString(filter);
     if (!filter.isEmpty()) {
-        m_searchFilterModel->setSourceModel(m_masterPaletteModel);
+        m_searchFilterModel->setSourceModel(masterPaletteModel());
     }
 }
 
@@ -682,7 +680,7 @@ QAbstractItemModel* PaletteProvider::mainPaletteModel()
 AbstractPaletteController* PaletteProvider::mainPaletteController()
 {
     if (!m_mainPaletteController) {
-        m_mainPaletteController = new UserPaletteController(mainPaletteModel(), m_userPaletteModel, iocContext(), this);
+        m_mainPaletteController = new UserPaletteController(mainPaletteModel(), userPaletteModel(), iocContext(), this);
     }
     return m_mainPaletteController;
 }
@@ -691,7 +689,7 @@ QModelIndex PaletteProvider::customElementsPaletteIndex(const QModelIndex& index
 {
     const QAbstractItemModel* model = customElementsPaletteModel();
     if (index.model() == m_mainPalette && index.parent() == QModelIndex()) {
-        const int row = convertProxyIndex(index, m_userPaletteModel).row();
+        const int row = convertProxyIndex(index, userPaletteModel()).row();
         return model->index(row, 0);
     }
     return convertIndex(index, model);
@@ -702,7 +700,7 @@ FilterPaletteTreeModel* PaletteProvider::customElementsPaletteModel()
     if (!m_customPoolPalette) {
         PaletteCellFilter* filter = new VisibilityCellFilter(/* acceptedValue */ false);
         filter->addChainedFilter(new CustomizedCellFilter(/* acceptedValue */ true));
-        m_customPoolPalette = new FilterPaletteTreeModel(filter, m_userPaletteModel, this);
+        m_customPoolPalette = new FilterPaletteTreeModel(filter, userPaletteModel(), this);
     }
     return m_customPoolPalette;
 }
@@ -710,7 +708,7 @@ FilterPaletteTreeModel* PaletteProvider::customElementsPaletteModel()
 AbstractPaletteController* PaletteProvider::customElementsPaletteController()
 {
     if (!m_customElementsPaletteController) {
-        m_customElementsPaletteController = new UserPaletteController(customElementsPaletteModel(), m_userPaletteModel, iocContext(), this);
+        m_customElementsPaletteController = new UserPaletteController(customElementsPaletteModel(), userPaletteModel(), iocContext(), this);
         m_customElementsPaletteController->setCustom(true);
     }
 
@@ -729,13 +727,13 @@ QModelIndex PaletteProvider::poolPaletteIndex(const QModelIndex& index, FilterPa
 
 FilterPaletteTreeModel* PaletteProvider::poolPaletteModel(const QModelIndex& index) const
 {
-    const QModelIndex filterIndex = convertProxyIndex(index, m_userPaletteModel);
-    PaletteCellFilter* filter = m_userPaletteModel->getFilter(filterIndex);
+    const QModelIndex filterIndex = convertProxyIndex(index, userPaletteModel());
+    PaletteCellFilter* filter = userPaletteModel()->getFilter(filterIndex);
     if (!filter) {
         return nullptr;
     }
 
-    FilterPaletteTreeModel* m = new FilterPaletteTreeModel(filter, m_masterPaletteModel);
+    FilterPaletteTreeModel* m = new FilterPaletteTreeModel(filter, masterPaletteModel());
     QQmlEngine::setObjectOwnership(m, QQmlEngine::JavaScriptOwnership);
     return m;
 }
@@ -744,7 +742,7 @@ AbstractPaletteController* PaletteProvider::poolPaletteController(FilterPaletteT
                                                                   const QModelIndex& rootIndex) const
 {
     Q_UNUSED(rootIndex);
-    UserPaletteController* c = new UserPaletteController(poolPaletteModel, m_userPaletteModel, iocContext());
+    UserPaletteController* c = new UserPaletteController(poolPaletteModel, userPaletteModel(), iocContext());
     c->setVisible(false);
     c->setCustom(false);
     c->setUserEditable(false);
@@ -766,12 +764,13 @@ QAbstractItemModel* PaletteProvider::availableExtraPalettesModel() const
 
     QStandardItem* root = m->invisibleRootItem();
 
-    const int masterRows = m_masterPaletteModel->rowCount();
+    const PaletteTreeModel* master = masterPaletteModel();
+    const int masterRows = master->rowCount();
     for (int row = 0; row < masterRows; ++row) {
-        const QModelIndex idx = m_masterPaletteModel->index(row, 0);
+        const QModelIndex idx = master->index(row, 0);
         // add everything that cannot be found in user palette
-        if (!convertIndex(idx, m_userPaletteModel).isValid()) {
-            const QString name = m_masterPaletteModel->data(idx, Qt::DisplayRole).toString();
+        if (!convertIndex(idx, userPaletteModel()).isValid()) {
+            const QString name = master->data(idx, Qt::DisplayRole).toString();
             QStandardItem* item = new QStandardItem(name);
             item->setData(false, CustomRole);       // this palette is from master palette, hence not custom
             item->setData(QPersistentModelIndex(idx), PaletteIndexRole);
@@ -779,14 +778,14 @@ QAbstractItemModel* PaletteProvider::availableExtraPalettesModel() const
         }
     }
 
-    const int userRows = m_userPaletteModel->rowCount();
+    const int userRows = userPaletteModel()->rowCount();
     for (int row = 0; row < userRows; ++row) {
-        const QModelIndex idx = m_userPaletteModel->index(row, 0);
+        const QModelIndex idx = userPaletteModel()->index(row, 0);
         // add invisible custom palettes
-        const bool visible = m_userPaletteModel->data(idx, PaletteTreeModel::VisibleRole).toBool();
-        const bool custom = m_userPaletteModel->data(idx, PaletteTreeModel::CustomRole).toBool();
+        const bool visible = userPaletteModel()->data(idx, PaletteTreeModel::VisibleRole).toBool();
+        const bool custom = userPaletteModel()->data(idx, PaletteTreeModel::CustomRole).toBool();
         if (!visible) {
-            const QString name = m_userPaletteModel->data(idx, Qt::DisplayRole).toString();
+            const QString name = userPaletteModel()->data(idx, Qt::DisplayRole).toString();
             QStandardItem* item = new QStandardItem(name);
             item->setData(custom, CustomRole);
             item->setData(QPersistentModelIndex(idx), PaletteIndexRole);
@@ -804,23 +803,23 @@ bool PaletteProvider::addPalette(const QPersistentModelIndex& index)
         return false;
     }
 
-    if (index.model() == m_userPaletteModel) {
-        const bool ok = m_userPaletteModel->setData(index, true, PaletteTreeModel::VisibleRole);
+    if (index.model() == userPaletteModel()) {
+        const bool ok = userPaletteModel()->setData(index, true, PaletteTreeModel::VisibleRole);
         if (!ok) {
             return false;
         }
         const QModelIndex parent = index.parent();
-        m_userPaletteModel->moveRow(parent, index.row(), parent, 0);
+        userPaletteModel()->moveRow(parent, index.row(), parent, 0);
         return true;
     }
 
     if (index.model() == m_masterPaletteModel) {
         QMimeData* data = m_masterPaletteModel->mimeData({ QModelIndex(index) });
-        QModelIndex dropIndex = m_userPaletteModel->index(0, 0);
+        QModelIndex dropIndex = userPaletteModel()->index(0, 0);
 
-        const bool success = m_userPaletteModel->dropMimeData(data, Qt::CopyAction, dropIndex.row(), dropIndex.column(), QModelIndex());
+        const bool success = userPaletteModel()->dropMimeData(data, Qt::CopyAction, dropIndex.row(), dropIndex.column(), QModelIndex());
         if (success) {
-            m_userPaletteModel->setData(dropIndex, true, PaletteTreeModel::VisibleRole);
+            userPaletteModel()->setData(dropIndex, true, PaletteTreeModel::VisibleRole);
         }
 
         data->deleteLater();
@@ -851,22 +850,22 @@ void PaletteProvider::resetPalette(const QModelIndex& index)
 
 void PaletteProvider::doResetPalette(const QModelIndex& index)
 {
-    Q_ASSERT(m_defaultPaletteModel != m_userPaletteModel);
+    Q_ASSERT(defaultPaletteModel() != userPaletteModel());
 
     QAbstractItemModel* resetModel = nullptr;
     QModelIndex resetIndex;
 
-    if (m_defaultPaletteModel) {
-        resetModel = m_defaultPaletteModel;
-        resetIndex = convertIndex(index, m_defaultPaletteModel);
+    if (defaultPaletteModel()) {
+        resetModel = defaultPaletteModel();
+        resetIndex = convertIndex(index, defaultPaletteModel());
     }
 
     if (!resetIndex.isValid()) {
-        resetModel = m_masterPaletteModel;
-        resetIndex = convertIndex(index, m_masterPaletteModel);
+        resetModel = masterPaletteModel();
+        resetIndex = convertIndex(index, masterPaletteModel());
     }
 
-    const QModelIndex userPaletteIndex = convertProxyIndex(index, m_userPaletteModel);
+    const QModelIndex userPaletteIndex = convertProxyIndex(index, userPaletteModel());
     const QModelIndex parent = userPaletteIndex.parent();
     const int row = userPaletteIndex.row();
     const int column = userPaletteIndex.column();
@@ -875,21 +874,21 @@ void PaletteProvider::doResetPalette(const QModelIndex& index)
     const bool wasVisible = index.data(PaletteTreeModel::VisibleRole).toBool();
     const bool wasExpanded = index.data(PaletteTreeModel::PaletteExpandedRole).toBool();
 
-    if (!m_userPaletteModel->removeRow(row, parent)) {
+    if (!userPaletteModel()->removeRow(row, parent)) {
         return;
     }
 
     if (resetIndex.isValid()) {
         QMimeData* data = resetModel->mimeData({ resetIndex });
-        m_userPaletteModel->dropMimeData(data, Qt::CopyAction, row, column, parent);
+        userPaletteModel()->dropMimeData(data, Qt::CopyAction, row, column, parent);
         data->deleteLater();
     } else {
-        m_userPaletteModel->insertRow(row, parent);
+        userPaletteModel()->insertRow(row, parent);
     }
 
-    const QModelIndex newIndex = m_userPaletteModel->index(row, column, parent);
-    m_userPaletteModel->setData(newIndex, wasVisible, PaletteTreeModel::VisibleRole);
-    m_userPaletteModel->setData(newIndex, wasExpanded, PaletteTreeModel::PaletteExpandedRole);
+    const QModelIndex newIndex = userPaletteModel()->index(row, column, parent);
+    userPaletteModel()->setData(newIndex, wasVisible, PaletteTreeModel::VisibleRole);
+    userPaletteModel()->setData(newIndex, wasExpanded, PaletteTreeModel::PaletteExpandedRole);
 }
 
 QString PaletteProvider::getPaletteFilename(bool open, const QString& name) const
@@ -932,8 +931,8 @@ QString PaletteProvider::getPaletteFilename(bool open, const QString& name) cons
 
 bool PaletteProvider::savePalette(const QModelIndex& index)
 {
-    const QModelIndex srcIndex = convertProxyIndex(index, m_userPaletteModel);
-    const Palette* pp = m_userPaletteModel->findPalette(srcIndex);
+    const QModelIndex srcIndex = convertProxyIndex(index, userPaletteModel());
+    const Palette* pp = userPaletteModel()->findPalette(srcIndex);
     if (!pp) {
         return false;
     }
@@ -959,16 +958,19 @@ bool PaletteProvider::loadPalette(const QModelIndex& index)
     }
     pp->setType(Palette::Type::Custom);   // mark the loaded palette custom
 
-    const QModelIndex srcIndex = convertProxyIndex(index, m_userPaletteModel);
+    const QModelIndex srcIndex = convertProxyIndex(index, userPaletteModel());
 
     const int row = srcIndex.row();
     const QModelIndex parent = srcIndex.parent();
 
-    return m_userPaletteModel->insertPalette(pp, row, parent);
+    return userPaletteModel()->insertPalette(pp, row, parent);
 }
 
 void PaletteProvider::setUserPaletteTree(PaletteTreePtr tree)
 {
+    m_userPaletteTreeLoader = nullptr;
+    m_isUserPaletteTreeLoaded = true;
+
     if (m_userPaletteModel) {
         disconnect(m_userPaletteModel, &PaletteTreeModel::treeChanged, this, &PaletteProvider::notifyAboutUserPaletteChanged);
         m_userPaletteModel->setPaletteTree(tree);
@@ -977,6 +979,48 @@ void PaletteProvider::setUserPaletteTree(PaletteTreePtr tree)
         m_userPaletteModel = new PaletteTreeModel(tree, iocContext(), /* parent */ this);
         connect(m_userPaletteModel, &PaletteTreeModel::treeChanged, this, &PaletteProvider::notifyAboutUserPaletteChanged);
     }
+}
+
+void PaletteProvider::setUserPaletteTreeLoader(std::function<void()> loader)
+{
+    if (m_userPaletteTreeLoader || !m_isUserPaletteTreeLoaded) {
+        m_userPaletteTreeLoader = std::move(loader);
+        return;
+    }
+
+    loader();
+}
+
+void PaletteProvider::ensureUserPaletteTree() const
+{
+    if (!m_userPaletteTreeLoader) {
+        return;
+    }
+
+    // (it sets the tree)
+    std::function<void()> loader = std::move(m_userPaletteTreeLoader);
+    m_userPaletteTreeLoader = nullptr;
+    loader();
+}
+
+PaletteTreeModel* PaletteProvider::masterPaletteModel() const
+{
+    if (!m_masterPaletteModel) {
+        auto self = const_cast<PaletteProvider*>(this);
+        m_masterPaletteModel = new PaletteTreeModel(PaletteCreator(iocContext()).newMasterPaletteTree(), iocContext(), self);
+    }
+
+    return m_masterPaletteModel;
+}
+
+PaletteTreeModel* PaletteProvider::defaultPaletteModel() const
+{
+    if (!m_defaultPaletteModel) {
+        auto self = const_cast<PaletteProvider*>(this);
+        m_defaultPaletteModel = new PaletteTreeModel(PaletteCreator(iocContext()).newDefaultPaletteTree(), iocContext(), self);
+    }
+
+    return m_defaultPaletteModel;
 }
 
 void PaletteProvider::setDefaultPaletteTree(PaletteTreePtr tree)
@@ -995,10 +1039,10 @@ muse::async::Channel<ElementPtr> PaletteProvider::addCustomItemRequested() const
 
 void PaletteProvider::write(XmlWriter& xml, bool pasteMode) const
 {
-    if (!m_userPaletteModel) {
+    if (!userPaletteModel()) {
         return;
     }
-    if (const PaletteTree* tree = m_userPaletteModel->paletteTree()) {
+    if (const PaletteTree* tree = userPaletteModel()->paletteTree()) {
         tree->write(xml, pasteMode);
     }
 }

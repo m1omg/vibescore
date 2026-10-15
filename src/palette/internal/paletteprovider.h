@@ -230,10 +230,11 @@ public:
 
     void init() override;
 
-    PaletteTreeModel* userPaletteModel() const { return m_userPaletteModel; }
-    PaletteTreePtr userPaletteTree() const override { return m_userPaletteModel->paletteTreePtr(); }
+    PaletteTreeModel* userPaletteModel() const { ensureUserPaletteTree(); return m_userPaletteModel; }
+    PaletteTreePtr userPaletteTree() const override { return userPaletteModel()->paletteTreePtr(); }
     muse::async::Notification userPaletteTreeChanged() const override { return m_userPaletteChanged; }
     void setUserPaletteTree(PaletteTreePtr tree) override;
+    void setUserPaletteTreeLoader(std::function<void()> loader) override;
 
     void setDefaultPaletteTree(PaletteTreePtr tree) override;
 
@@ -257,17 +258,21 @@ public:
     Q_INVOKABLE void setSearching(bool searching);
     Q_INVOKABLE void setFilter(const QString&);
 
-    bool paletteChanged() const { return m_userPaletteModel->paletteTreeChanged(); }
+    bool paletteChanged() const { return userPaletteModel()->paletteTreeChanged(); }
 
     void write(engraving::XmlWriter&, bool pasteMode) const;
     bool read(engraving::XmlReader&, bool pasteMode);
 
-    void updateCellsState(const engraving::Selection& sel) { m_userPaletteModel->updateCellsState(sel); }
+    void updateCellsState(const engraving::Selection& sel) { userPaletteModel()->updateCellsState(sel); }
     void retranslate()
     {
         m_userPaletteModel->retranslate();
-        m_masterPaletteModel->retranslate();
-        m_defaultPaletteModel->retranslate();
+        if (m_masterPaletteModel) {
+            m_masterPaletteModel->retranslate();
+        }
+        if (m_defaultPaletteModel) {
+            m_defaultPaletteModel->retranslate();
+        }
     }
 
     bool isSinglePalette() const;
@@ -305,9 +310,18 @@ private:
 
     void doResetPalette(const QModelIndex& index);
 
+    //! The palettes with all the elements, and the default ones, are made when they are needed (they have thousands of
+    //! elements: making them took a good part of the start of the app on phones, tablets and in the browser)
+    PaletteTreeModel* masterPaletteModel() const;
+    PaletteTreeModel* defaultPaletteModel() const;
+    //! The user's palettes likewise, when they are needed first
+    void ensureUserPaletteTree() const;
+    mutable std::function<void()> m_userPaletteTreeLoader;
+    bool m_isUserPaletteTreeLoaded = false;
+
     PaletteTreeModel* m_userPaletteModel = nullptr;
-    PaletteTreeModel* m_masterPaletteModel = nullptr;
-    PaletteTreeModel* m_defaultPaletteModel = nullptr; // palette used by "Reset palette" action
+    mutable PaletteTreeModel* m_masterPaletteModel = nullptr;
+    mutable PaletteTreeModel* m_defaultPaletteModel = nullptr; // palette used by "Reset palette" action
 
     muse::async::Notification m_userPaletteChanged;
 
