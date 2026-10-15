@@ -37,6 +37,7 @@
 #include "mixerchannel.h"
 #include "igetplaybackposition.h"
 #include "audiosignalnotifier.h"
+#include "dsp/peaklimiter.h"
 
 namespace muse {
 class TaskScheduler;
@@ -125,6 +126,9 @@ private:
     std::set<IClockPtr> m_clocks;
 
     mutable AudioSignalsNotifier m_audioSignalNotifier;
+
+    //! Keeps the sum of all the instruments from clipping
+    dsp::PeakLimiter m_limiter;
 
     bool m_isSilence = false;
     bool m_shouldProcessMasterFxDuringSilence = false;

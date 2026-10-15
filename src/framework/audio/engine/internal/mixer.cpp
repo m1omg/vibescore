@@ -195,6 +195,8 @@ void Mixer::setOutputSpec(const OutputSpec& spec)
     for (IFxProcessorPtr& fx : m_masterFxProcessors) {
         fx->setOutputSpec(spec);
     }
+
+    m_limiter.setFormat(spec.sampleRate, spec.audioChannelCount);
 }
 
 unsigned int Mixer::audioChannelsCount() const
@@ -232,6 +234,7 @@ samples_t Mixer::process(float* outBuffer, samples_t samplesPerChannel)
     std::fill(outBuffer, outBuffer + outBufferSize, 0.f);
 
     if (m_isIdle && m_tracksToProcessWhenIdle.empty() && (m_isSilence && !m_shouldProcessMasterFxDuringSilence)) {
+        m_limiter.reset();
         notifyNoAudioSignal();
         return 0;
     }
@@ -260,6 +263,7 @@ samples_t Mixer::process(float* outBuffer, samples_t samplesPerChannel)
     }
 
     if (m_masterParams.muted || samplesPerChannel == 0 || (m_isSilence && !m_shouldProcessMasterFxDuringSilence)) {
+        m_limiter.reset();
         notifyNoAudioSignal();
         return 0;
     }
@@ -581,18 +585,25 @@ void Mixer::completeOutput(float* buffer, samples_t samplesPerChannel)
     }
 
     const float volume = muse::db_to_linear(m_masterParams.volume);
+    const audioch_t channels = m_outputSpec.audioChannelCount;
+
+    for (audioch_t audioChNum = 0; audioChNum < channels; ++audioChNum) {
+        const gain_t totalGain = dsp::balanceGain(m_masterParams.balance, audioChNum) * volume;
+
+        for (samples_t s = 0; s < samplesPerChannel; ++s) {
+            buffer[s * channels + audioChNum] *= totalGain;
+        }
+    }
+
+    m_limiter.process(buffer, samplesPerChannel);
+
     float globalPeak = 0.f;
 
-    for (audioch_t audioChNum = 0; audioChNum < m_outputSpec.audioChannelCount; ++audioChNum) {
-        const gain_t totalGain = dsp::balanceGain(m_masterParams.balance, audioChNum) * volume;
+    for (audioch_t audioChNum = 0; audioChNum < channels; ++audioChNum) {
         float peak = 0.f;
 
         for (samples_t s = 0; s < samplesPerChannel; ++s) {
-            const size_t idx = s * m_outputSpec.audioChannelCount + audioChNum;
-            const float resultSample = buffer[idx] * totalGain;
-            const float absSample = std::fabs(resultSample);
-
-            buffer[idx] = resultSample;
+            const float absSample = std::fabs(buffer[s * channels + audioChNum]);
 
             if (absSample > peak) {
                 peak = absSample;

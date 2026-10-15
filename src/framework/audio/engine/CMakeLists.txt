@@ -98,6 +98,8 @@ else()
         internal/dsp/limiter.cpp
         internal/dsp/limiter.h
         internal/dsp/audiomathutils.h
+        internal/dsp/peaklimiter.cpp
+        internal/dsp/peaklimiter.h
 
         # FX
         internal/fx/abstractfxresolver.cpp
