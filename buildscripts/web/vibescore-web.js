@@ -532,20 +532,37 @@ function vsStorageSet(key, value) {
 const VS_ISOLATION_FAILED_KEY = 'vibescore-isolation-failed';
 // The app with threads did not start with this build: the page uses the one without threads
 const VS_THREADS_FAILED_KEY = 'vibescore-threads-failed';
-const VS_SERVICE_WORKER_WAIT_MS = 10000;
+const VS_SERVICE_WORKER_WAIT_MS = 5000;
 
 // Registers the service worker (vibescore-sw.js), which keeps the app's files and makes the page cross-origin isolated.
-// Returns true when the page is loaded again to be isolated (the first time).
+// Returns true when the page is loaded again to be isolated (the first time). Whatever goes wrong, the app starts
+// (without the service worker).
 async function vibescoreIsolatePage() {
+    try {
+        return await vsIsolatePage();
+    } catch (error) {
+        console.warn('VibeScore: no service worker', error);
+        return false;
+    }
+}
+
+async function vsIsolatePage() {
     if (!('serviceWorker' in navigator) || !window.isSecureContext) {
         return false;
     }
 
+    // (The browser may not answer: then the app starts without the service worker)
     let registration;
     try {
-        registration = await navigator.serviceWorker.register('vibescore-sw.js');
+        registration = await Promise.race([
+            navigator.serviceWorker.register('vibescore-sw.js'),
+            new Promise((_, reject) => setTimeout(() => reject(new Error('no answer')), VS_SERVICE_WORKER_WAIT_MS)),
+        ]);
     } catch (error) {
         console.warn('VibeScore: no service worker', error);
+        return false;
+    }
+    if (!registration) {
         return false;
     }
 
