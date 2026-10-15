@@ -135,6 +135,12 @@ function(muse_create_qml_module target_name)
     muse_create_module(${target_name} ${arg_UNPARSED_ARGUMENTS})
     target_link_libraries(${target_name} INTERFACE ${target_name}plugin)
 
+    if (OS_IS_MOBILE OR OS_IS_WASM)
+        # The QML is compiled to byte code when the app is built, and the app loads that (see main.cpp): the same
+        # byte code as when the QML is compiled at run time, without the C++ that qmlcachegen can also generate
+        set_target_properties(${target_name} PROPERTIES QT_QMLCACHEGEN_ARGUMENTS "--only-bytecode")
+    endif()
+
     if (arg_FOR)
         get_target_property(_for_dir ${arg_FOR} SOURCE_DIR)
         target_include_directories(${target_name} PRIVATE ${_for_dir})

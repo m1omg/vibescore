@@ -89,7 +89,14 @@ int main(int argc, char** argv)
     app_init_qrc();
 
     qputenv("QT_STYLE_OVERRIDE", "Fusion");
+#if defined(Q_OS_ANDROID) || defined(Q_OS_IOS) || defined(Q_OS_WASM)
+    // The QML that was compiled when the app was built (its byte code, see muse_create_qml_module), but no cache files
+    // written when the app runs. QML_DISABLE_DISK_CACHE turns off both: then all the QML is compiled at every start,
+    // which took seconds on phones, tablets and in the browser
+    qputenv("QML_DISK_CACHE", "aot");
+#else
     qputenv("QML_DISABLE_DISK_CACHE", "true");
+#endif
 
     // HACK: Workaround for crash #28840. This disables the incremental GC
     if (!qEnvironmentVariableIsSet("MU_QV4_GC_TIMELIMIT")) {
