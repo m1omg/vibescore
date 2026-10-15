@@ -823,7 +823,7 @@ void Segment::add(EngravingItem* el)
                     measure()->setHasVoices(track / VOICES, true);
                 }
             }
-            score()->setPlaylistDirty();
+            // (Not setPlaylistDirty(): chords and rests do not change the repeats, see Chord::add())
         }
     // fall through
 

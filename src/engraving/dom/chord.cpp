@@ -655,7 +655,8 @@ void Chord::add(EngravingItem* e)
             measure()->setHasVoices(staffIdx(), true);
         }
     }
-        score()->setPlaylistDirty();
+        // (Not setPlaylistDirty(): notes do not change the repeats, and each note made the next tie that was connected
+        // unwind the repeats of the whole score again, which took long when a big score was opened)
         break;
     case ElementType::ARPEGGIO:
         m_arpeggio = toArpeggio(e);
@@ -758,7 +759,7 @@ void Chord::remove(EngravingItem* e)
         if (voice() && measure() && note->visible()) {
             measure()->checkMultiVoices(staffIdx());
         }
-        score()->setPlaylistDirty();
+        // (not setPlaylistDirty(): see add())
     }
     break;
 
