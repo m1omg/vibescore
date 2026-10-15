@@ -170,7 +170,11 @@ private:
         n |= n >> 4;
         n |= n >> 8;
         n |= n >> 16;
-        n |= n >> 32;
+        // Only where size_t has 64 bits: shifting a 32-bit size_t (WebAssembly) by 32 is undefined, and Clang's
+        // optimizer then made the capacity 1 (one message at a time, also when hundreds were waiting)
+        if constexpr (sizeof(size_t) > 4) {
+            n |= n >> 32;
+        }
         return n + 1;
     }
 };
