@@ -177,7 +177,8 @@ The app pauses playback and stops the audio stream when it goes to the backgroun
 `buildscripts/web/index.html` and `vibescore-web.js` download the app with a progress bar and say which step of
 the start takes too long or failed. The page is stamped by `stamp_page.py` with the version of each file (a hash of
 its content), which is in the file's address (`?v=`): the browser does not mix files of different builds, and a new
-build downloads only the files that changed. The page keeps the app (the wasm, `share.data`) in Cache Storage itself
+build downloads only the files that changed (Qt's resources get a fixed time, `QT_RCC_SOURCE_DATE_OVERRIDE` in
+`build_web.yml`: rcc wrote the time of the checkout, so the wasm differed at every build). The page keeps the app (the wasm, `share.data`) in Cache Storage itself
 (`vsFetchKept`), so later starts do not download it (the browser's own cache may not keep files this big, and GitHub
 Pages changes every file's ETag at every deployment). It downloads them past the service worker (`cache:
 'no-store'`): browsers stop a service worker that works too long (Firefox a minute after the page's last request,
