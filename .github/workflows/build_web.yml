@@ -20,6 +20,11 @@ env:
   QT_MODULES: 'qt5compat qtshadertools'
   EMSDK_VERSION: '4.0.7' # the version Qt 6.10 is built with
   BUILD_TYPE: 'Release'
+  # Qt's rcc writes the time of each resource file into the app, here the time of the checkout: the wasm differed at
+  # every build. With a fixed time it is the same for the same sources, and a deployment that did not change the app's
+  # code does not make browsers download it again (the page gives each file its version, see stamp_page.py). The QML
+  # does not depend on it (QML_DISK_CACHE=aot, see main.cpp).
+  QT_RCC_SOURCE_DATE_OVERRIDE: '1767225600' # 2026-01-01
 
 permissions:
   contents: read
