@@ -29,6 +29,7 @@
 #include <QUrlQuery>
 #include <QTimer>
 
+#include "app_config.h"
 #include "async/async.h"
 #include "defer.h"
 #include "translation.h"
@@ -352,6 +353,18 @@ Ret ProjectActionsController::loadWithFallback(const std::shared_ptr<INotationPr
 Ret ProjectActionsController::doOpenProject(const muse::io::path_t& filePath)
 {
     TRACEFUNC;
+
+#ifdef MUE_CONFIGURATION_IS_APPMOBILE
+    // A big score takes a while to open, and the app cannot respond meanwhile: it says so first (and the dialog that
+    // asked about saving the previous score is gone by then, see MobileInteractive::showProgress)
+    Progress opening;
+    interactive()->showProgress(muse::qtrc("project", "Opening “%1”…")
+                                .arg(io::completeBasename(filePath).toQString()).toStdString(), opening);
+    opening.start();
+    DEFER {
+        opening.finish(make_ok());
+    };
+#endif
 
     RetVal<INotationProjectPtr> rv = loadProject(filePath);
     if (!rv.ret) {

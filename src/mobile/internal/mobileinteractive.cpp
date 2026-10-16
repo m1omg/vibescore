@@ -21,15 +21,19 @@
 #include <algorithm>
 
 #include <QDir>
+#include <QEventLoop>
 #include <QFileDialog>
 #include <QFileInfo>
+#include <QGuiApplication>
+#include <QQuickWindow>
+#include <QSet>
+#include <QTimer>
 
 #if defined(Q_OS_ANDROID)
 #include "platform/android/androidshare.h"
 #elif defined(Q_OS_IOS)
 #include "platform/ios/iosplatform.h"
 #elif defined(Q_OS_WASM)
-#include <QEventLoop>
 #include <QTemporaryDir>
 #include "platform/web/webplatform.h"
 #endif
@@ -147,9 +151,65 @@ async::Promise<IInteractive::Result> MobileInteractive::error(const std::string&
     return m_origin->error(contentTitle, text, buttons, defBtn, options, dialogTitle);
 }
 
+static const Uri BUSY_URI("musescore://mobile/busy");
+//! The windows have drawn the busy dialog by then (unless they draw nothing: a page or an app in the background)
+static constexpr int BUSY_DRAWN_TIMEOUT_MS = 1000;
+
+//! Before a long task on the app's thread, during which nothing can be drawn: processes the events until each visible
+//! window drew a frame, so that the windows show their latest changes (a dialog that opened, one that closed, ...);
+//! user input waits until after the task
+static void drawWindowsNow(int timeoutMs)
+{
+    QSet<QQuickWindow*> notDrawn;
+    QEventLoop loop; // destroyed first, with the connections that use notDrawn
+
+    for (QWindow* window : QGuiApplication::topLevelWindows()) {
+        QQuickWindow* quickWindow = qobject_cast<QQuickWindow*>(window);
+        if (!quickWindow || !quickWindow->isVisible()) {
+            continue;
+        }
+
+        notDrawn.insert(quickWindow);
+        auto drawn = [&loop, &notDrawn, quickWindow]() {
+            if (notDrawn.remove(quickWindow) && notDrawn.isEmpty()) {
+                // A browser shows a frame after the task that drew it: the long task starts in a later one
+                QTimer::singleShot(0, &loop, &QEventLoop::quit);
+            }
+        };
+        QObject::connect(quickWindow, &QQuickWindow::frameSwapped, &loop, drawn);
+        // A window that goes away draws nothing more
+        QObject::connect(quickWindow, &QObject::destroyed, &loop, drawn);
+        QObject::connect(quickWindow, &QWindow::visibleChanged, &loop, [drawn](bool visible) {
+            if (!visible) {
+                drawn();
+            }
+        });
+        quickWindow->update();
+    }
+
+    if (notDrawn.isEmpty()) {
+        return;
+    }
+
+    QTimer::singleShot(timeoutMs, &loop, &QEventLoop::quit);
+    loop.exec(QEventLoop::ExcludeUserInputEvents);
+}
+
 void MobileInteractive::showProgress(const std::string& title, Progress progress)
 {
-    m_origin->showProgress(title, progress);
+    // What follows keeps the app's thread busy (e.g. opening a big score, see ProjectActionsController::doOpenProject),
+    // and nothing can be drawn until it is done: the busy dialog is drawn before this returns, together with the other
+    // changes of the windows (e.g. the dialog that asked about saving the previous score is gone). It has no progress
+    // bar or Cancel button, which could neither move nor react meanwhile.
+    UriQuery query(BUSY_URI);
+    query.set("text", title);
+    m_origin->open(query);
+
+    progress.finished().onReceive(this, [this](const ProgressResult&) {
+        m_origin->close(BUSY_URI);
+    });
+
+    drawWindowsNow(BUSY_DRAWN_TIMEOUT_MS);
 }
 
 // Files

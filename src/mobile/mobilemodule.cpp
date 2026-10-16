@@ -68,6 +68,7 @@ void MobileModule::resolveImports()
     auto ir = ioc()->resolve<muse::ui::IInteractiveUriRegister>(moduleName());
     if (ir) {
         ir->registerQmlUri(Uri("musescore://mobile/savetolibrary"), "MuseScore.Mobile", "SaveToLibraryDialog");
+        ir->registerQmlUri(Uri("musescore://mobile/busy"), "MuseScore.Mobile", "BusyDialog");
     }
 }
 
