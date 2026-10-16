@@ -20,6 +20,7 @@
 
 #include <QDateTime>
 
+#include "async/asyncable.h"
 #include "global/iinteractive.h"
 
 #include "scoreslibrary.h"
@@ -29,7 +30,7 @@ namespace mu::mobile {
 //! - files are picked with the system document picker and imported as local copies (see ScoresLibrary)
 //! - scores are saved into the Scores library, under a name asked in the app
 //! - exports are written to the exports folder, and "revealing" them shares them (Android share sheet)
-class MobileInteractive : public muse::IInteractive
+class MobileInteractive : public muse::IInteractive, public muse::async::Asyncable
 {
 public:
     explicit MobileInteractive(std::shared_ptr<muse::IInteractive> origin);

@@ -14,6 +14,7 @@ qt_add_qml_module(mobile_qml
         touchmodifiersmodel.h
     QML_FILES
         AppMenuDrawer.qml
+        BusyDialog.qml
         Main.qml
         MobileHomePage.qml
         MobileNotationPage.qml

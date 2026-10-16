@@ -193,7 +193,10 @@ regularly and when the page is hidden. The start waits for IndexedDB (the app's 
 database that the browser does not open in 10 seconds fails instead, and the app starts without the saved data
 and says so. The app is linked with Asyncify, so that dialogs that wait for an answer
 (nested event loops) work; `web::fixNestedEventLoops()` works around a Qt 6.10 bug that stopped the event processing
-after such a dialog.
+after such a dialog. Nothing is drawn while the app's thread is busy, e.g. opening a big score: a dialog that was just
+answered stayed on the screen meanwhile, as if the app had frozen. Opening a score shows "Opening “name”…" first
+(`ProjectActionsController::doOpenProject`, `MobileInteractive::showProgress`), and waits until each window has drawn
+a frame with it (an event loop until `QQuickWindow::frameSwapped`, at most 1 s) before it starts.
 
 Threads: the app with threads needs shared memory (SharedArrayBuffer), which browsers give only to a cross-origin
 isolated page (headers COOP/COEP, which GitHub Pages does not send). The service worker `vibescore-sw.js` adds them
