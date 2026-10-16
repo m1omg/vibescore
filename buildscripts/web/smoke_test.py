@@ -6,8 +6,8 @@ Usage: smoke_test.py URL OUT_DIR [--engine chromium|firefox] [--timeout SECONDS]
                      [--max-memory MB] [--headed]
 
 Writes to OUT_DIR, with the engine as prefix: the loading steps with their times (timeline.txt), the browser's console
-(console.log) and screenshots. After the app started, the page is loaded again (the second start), which must not
-download the app again (the browser keeps it). Exits with 1 when the app did not start in time (either time), when the
+(console.log) and screenshots. After the app started, it is closed and opened again in a new tab of the same browser
+profile (the second start), which must not download the app again (the browser keeps it). Exits with 1 when the app did not start in time (either time), when the
 second start downloaded the app, or (on Linux) when the page's process used more memory than --max-memory.
 - --cpu-slowdown N (Chromium): runs the page N times slower, like a slower device.
 - --tablet (Chromium): a touch tablet (mobile viewport).
@@ -134,17 +134,22 @@ async def main():
         if args.tablet:
             options = dict(p.devices["Galaxy Tab S4 landscape"])
         context = await browser.new_context(**options)
-        page = await context.new_page()
-        await page.add_init_script(PAGE_PROBE)
-        page.on("console", lambda m: console.append(f"{time.time() - t0:7.1f}s [{m.type}] {m.text}"))
-        page.on("pageerror", lambda e: console.append(f"{time.time() - t0:7.1f}s [pageerror] {e}"))
-        page.on("crash", lambda _: note("THE PAGE CRASHED"))
-        page.on("requestfailed", lambda r: console.append(f"{time.time() - t0:7.1f}s [request failed] {r.url} {r.failure}"))
 
-        if args.cpu_slowdown and args.engine == "chromium":
-            cdp = await context.new_cdp_session(page)
-            await cdp.send("Emulation.setCPUThrottlingRate", {"rate": args.cpu_slowdown})
-            note(f"CPU slowed down {args.cpu_slowdown:g} times")
+        async def open_page():
+            page = await context.new_page()
+            await page.add_init_script(PAGE_PROBE)
+            page.on("console", lambda m: console.append(f"{time.time() - t0:7.1f}s [{m.type}] {m.text}"))
+            page.on("pageerror", lambda e: console.append(f"{time.time() - t0:7.1f}s [pageerror] {e}"))
+            page.on("crash", lambda _: note("THE PAGE CRASHED"))
+            page.on("requestfailed",
+                    lambda r: console.append(f"{time.time() - t0:7.1f}s [request failed] {r.url} {r.failure}"))
+            if args.cpu_slowdown and args.engine == "chromium":
+                cdp = await context.new_cdp_session(page)
+                await cdp.send("Emulation.setCPUThrottlingRate", {"rate": args.cpu_slowdown})
+                note(f"CPU slowed down {args.cpu_slowdown:g} times")
+            return page
+
+        page = await open_page()
 
         async def screenshot(name):
             try:
@@ -211,13 +216,17 @@ async def main():
         started, state = await wait_for_start(t0)
         note_steps(state, "The first start:")
 
-        # The second start: the browser kept the app (vsFetchKept in vibescore-web.js), so it is not downloaded again
+        # The second start: the browser kept the app (vsFetchKept in vibescore-web.js), so it is not downloaded again.
+        # The app is closed and opened again, as when it is used another time: a reload would start it while the
+        # browser still holds the memory of the first start (in Firefox, ~1.6 instead of ~1 GB at the peak).
         is_second_start = started
         downloaded_again = False
         if is_second_start:
             await screenshot("screen.png")
-            note("the page is loaded again (the second start)")
-            await page.reload(wait_until="commit")
+            note("the app is closed and opened again in a new tab (the second start)")
+            await page.close()
+            page = await open_page()
+            await page.goto(args.url, wait_until="commit")
             started, state = await wait_for_start(time.time())
             note_steps(state, "The second start:")
             downloaded_again = any("Downloading VibeScore" in text for _, text in state.get("steps") or [])
