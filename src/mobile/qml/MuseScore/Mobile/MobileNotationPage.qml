@@ -251,9 +251,9 @@ Item {
                 // When there is no room for the playback toolbar
                 visible: !playbackToolBar.visible
 
-                icon: IconCode.PLAY
+                icon: root.shell.isPlaying ? IconCode.PAUSE : IconCode.PLAY
                 transparent: true
-                toolTipTitle: qsTrc("action", "Play")
+                toolTipTitle: root.shell.isPlaying ? qsTrc("action", "Pause") : qsTrc("action", "Play")
 
                 navigation.panel: topBarNavPanel
                 navigation.column: 1
