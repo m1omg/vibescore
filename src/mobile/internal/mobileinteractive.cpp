@@ -25,8 +25,8 @@
 #include <QFileDialog>
 #include <QFileInfo>
 #include <QGuiApplication>
+#include <QHash>
 #include <QQuickWindow>
-#include <QSet>
 #include <QTimer>
 
 #if defined(Q_OS_ANDROID)
@@ -156,12 +156,23 @@ static const Uri BUSY_URI("musescore://mobile/busy");
 static constexpr int BUSY_DRAWN_TIMEOUT_MS = 1000;
 
 //! Before a long task on the app's thread, during which nothing can be drawn: processes the events until each visible
-//! window drew a frame, so that the windows show their latest changes (a dialog that opened, one that closed, ...);
+//! window drew two frames, so that the windows show their latest changes (a dialog that opened, one that closed, ...);
 //! user input waits until after the task
 static void drawWindowsNow(int timeoutMs)
 {
-    QSet<QQuickWindow*> notDrawn;
-    QEventLoop loop; // destroyed first, with the connections that use notDrawn
+    // A browser shows a drawn frame at its next refresh, which can come after a task that starts at once (Firefox).
+    // It asks for the next frame then: when a window drew its second frame, its first one is on the screen.
+    static constexpr int FRAMES = 2;
+
+    QHash<QQuickWindow*, int> framesToDraw;
+    QEventLoop loop; // destroyed first, with the connections that use framesToDraw
+
+    auto finished = [&loop, &framesToDraw]() {
+        if (framesToDraw.isEmpty()) {
+            // The long task starts in a later task, after the one that drew the last frame
+            QTimer::singleShot(0, &loop, &QEventLoop::quit);
+        }
+    };
 
     for (QWindow* window : QGuiApplication::topLevelWindows()) {
         QQuickWindow* quickWindow = qobject_cast<QQuickWindow*>(window);
@@ -169,25 +180,35 @@ static void drawWindowsNow(int timeoutMs)
             continue;
         }
 
-        notDrawn.insert(quickWindow);
-        auto drawn = [&loop, &notDrawn, quickWindow]() {
-            if (notDrawn.remove(quickWindow) && notDrawn.isEmpty()) {
-                // A browser shows a frame after the task that drew it: the long task starts in a later one
-                QTimer::singleShot(0, &loop, &QEventLoop::quit);
+        framesToDraw.insert(quickWindow, FRAMES);
+        QObject::connect(quickWindow, &QQuickWindow::frameSwapped, &loop, [&framesToDraw, finished, quickWindow]() {
+            auto it = framesToDraw.find(quickWindow);
+            if (it == framesToDraw.end()) {
+                return;
+            }
+            if (--it.value() > 0) {
+                quickWindow->update();
+                return;
+            }
+            framesToDraw.erase(it);
+            finished();
+        });
+        // A window that goes away draws nothing more
+        auto gone = [&framesToDraw, finished, quickWindow]() {
+            if (framesToDraw.remove(quickWindow)) {
+                finished();
             }
         };
-        QObject::connect(quickWindow, &QQuickWindow::frameSwapped, &loop, drawn);
-        // A window that goes away draws nothing more
-        QObject::connect(quickWindow, &QObject::destroyed, &loop, drawn);
-        QObject::connect(quickWindow, &QWindow::visibleChanged, &loop, [drawn](bool visible) {
+        QObject::connect(quickWindow, &QObject::destroyed, &loop, gone);
+        QObject::connect(quickWindow, &QWindow::visibleChanged, &loop, [gone](bool visible) {
             if (!visible) {
-                drawn();
+                gone();
             }
         });
         quickWindow->update();
     }
 
-    if (notDrawn.isEmpty()) {
+    if (framesToDraw.isEmpty()) {
         return;
     }
 
