@@ -196,7 +196,8 @@ and says so. The app is linked with Asyncify, so that dialogs that wait for an a
 after such a dialog. Nothing is drawn while the app's thread is busy, e.g. opening a big score: a dialog that was just
 answered stayed on the screen meanwhile, as if the app had frozen. Opening a score shows "Opening “name”…" first
 (`ProjectActionsController::doOpenProject`, `MobileInteractive::showProgress`), and waits until each window has drawn
-a frame with it (an event loop until `QQuickWindow::frameSwapped`, at most 1 s) before it starts.
+two frames (an event loop until `QQuickWindow::frameSwapped`, at most 1 s) before it starts: a browser shows a drawn
+frame at its next refresh, which can come after a task that starts at once (Firefox), and asks for the next frame then.
 
 Threads: the app with threads needs shared memory (SharedArrayBuffer), which browsers give only to a cross-origin
 isolated page (headers COOP/COEP, which GitHub Pages does not send). The service worker `vibescore-sw.js` adds them
