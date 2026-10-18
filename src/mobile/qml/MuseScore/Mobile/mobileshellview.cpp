@@ -55,6 +55,12 @@ void MobileShellView::componentComplete()
         listenNotation();
     }
 
+    if (playbackController()) {
+        playbackController()->isPlayingChanged().onNotify(this, [this]() {
+            emit isPlayingChanged();
+        });
+    }
+
     // In-window dialogs, popups and the menu drawer leave nothing active when they close (windows of the desktop
     // give the focus back): then the score gets the keyboard again, so that its shortcuts work
     if (navigationController()) {
@@ -98,6 +104,11 @@ void MobileShellView::updateNoteInputMode()
 bool MobileShellView::isNoteInputMode() const
 {
     return m_isNoteInputMode;
+}
+
+bool MobileShellView::isPlaying() const
+{
+    return playbackController() && playbackController()->isPlaying();
 }
 
 void MobileShellView::updateEditedText()
