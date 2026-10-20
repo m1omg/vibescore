@@ -25,12 +25,12 @@ function(vs_setup_web_packaging target)
         COMMAND ${CMAKE_COMMAND} -E copy "${web_src}/index.html" "${web_src}/vibescore-web.js" "${web_src}/vibescore-sw.js"
                 "${web_src}/manifest.json" "${web_src}/apple-touch-icon.png" "${web_src}/icon-192.png"
                 "${web_src}/icon-512.png" "${web_dir}/"
+        # Downloaded by the page after the app started (stamped with its version, like the app's other files)
+        COMMAND ${CMAKE_COMMAND} -E copy_directory "${stage_dir}/share/sound" "${web_dir}/sound"
         COMMAND ${Python3_EXECUTABLE} "${web_src}/stamp_page.py" "${web_dir}"
         COMMAND ${CMAKE_COMMAND} -E copy
                 "${PROJECT_SOURCE_DIR}/src/appshell/qml/MuseScore/AppShell/resources/vibescore_logo.svg"
                 "${web_dir}/vibescore.svg"
-        # Downloaded by the page after the app started
-        COMMAND ${CMAKE_COMMAND} -E copy_directory "${stage_dir}/share/sound" "${web_dir}/sound"
         COMMENT "Packaging the web app in ${web_dir}"
         VERBATIM
     )

@@ -13,7 +13,7 @@
 //   them past the service worker (cache: 'no-store').
 //   The address of a file has its version (?v=..., see stamp_page.py); the other versions of a file are removed when
 //   it is kept. The page itself is taken from the network when there is one.
-// - The sound font is not kept here: the app keeps it in its own storage (IndexedDB).
+// - The sound font is not given from here: the page takes it from Cache Storage itself (vibescoreLoadSoundFont).
 
 const VS_CACHE = 'vibescore-app';
 
@@ -96,7 +96,7 @@ self.addEventListener('fetch', event => {
         return;
     }
     if (url.pathname.includes('/sound/')) {
-        return; // the sound font: kept by the app
+        return; // the sound font: kept by the page
     }
     if (request.cache === 'no-store') {
         return; // a download that the page keeps itself

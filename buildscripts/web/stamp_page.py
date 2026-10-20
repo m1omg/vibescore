@@ -30,7 +30,8 @@ page = os.path.join(web_dir, "index.html")
 threads_wasm = os.path.join(web_dir, "threads", "VibeScore.wasm")
 has_threads = os.path.exists(threads_wasm)
 
-names = ["VibeScore.wasm", "VibeScore.js", "qtloader.js", "vibescore-web.js", "share.data", "share.json"]
+names = ["VibeScore.wasm", "VibeScore.js", "qtloader.js", "vibescore-web.js", "share.data", "share.json",
+         "sound/MS Basic.sf3"]
 if has_threads:
     names += ["threads/VibeScore.wasm", "threads/VibeScore.js"]
 
