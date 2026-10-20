@@ -55,8 +55,10 @@ class MobileShellView : public QQuickItem, public muse::dock::IDockWindow, publi
 
     //! Whether the current score is in note input mode (e.g. to show the note input keypad on phones)
     Q_PROPERTY(bool isNoteInputMode READ isNoteInputMode NOTIFY isNoteInputModeChanged)
-    //! Whether the score is being played (e.g. for the play button that is shown when the playback toolbar is not)
+    //! Whether the score is being played (e.g. for the play button that is shown when the playback toolbar is not),
+    //! and whether it can be played yet (not while its sounds are loaded, which takes a while for a big score)
     Q_PROPERTY(bool isPlaying READ isPlaying NOTIFY isPlayingChanged)
+    Q_PROPERTY(bool isPlayAllowed READ isPlayAllowed NOTIFY isPlayAllowedChanged)
 
     //! Whether text on the score is being edited, and which kind of text (see EditedTextKind),
     //! for the bar of text editing over the keyboard
@@ -95,6 +97,7 @@ public:
 
     bool isNoteInputMode() const;
     bool isPlaying() const;
+    bool isPlayAllowed() const;
     bool isEditingText() const;
     int editedTextKind() const;
 
@@ -141,6 +144,7 @@ signals:
     void panelsOverlayChanged();
     void isNoteInputModeChanged();
     void isPlayingChanged();
+    void isPlayAllowedChanged();
     void editedTextChanged();
 
     //! A page is shown, the first one or another one
