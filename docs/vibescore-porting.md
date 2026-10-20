@@ -176,7 +176,10 @@ scores (rename, duplicate, delete, share).
   lets the app and the browser run for a moment (a nested event loop, on the app's side of the RPC channel), so that
   the progress shows and Cancel works; the driver does not call the engine again meanwhile.
 
-The app pauses playback and stops the audio stream when it goes to the background, and saves an autosave.
+The app pauses playback when the score page is left (the arrow at the top left, Android's Back key:
+`MobileShellView::loadPage`; the score stays open, to come back to, but is not played on unseen) and when it goes to
+the background (`MobileLifecycleController`; on the web, when the page is hidden: Chrome on Android would play on),
+where it also stops the audio stream and saves an autosave.
 
 ### The web app
 
@@ -268,7 +271,7 @@ Installed app (from the Home Screen of an iPhone or iPad, or installed from Chro
 `display-mode: standalone` or `navigator.standalone`): phones and tablets close such an app in the background to
 free memory, like any app, so it behaves like the mobile apps. The page tells the app when it is hidden or shown
 (`web::watchPageVisibility`: the application state becomes inactive or active, through Qt's queue of browser events),
-and the changes of the open score are autosaved when it is hidden (`ProjectAutoSaver`, as on Android and iOS; also in
+playback pauses and the changes of the open score are autosaved when it is hidden (`ProjectAutoSaver`, as on Android and iOS; also in
 a browser tab, which a phone's browser may close too) and written to IndexedDB. When the page ended hidden and was
 not closed (`vibescoreEndedInBackground()`: the system ended it in the background, an installed app or a tab), the
 next start opens the scores that were open (`StartupScenario::restoreLastSession`); a page that was closed or loaded

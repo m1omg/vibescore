@@ -52,7 +52,15 @@ void MobileLifecycleController::onApplicationStateChanged(Qt::ApplicationState s
 {
     LOGI() << "Application state: " << int(state);
 
-    if (state == Qt::ApplicationSuspended && playbackController() && playbackController()->isPlaying()) {
+    bool inBackground = state == Qt::ApplicationSuspended;
+#ifdef Q_OS_WASM
+    // Qt for WebAssembly reports no state changes of its own: the page reports itself hidden as inactive
+    // (web::watchPageVisibility): another app or tab is in front, or the screen is off. Chrome on Android would
+    // play on in the background
+    inBackground = inBackground || state == Qt::ApplicationInactive;
+#endif
+
+    if (inBackground && playbackController() && playbackController()->isPlaying()) {
         // Toggles playback: pauses at the current position
         dispatcher()->dispatch("play");
     }

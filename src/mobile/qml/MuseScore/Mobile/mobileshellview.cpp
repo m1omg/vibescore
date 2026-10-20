@@ -227,10 +227,30 @@ void MobileShellView::loadPage(const QString& uri, const QVariantMap& params)
         return;
     }
 
+    // Leaving the score (the arrow at the top left, the Back key of Android): the score stays open, to come back to,
+    // but it is not played on while it is not seen
+    if (isNotationPage(m_currentPageUri) && !isNotationPage(uri)) {
+        pausePlayback();
+    }
+
     m_currentPageUri = uri;
     m_currentPageParams = params;
     emit currentPageChanged();
     emit pageLoaded();
+}
+
+bool MobileShellView::isNotationPage(const QString& uri) const
+{
+    // Publishing (print, export) is in the app menu; the review page shows the score too
+    return uri == "musescore://notation" || uri == "musescore://notation/review" || uri == "musescore://publish";
+}
+
+void MobileShellView::pausePlayback()
+{
+    if (playbackController() && playbackController()->isPlaying()) {
+        // Toggles playback: pauses at the current position
+        dispatcher()->dispatch("play");
+    }
 }
 
 void MobileShellView::registerDock(const QString& dockName, const QString& group, bool openByDefault)

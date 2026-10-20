@@ -115,6 +115,9 @@ public:
     //! Called by the interactive provider for primary pages (musescore://home, musescore://notation, ...)
     Q_INVOKABLE void loadPage(const QString& uri, const QVariantMap& params);
 
+    //! Whether a page shows the score (the score page itself, its review and publishing)
+    Q_INVOKABLE bool isNotationPage(const QString& uri) const;
+
     //! Declares a panel: its group (panels of a group are shown one at a time) and whether it is open by default
     Q_INVOKABLE void registerDock(const QString& dockName, const QString& group, bool openByDefault);
 
@@ -153,6 +156,7 @@ private:
     };
 
     void notifyAboutDocksChanged(const QStringList& changed);
+    void pausePlayback();
     void listenNotation();
     void updateNoteInputMode();
     void updateEditedText();
