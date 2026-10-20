@@ -8,7 +8,8 @@ the sound font is there.
 Usage: sound_check.py URL OUT_DIR STEP...
 Steps: start, shot:NAME, tap:X,Y, open:X,Y=FILE (tap the "Open other" button at X,Y and give FILE), wait:S,
        waitsf:S (until the sound font is in the app, at most S seconds), measure:S (log every 0.5 s for S seconds),
-       throttle:KBYTES_PER_S, offline, online, tapline (tap the page's sound line)
+       throttle:KBYTES_PER_S, offline, online, tapline (tap the page's sound line), hide (the page is hidden, as when
+       the user switches apps: the browser's visibility change, fired by hand), show (the page is shown again)
 Environment: VS_STRICT_AUTOPLAY=1 (an AudioContext made before a user gesture stays suspended, as on Android),
              VS_LOCKED_AUDIO=1 (the browser never plays audio: the sound line must ask for a tap)
 
@@ -184,6 +185,17 @@ with sync_playwright() as p:
             cdp.send("Network.emulateNetworkConditions", {"offline": False, "latency": 50,
                                                           "downloadThroughput": rate, "uploadThroughput": rate})
             note(f"throttled to {arg} kB/s")
+        elif kind in ("hide", "show"):
+            # The page is hidden (another app or tab in front) or shown again: the browser's visibility change, fired
+            # by hand (a tab put in front of it does not hide this Chromium's page)
+            hidden = kind == "hide"
+            page.evaluate("""hidden => {
+                Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => hidden ? 'hidden' : 'visible' });
+                Object.defineProperty(document, 'hidden', { configurable: true, get: () => hidden });
+                document.dispatchEvent(new Event('visibilitychange'));
+            }""", hidden)
+            time.sleep(1)
+            note(f"{kind}: " + str(page.evaluate("document.visibilityState")))
         elif kind == "offline":
             context.set_offline(True)
             note("offline")
