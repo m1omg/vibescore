@@ -115,11 +115,14 @@ the live threads app, `devtools/load_check.py`; the stand-ins are `devtools/mult
 
 ### Other findings
 
-- The "Do you want to save changes to the score … before closing?" dialog (three buttons) is wider than a phone
-  screen in portrait: the third button ("Save") is cut off at the right (seen in a screenshot, Pixel 7 profile).
-- "Glitchy": crackles or dropouts were not asked about; `Module.vibescoreAudio.underrunFrames()` counts missing
-  frames (`devtools/sound_check.py` logs it). During a load the engine thread waits for the main thread (file access
-  from threads goes through it), so the counter grows then; nothing plays at that time.
+- The "Do you want to save changes to the score … before closing?" dialog (three buttons) was wider than a phone
+  screen in portrait, with the third button ("Save") off the screen: fixed in
+  [m1omg/vibescore#8](https://github.com/m1omg/vibescore/pull/8) (the standard dialogs adapt to the width of a
+  single window, `StyledDialogView.availableWidth`; `ButtonBox` stacks its buttons where their row does not fit).
+- "Glitchy": the user says the sound did not crackle on the phone when playing normally with the notation open.
+  `Module.vibescoreAudio.underrunFrames()` counts missing frames (`devtools/sound_check.py` logs it). During a load
+  the engine thread waits for the main thread (file access from threads goes through it), so the counter grows then;
+  nothing plays at that time.
 - `load_check.py --chrome-arg "--js-flags=--no-liftoff"` is not "optimized code only": functions are then compiled
   lazily on first call, which is counted as busy time (47 s for x60).
 
@@ -144,6 +147,8 @@ the live threads app, `devtools/load_check.py`; the stand-ins are `devtools/mult
   is hidden; the top bar's play button is disabled while the sounds load; the web "Opening…" box is the page's,
   with a spinner that keeps turning while the app's thread is busy; `devtools/load_check.py` (threads, memory, busy
   time, Chrome's compilers, video), `devtools/serve_isolated.py`, and `hide`/`show` steps in `sound_check.py`.
+- [m1omg/vibescore#8](https://github.com/m1omg/vibescore/pull/8): the "save changes?" dialog fits a phone's screen
+  (text wrapped, buttons stacked); `load_check.py --device`.
 
 ## Building and testing in a cloud container
 
