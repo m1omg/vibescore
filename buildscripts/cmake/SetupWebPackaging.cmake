@@ -5,6 +5,12 @@
 # the icon, and the application data packed into share.data (see buildscripts/web/pack_share.py). The page is
 # stamped with the build (see buildscripts/web/stamp_page.py).
 
+# Functions of the app that Safari's optimizing compiler (OMG) took gigabytes of memory for, so that iOS ended the
+# page (WebKit bug 304810; found by allowing OMG only some functions, JSC_omgAllowlist, in WebKitGTK)
+set(VS_WEB_NO_OMG_FUNCTIONS
+    "QV4::Moth::VME::interpret(*"
+)
+
 function(vs_setup_web_packaging target)
     set(web_dir "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}")
     set(stage_dir "${CMAKE_BINARY_DIR}/web-share-stage")
@@ -25,6 +31,10 @@ function(vs_setup_web_packaging target)
         COMMAND ${CMAKE_COMMAND} -E copy "${web_src}/index.html" "${web_src}/vibescore-web.js" "${web_src}/vibescore-sw.js"
                 "${web_src}/manifest.json" "${web_src}/apple-touch-icon.png" "${web_src}/icon-192.png"
                 "${web_src}/icon-512.png" "${web_dir}/"
+        # Functions that Safari's optimizing compiler must leave alone (see pad_wasm_functions.py); the symbol map
+        # (from the link, --emit-symbol-map) stays with the app, for the names of functions in a stack trace
+        COMMAND ${Python3_EXECUTABLE} "${web_src}/pad_wasm_functions.py" "${web_dir}/${VS_BRAND_NAME_MACHINE}.wasm"
+                "${web_dir}/${VS_BRAND_NAME_MACHINE}.js.symbols" ${VS_WEB_NO_OMG_FUNCTIONS}
         COMMAND ${Python3_EXECUTABLE} "${web_src}/stamp_page.py" "${web_dir}"
         COMMAND ${CMAKE_COMMAND} -E copy
                 "${PROJECT_SOURCE_DIR}/src/appshell/qml/MuseScore/AppShell/resources/vibescore_logo.svg"
