@@ -94,6 +94,10 @@ StyledDialogView {
             navigation.section: root.navigationSection
             navigation.order: 1
 
+            // In a narrow window (phones), the text wraps to it and the buttons stack; a gutter stays beside the
+            // dialog
+            availableWidth: root.availableWidth > 0 ? Math.max(root.availableWidth - 2 * root.margins - 2 * 16, 0) : 0
+
             buttons: root.buttons
             customButtons: root.customButtons
 

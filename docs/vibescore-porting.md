@@ -95,7 +95,11 @@ inside the main window instead:
 
 - **Popups, menus, dropdowns, tooltips and QML dialogs** (`WindowView` and its subclasses) are hosted by
   `InWindowHost.qml` (a `T.Popup` on the window's overlay) when `MUSE_CONFIGURATION_IS_MOBILE` is set. Dialogs stay
-  inside the safe area; dialogs with `fillsCompactWindow` take the whole window on phones.
+  inside the safe area; dialogs with `fillsCompactWindow` take the whole window on phones. The host tells a dialog
+  with an `availableWidth` property (`StyledDialogView`) the width there is: the standard dialogs (questions,
+  warnings, ...) wrap their text to it, and `ButtonBox` stacks the buttons, each as wide as the box, where their row
+  does not fit (three buttons, "Don't save", "Cancel" and "Save", were wider than a phone, and the last one was off
+  the screen).
 - **QWidget dialogs** (Style, Page settings, Transpose, Staff properties, ...) are shown in
   `MobileWidgetDialogFrame`: the whole window, a title bar with a close button, kinetic scrolling, and the dialog's
   buttons kept in sight.
