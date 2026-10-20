@@ -264,13 +264,26 @@ Installed app (from the Home Screen of an iPhone or iPad, or installed from Chro
 free memory, like any app, so it behaves like the mobile apps. The page tells the app when it is hidden or shown
 (`web::watchPageVisibility`: the application state becomes inactive or active, through Qt's queue of browser events),
 and the changes of the open score are autosaved when it is hidden (`ProjectAutoSaver`, as on Android and iOS; also in
-a browser tab, which a phone's browser may close too) and written to IndexedDB. At the next start, an installed app
-opens the scores that were open (`StartupScenario::restoreLastSession`); in a browser tab, closing the page is the
-usual way to quit, so it starts with the Scores page. An installed app asks for persistent storage at the start
+a browser tab, which a phone's browser may close too) and written to IndexedDB. When the page ended hidden and was
+not closed (`vibescoreEndedInBackground()`: the system ended it in the background, an installed app or a tab), the
+next start opens the scores that were open (`StartupScenario::restoreLastSession`); a page that was closed or loaded
+again, or that ended on the screen (e.g. the browser ended it for its memory, which could happen again at once with
+the same score), starts with the Scores page. An installed app asks for persistent storage at the start
 (browsers give it to such apps without asking; Safari also does not remove the data of a Home Screen app after 7
 days without use, as it does for a site); in a tab it is asked after the first save. iOS needs PNG icons
 (`apple-touch-icon.png`, made from the iOS app's icon) and, before iOS 26, the `apple-mobile-web-app-*` meta tags;
 in Safari on an iPhone or iPad (not from the Home Screen) the loading screen says how to add the app there.
+
+Safari (WebKit; every browser on iOS and iPadOS): the app runs in WebKit (tested with WebKitGTK 2.52 and
+`WebKitWebDriver`: the start, opening and playing a score, the files kept; the service worker's isolation works, so
+Safari gets the app with threads). But JavaScriptCore's optimizing compiler (OMG), which compiles the hot wasm
+functions again, takes gigabytes of memory for the app's code, which has Asyncify's instrumentation (WebKit bug
+304810): the page's process grew from 1.3 GB to 4-8 GB within two minutes of opening a small score, and the app did
+not answer for minutes; with OMG off (`JSC_useOMGJIT=false`) it stays at 1.3 GB. iOS ends a page that takes that
+much, and Safari loads it again. The memory is spread over many of the ~1000 functions that OMG compiles (allowing
+OMG only some of them, `JSC_omgAllowlist`: the QML interpreter alone took ~3 GB; padding the biggest ones past OMG's
+size limit, `maximumOMGCandidateCost`, did not keep it down, as others were compiled then), so the page cannot
+avoid it; JSPI instead of Asyncify (above), once Safari has it, or a fix in WebKit would.
 
 Keyboard focus: Qt for WebAssembly can leave the browser's focus on the page itself (seen when the Properties
 panel was opened), and the app then got no keys; `vibescoreKeepKeyboardFocus` gives the focus back to the
