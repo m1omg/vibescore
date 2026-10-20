@@ -250,6 +250,8 @@ Item {
 
                 // When there is no room for the playback toolbar
                 visible: !playbackToolBar.visible
+                // Not while the sounds of the score are loaded (a while for a big score): the tap would do nothing
+                enabled: root.shell.isPlayAllowed
 
                 icon: root.shell.isPlaying ? IconCode.PAUSE : IconCode.PLAY
                 transparent: true

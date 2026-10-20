@@ -59,6 +59,9 @@ void MobileShellView::componentComplete()
         playbackController()->isPlayingChanged().onNotify(this, [this]() {
             emit isPlayingChanged();
         });
+        playbackController()->isPlayAllowedChanged().onNotify(this, [this]() {
+            emit isPlayAllowedChanged();
+        });
     }
 
     // In-window dialogs, popups and the menu drawer leave nothing active when they close (windows of the desktop
@@ -109,6 +112,11 @@ bool MobileShellView::isNoteInputMode() const
 bool MobileShellView::isPlaying() const
 {
     return playbackController() && playbackController()->isPlaying();
+}
+
+bool MobileShellView::isPlayAllowed() const
+{
+    return playbackController() && playbackController()->isPlayAllowed();
 }
 
 void MobileShellView::updateEditedText()
