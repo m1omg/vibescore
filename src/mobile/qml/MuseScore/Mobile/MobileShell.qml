@@ -56,11 +56,6 @@ MobileShellView {
         return Boolean(page) && page.closeOverlay()
     }
 
-    function isNotationPage(uri) {
-        // Publishing (print, export) is in the app menu; the review page shows the score too
-        return uri === "musescore://notation" || uri === "musescore://notation/review" || uri === "musescore://publish"
-    }
-
     Loader {
         id: homeLoader
 
