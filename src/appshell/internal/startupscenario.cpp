@@ -340,21 +340,20 @@ void StartupScenario::openScore(const project::ProjectFile& file)
 void StartupScenario::restoreLastSession()
 {
 #if defined(Q_OS_WASM)
-    // Started as an installed app (from the Home Screen of an iPhone or iPad, or installed from the browser; see
-    // vibescoreIsInstalled in vibescore-web.js): the system closes it in the background like a mobile app, so this is
-    // the usual way back to it, as on Android and iOS
-    const bool isInstalledApp = EM_ASM_INT({
-        return window.vibescoreIsInstalled && window.vibescoreIsInstalled() ? 1 : 0;
+    // The system ended the page in the background, as phones and tablets do to free memory (see
+    // vibescoreEndedInBackground in vibescore-web.js): this is the usual way back to it, as on Android and iOS
+    const bool endedInBackground = EM_ASM_INT({
+        return window.vibescoreEndedInBackground && window.vibescoreEndedInBackground() ? 1 : 0;
     }) != 0;
-    if (isInstalledApp) {
+    if (endedInBackground) {
         sessionsManager()->restore();
         return;
     }
 
-    // In a browser tab, closing the page is the usual way to quit, so the scores that were open then are not opened
-    // again at every start (a big one takes long to open): they are in the library, and their unsaved changes are
-    // kept and come back when they are opened. Only a new score that was never saved is opened again, as there is
-    // no other way back to it
+    // Otherwise closing the page is the usual way to quit (or the page ended on the screen, which could happen again
+    // with the same score), so the scores that were open then are not opened again at every start (a big one takes
+    // long to open): they are in the library, and their unsaved changes are kept and come back when they are opened.
+    // Only a new score that was never saved is opened again, as there is no other way back to it
     io::paths_t newProjects;
     for (const io::path_t& path : configuration()->sessionProjectsPaths()) {
         if (projectAutoSaver()->isAutosaveOfNewlyCreatedProject(path) && QFileInfo::exists(path.toQString())) {

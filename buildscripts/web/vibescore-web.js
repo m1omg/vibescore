@@ -607,8 +607,35 @@ function vibescorePreRun(module, loader) {
     window.addEventListener('pagehide', sync);
 }
 
-// Started as an installed app: from the Home Screen of an iPhone or iPad, or installed from the browser (e.g. Chrome).
-// The system closes such an app in the background (to free memory) like any app, and it then continues where it was.
+// How the page ended the last time, for the app (see StartupScenario::restoreLastSession): hidden, and not closed,
+// means that the system ended it in the background, as phones and tablets do to free memory (to an installed app or
+// a tab), and the app then continues where it was. A page that the user closed or loaded again, or that ended while
+// it was on the screen (e.g. the browser ended a page that took too much memory), starts at the Scores page: the
+// same could happen again at once with the same score.
+const VS_ENDED_HIDDEN_KEY = 'vibescore-ended-hidden';
+const vsEndedInBackground = vsStorageGet(VS_ENDED_HIDDEN_KEY) === '1';
+function vibescoreEndedInBackground() {
+    return vsEndedInBackground;
+}
+(() => {
+    // Closing the page fires pagehide before or after the last visibilitychange, depending on the browser
+    let isLeaving = false;
+    const remember = () => {
+        vsStorageSet(VS_ENDED_HIDDEN_KEY, !isLeaving && document.visibilityState === 'hidden' ? '1' : null);
+    };
+    document.addEventListener('visibilitychange', remember);
+    window.addEventListener('pagehide', () => {
+        isLeaving = true;
+        remember();
+    });
+    window.addEventListener('pageshow', () => {
+        isLeaving = false;
+        remember();
+    });
+    remember();
+})();
+
+// Started as an installed app: from the Home Screen of an iPhone or iPad, or installed from the browser (e.g. Chrome)
 function vibescoreIsInstalled() {
     return window.matchMedia?.('(display-mode: standalone)').matches || navigator.standalone === true;
 }
