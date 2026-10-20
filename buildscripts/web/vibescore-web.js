@@ -578,21 +578,48 @@ function vibescorePreRun(module, loader) {
     setInterval(sync, VS_SYNC_INTERVAL_MS);
 
     // The app asks for it after a score was saved. Then the browser is also asked to keep the data (it may otherwise
-    // evict it when storage runs low): some browsers ask the user, which makes more sense after a save than at the start
+    // evict it when storage runs low): some browsers ask the user, which makes more sense after a save than at the
+    // start. An installed app is asked at the start: browsers keep the data of such an app without asking.
     let isPersistenceRequested = false;
-    window.vibescoreSyncFileSystem = () => {
+    const requestPersistence = () => {
         if (!isPersistenceRequested) {
             isPersistenceRequested = true;
             navigator.storage?.persist?.().catch(() => {});
         }
+    };
+    if (vibescoreIsInstalled()) {
+        requestPersistence();
+    }
+    window.vibescoreSyncFileSystem = () => {
+        requestPersistence();
         return sync();
     };
+    // The app is told when the page is hidden or shown again (window.vibescorePageVisibilityChanged is set by the app,
+    // see web::watchPageVisibility): when hidden, it saves the changes of the open score, as the system may close the
+    // page without notice then (a phone or tablet does it to apps in the background)
     document.addEventListener('visibilitychange', () => {
-        if (document.visibilityState === 'hidden') {
+        const isVisible = document.visibilityState === 'visible';
+        window.vibescorePageVisibilityChanged?.(isVisible);
+        if (!isVisible) {
             sync();
         }
     });
     window.addEventListener('pagehide', sync);
+}
+
+// Started as an installed app: from the Home Screen of an iPhone or iPad, or installed from the browser (e.g. Chrome).
+// The system closes such an app in the background (to free memory) like any app, and it then continues where it was.
+function vibescoreIsInstalled() {
+    return window.matchMedia?.('(display-mode: standalone)').matches || navigator.standalone === true;
+}
+
+// In Safari on an iPhone or iPad (only it has navigator.standalone; a Mac has no touch screen), not from the Home
+// Screen: says how to add the app there. Safari removes the data of a page that was not used for a while (scores
+// included), but not of an app on the Home Screen.
+function vibescoreShowInstallHint(element) {
+    if ('standalone' in navigator && !navigator.standalone && navigator.maxTouchPoints > 0) {
+        element.style.display = 'block';
+    }
 }
 
 // The sound font (about 50 MB) is downloaded after the app started, so that the app shows up sooner;

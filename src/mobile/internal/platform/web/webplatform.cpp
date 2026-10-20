@@ -25,6 +25,7 @@
 #include <QFileDialog>
 #include <QFileInfo>
 #include <QtCore/private/qwasmsuspendresumecontrol_p.h>
+#include <qpa/qwindowsysteminterface.h>
 
 #include "log.h"
 
@@ -120,6 +121,28 @@ void fixNestedEventLoops()
     const uint32_t noopHandler = control->registerEventHandler([](emscripten::val) {});
 
     vs_guard_pending_events(static_cast<int>(noopHandler));
+}
+
+void watchPageVisibility()
+{
+    // Through Qt's queue of browser events, which the event loop waiting for a dialog's answer also processes
+    QWasmSuspendResumeControl* control = QWasmSuspendResumeControl::get();
+    if (!control) {
+        return;
+    }
+
+    const uint32_t handler = control->registerEventHandler([](emscripten::val visible) {
+        const bool isVisible = visible.as<bool>();
+        QWindowSystemInterface::handleApplicationStateChanged<QWindowSystemInterface::SynchronousDelivery>(
+            isVisible ? Qt::ApplicationActive : Qt::ApplicationInactive);
+
+        // E.g. the autosave of the open score
+        if (!isVisible) {
+            syncFileSystem();
+        }
+    });
+
+    emscripten::val::global("window").set("vibescorePageVisibilityChanged", control->jsEventHandlerAt(handler));
 }
 
 static std::function<void()> s_soundFontsChangedHandler;

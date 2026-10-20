@@ -85,6 +85,7 @@ void MobileModule::onInit(const IApplication::RunMode& mode)
 
 #ifdef Q_OS_WASM
     web::fixNestedEventLoops();
+    web::watchPageVisibility();
 
     // The page downloads the sound font after the app started: then it is loaded like the others
     web::setSoundFontsChangedHandler([this]() {

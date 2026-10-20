@@ -43,6 +43,12 @@ void syncFileSystem();
 //! (a nested event loop); call it once the application object exists
 void fixNestedEventLoops();
 
+//! The page tells the app when it is hidden or shown again (see vibescore-web.js): the application state becomes
+//! inactive or active, as for an app that is left on Android or iOS (e.g. its changes are autosaved; the system may
+//! close the page in the background without notice). The app writes its files to the browser's storage then.
+//! Call it once the application object exists
+void watchPageVisibility();
+
 //! The page tells the app that it added a sound font (it downloads it after the app started, see vibescore-web.js):
 //! Module.vibescoreSoundFontsChanged()
 void setSoundFontsChangedHandler(const std::function<void()>& handler);
