@@ -163,9 +163,15 @@ scores (rename, duplicate, delete, share).
   ring of audio in the shared memory filled ~64 ms ahead; the AudioWorklet plays it from there (the page's thread does
   nothing for the audio), and the mixer renders the instruments in a pool of up to 4 threads. Without threads the
   engine renders on the main thread, a little ahead of time, and the blocks are sent to the AudioWorklet. Browsers
-  play audio after a user gesture; until then the engine runs in real time and its audio is dropped. The page downloads the
-  sound font after the app started (once: it is kept in IndexedDB); instruments that find no sound font wait for
-  one (`EventAudioSource`), so a score opened before the download finished gets its sounds then. An audio export
+  play audio after a user gesture; until then the engine runs in real time and its audio is dropped (the cursor
+  moves, nothing is heard). The AudioContext is resumed at taps, clicks and keys (on a touch screen Chrome counts the
+  end of a tap: `pointerup`, `touchend`, `click`); when the browser still does not play it after a tap, a line at the
+  bottom of the page says "Tap here to turn on the sound" (`vibescoreAudioCreated`). The page loads the sound font
+  (51 MB) after the app started, from Cache Storage or downloaded and kept there like the app's other files
+  (`vibescoreLoadSoundFont`: with its version in its address, retried when the download stops, its progress shown
+  in that line, "Try again" when it failed; it was kept in IndexedDB before, and was downloaded with no word to the
+  user, which on a phone's connection meant minutes of silence or none at all); instruments that find no sound font
+  wait for one (`EventAudioSource`), so a score opened before the download finished gets its sounds then. An audio export
   renders in the driver's callback too: every 150 ms `SoundTrackWriter` hands the app what the engine sent it and
   lets the app and the browser run for a moment (a nested event loop, on the app's side of the RPC channel), so that
   the progress shows and Cancel works; the driver does not call the engine again meanwhile.
@@ -186,8 +192,7 @@ Pages changes every file's ETag at every deployment). It downloads them past the
 slower connections. A file that is kept is still taken through the service worker, which gives it from the cache:
 Chromium keeps the compiled code of a wasm only with such a response. They prepare the file system before the app
 starts: the user's
-folders (`/home/web_user`, `/files/data`) and the downloaded sound font (`/files/share/sound`) are mounted from
-IndexedDB, and the application data (`/files/share`) is unpacked from `share.data` (made by `pack_share.py` at build
+folders (`/home/web_user`, `/files/data`) are mounted from IndexedDB, and the application data (`/files/share`) is unpacked from `share.data` (made by `pack_share.py` at build
 time). The folders are written back to IndexedDB
 regularly and when the page is hidden. The start waits for IndexedDB (the app's runtime opens a database too); a
 database that the browser does not open in 10 seconds fails instead, and the app starts without the saved data
@@ -216,7 +221,7 @@ it sets `QML_DISK_CACHE=aot`, and the QML modules are compiled to byte code only
 is 18 MB smaller). The music fonts are added to the font database at the start, but a font reads its metadata when
 it is used first, and each glyph is measured when its symbol is used first (measuring the thousands of glyphs of all
 the fonts was a third of the start). The palettes with all the elements and the default ones (for "Reset palette")
-are made when they are needed. The sound font is read from IndexedDB after the start. The download's progress is
+are made when they are needed. The sound font is loaded after the start. The download's progress is
 shown a few times a second.
 
 Opening a big score: a lyrics line (the hyphens and melismas, which the layout makes) made the score's map of spanners

@@ -78,14 +78,19 @@ EM_JS(int, vs_audio_create, (const char* playerCodePtr), {
             }
         }).catch((error) => console.error('VibeScore: no audio output', error));
 
-        // Browsers let a page play audio after the user interacted with it
+        // Browsers let a page play audio after the user interacted with it (on a touch screen, Chrome counts the end of
+        // a tap, not its start)
         const resume = () => {
             if (ctx.state !== 'running') {
-                ctx.resume();
+                ctx.resume().catch(() => {});
             }
         };
-        for (const type of ['pointerdown', 'keydown', 'touchend']) {
+        for (const type of ['pointerdown', 'pointerup', 'touchend', 'click', 'keydown']) {
             document.addEventListener(type, resume, { capture: true });
+        }
+        // The page tells the user when the browser still does not play the audio (see vibescore-web.js)
+        if (window.vibescoreAudioCreated) {
+            window.vibescoreAudioCreated(ctx);
         }
     }
 

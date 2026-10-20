@@ -11,15 +11,14 @@
 //   there after the app started (instruments without a sound font wait for one, see EventAudioSource).
 // - The service worker (vibescore-sw.js) makes the page cross-origin isolated, for the app with threads (in threads/),
 //   and keeps the app's scripts; the page uses the app without threads where that does not work (vibescoreChooseApp).
-// - The page keeps the app itself (the wasm, share.data) in the browser's Cache Storage (vsFetchKept): later starts do
-//   not download it. The address of each file has its version (vibescoreFileUrl), so a new build downloads only the
-//   files that changed.
+// - The page keeps the app itself (the wasm, share.data, the sound font) in the browser's Cache Storage (vsFetchKept):
+//   later starts do not download it. The address of each file has its version (vibescoreFileUrl), so a new build
+//   downloads only the files that changed.
 
 const VS_SHARE_FOLDER = '/files/share';
 const VS_SOUND_FOLDER = VS_SHARE_FOLDER + '/sound';
-const VS_PERSISTENT_FOLDERS = ['/home/web_user', '/files/data', VS_SOUND_FOLDER];
-// Read from IndexedDB before the app starts; the sound font (~50 MB) is read after it started (vibescoreLoadSoundFont)
-const VS_STARTUP_FOLDERS = ['/home/web_user', '/files/data'];
+// Kept in IndexedDB: read before the app starts, written back while it runs
+const VS_PERSISTENT_FOLDERS = ['/home/web_user', '/files/data'];
 const VS_SYNC_INTERVAL_MS = 30000;
 // Opening an IndexedDB database takes a moment; when the browser does not answer (seen in some browser profiles),
 // the app starts without it (without the saved data) instead of waiting for good
@@ -336,18 +335,19 @@ async function vsRemoveOtherVersions(cache, url) {
 }
 
 // A file of the app (its address has its version): from Cache Storage, or downloaded and kept there. Returns
-// { response, isKept }; fresh: downloaded again, from no cache.
+// { response, isKept }; fresh: downloaded again, from no cache; compiled: the wasm (see below).
 // The page keeps the files itself, not the service worker: the browser stops a service worker that works too long
 // (Firefox a minute after the page's last request, with or without waitUntil), and a download of the app often takes
 // longer, so it was not kept and every start downloaded the app again.
-async function vsFetchKept(url, { fresh = false, signal } = {}) {
+async function vsFetchKept(url, { fresh = false, compiled = false, signal } = {}) {
     const cache = await vsOpenCache();
     if (cache && !fresh) {
         const kept = await vsWithin(cache.match(url, { ignoreVary: true }), VS_CACHE_TIMEOUT_MS).catch(() => null);
         if (kept) {
-            // Through the service worker, which gives it from the cache too: Chromium keeps the compiled code of a wasm
-            // only with a response from a service worker (or the network), not with one that the page took from the cache
-            const response = navigator.serviceWorker?.controller ? await fetch(url, { signal }) : kept;
+            // The wasm through the service worker, which gives it from the cache too: Chromium keeps the compiled code of
+            // a wasm only with a response from a service worker (or the network), not with one that the page took from
+            // the cache
+            const response = compiled && navigator.serviceWorker?.controller ? await fetch(url, { signal }) : kept;
             return { response, isKept: true };
         }
     }
@@ -383,7 +383,7 @@ async function vsCompileWasm(url, expectedSize, loader, isRetry, onStall) {
     }, 1000);
 
     try {
-        const { response, isKept } = await vsFetchKept(url, { fresh: isRetry, signal: abort.signal });
+        const { response, isKept } = await vsFetchKept(url, { fresh: isRetry, compiled: true, signal: abort.signal });
         if (!response.ok) {
             throw new Error(`Could not download the app (${url}: ${response.status} ${response.statusText})`);
         }
@@ -487,12 +487,6 @@ function vsSyncFileSystem(FS, populate, folders) {
     })), Promise.resolve(true));
 }
 
-// Reads the folder of the sound font from IndexedDB (set by vibescorePreRun): a promise of whether it worked
-let vsRestoreSoundFolder = null;
-
-// Writes the persistent folders to IndexedDB (set by vibescorePreRun)
-let vsSyncFileSystemNow = null;
-
 // Qt for WebAssembly arms one browser timer for its next timer, with the wait rounded down to whole milliseconds,
 // and arms it again only if a timer of Qt was due when it fired (QEventDispatcherWasm::sendTimerEvents). Firefox's
 // clock is coarser, so the browser's timer often fired just before Qt's timer was due: then Qt's timers stopped
@@ -524,7 +518,7 @@ function vibescorePreRun(module, loader) {
     // and does not save it (that could overwrite the data that the browser still has)
     let canPersist = true;
     const restore = Promise.race([
-        vsSyncFileSystem(FS, true, VS_STARTUP_FOLDERS),
+        vsSyncFileSystem(FS, true, VS_PERSISTENT_FOLDERS),
         new Promise(resolve => setTimeout(() => resolve('timeout'), VS_RESTORE_TIMEOUT_MS)),
     ]).then(result => {
         if (result !== true) {
@@ -538,22 +532,9 @@ function vibescorePreRun(module, loader) {
         module.removeRunDependency('vibescore-files');
     }).catch(error => loader.failed(error));
 
-    // The sound font's folder, after the start; until it was read, it is not written (that would remove the sound font
-    // that IndexedDB has)
-    let isSoundFolderRestored = false;
-    vsRestoreSoundFolder = async () => {
-        await restore;
-        if (!canPersist) {
-            return false;
-        }
-        const ok = await vsSyncFileSystem(FS, true, [VS_SOUND_FOLDER]);
-        isSoundFolderRestored = ok;
-        return ok;
-    };
-
     // Written back to IndexedDB: regularly, when the page is hidden (a tab change, the app is closed). Asked for while
-    // it is being written (e.g. after a score was saved, or the sound font was downloaded), it is written again after
-    // that: the running sync may have missed the change.
+    // it is being written (e.g. after a score was saved), it is written again after that: the running sync may have
+    // missed the change.
     let syncing = null;
     let isSyncAgain = false;
     const sync = () => {
@@ -567,14 +548,13 @@ function vibescorePreRun(module, loader) {
         syncing = (async () => {
             do {
                 isSyncAgain = false;
-                await vsSyncFileSystem(FS, false, isSoundFolderRestored ? VS_PERSISTENT_FOLDERS : VS_STARTUP_FOLDERS);
+                await vsSyncFileSystem(FS, false, VS_PERSISTENT_FOLDERS);
             } while (isSyncAgain);
             syncing = null;
         })();
         return syncing;
     };
 
-    vsSyncFileSystemNow = sync;
     setInterval(sync, VS_SYNC_INTERVAL_MS);
 
     // The app asks for it after a score was saved. Then the browser is also asked to keep the data (it may otherwise
@@ -649,8 +629,6 @@ function vibescoreShowInstallHint(element) {
     }
 }
 
-// The sound font (about 50 MB) is downloaded after the app started, so that the app shows up sooner;
-// playback is silent until it is loaded
 // localStorage, where the browser has it
 function vsStorageGet(key) {
     try {
@@ -798,28 +776,174 @@ function vibescoreLoadScript(src) {
     });
 }
 
-async function vibescoreLoadSoundFont(instance, onStatus) {
-    const name = 'MS Basic.sf3';
-    // Kept from an earlier visit: read from the browser's storage now (after the start, which does not need it)
-    if (vsRestoreSoundFolder && await vsRestoreSoundFolder()
-        && instance.FS.analyzePath(VS_SOUND_FOLDER + '/' + name).exists) {
-        instance.vibescoreSoundFontsChanged();
-        return;
-    }
+// A big file of the app, whole: from Cache Storage or downloaded (vsFetchKept), with its progress (onProgress(received
+// bytes, total bytes or 0)); the download is cancelled when no data comes for VS_DOWNLOAD_STALL_MS
+async function vsDownloadKept(url, { fresh = false, onProgress } = {}) {
+    const abort = new AbortController();
+    let lastDataTime = Date.now();
+    const stallCheck = setInterval(() => {
+        if (Date.now() - lastDataTime > VS_DOWNLOAD_STALL_MS) {
+            abort.abort();
+        }
+    }, 1000);
 
     try {
-        const response = await fetch('sound/' + encodeURIComponent(name));
+        const { response } = await vsFetchKept(url, { fresh, signal: abort.signal });
         if (!response.ok) {
-            throw new Error(response.status + ' ' + response.statusText);
+            throw new Error(`${url}: ${response.status} ${response.statusText}`);
         }
-        const data = new Uint8Array(await response.arrayBuffer());
-        instance.FS.writeFile(VS_SOUND_FOLDER + '/' + name, data);
-        instance.vibescoreSoundFontsChanged();
-        vsSyncFileSystemNow?.();
-    } catch (error) {
-        console.error('VibeScore: could not download the sound font', error);
-        onStatus?.('No sound: the sound font could not be downloaded');
+        const total = Number(response.headers.get('Content-Length')) || 0;
+        // Into one buffer when its size is known (not compressed on the way: then the length is that of the
+        // compressed data), so that the file is not in memory twice
+        const isSizeKnown = total > 0 && !response.headers.get('Content-Encoding');
+        let data = isSizeKnown ? new Uint8Array(total) : null;
+        const parts = [];
+        const reader = response.body.getReader();
+        let received = 0;
+        let lastShownTime = 0;
+        for (;;) {
+            const { done, value } = await reader.read();
+            if (done) {
+                break;
+            }
+            if (data && received + value.byteLength <= data.length) {
+                data.set(value, received);
+            } else {
+                if (data) {
+                    parts.push(data.subarray(0, received)); // longer than it said
+                    data = null;
+                }
+                parts.push(value);
+            }
+            received += value.byteLength;
+            lastDataTime = Date.now();
+            if (onProgress && lastDataTime - lastShownTime >= VS_PROGRESS_INTERVAL_MS) {
+                lastShownTime = lastDataTime;
+                onProgress(received, total);
+            }
+        }
+
+        if (data) {
+            return data.subarray(0, received);
+        }
+        const whole = new Uint8Array(received);
+        let offset = 0;
+        for (const part of parts) {
+            whole.set(part, offset);
+            offset += part.byteLength;
+        }
+        return whole;
+    } finally {
+        clearInterval(stallCheck);
     }
+}
+
+// One line at the bottom of the page about the sound, while the app cannot play it: the sound font is being loaded,
+// or could not be (with a button to try again), or the browser has not let the page play audio yet (a tap on the line
+// turns it on). Set by vibescoreLoadSoundFont and vibescoreAudioCreated; the line is the page's #sound.
+const vsSound = { loading: null, loadingSince: 0, failed: null, locked: null };
+// Loading the sound font from the browser's storage takes a moment: the line shows only a longer loading
+const VS_SOUND_LOADING_SHOWN_AFTER_MS = 1000;
+
+function vsShowSound() {
+    const element = document.querySelector('#sound');
+    if (!element) {
+        return;
+    }
+    const text = element.querySelector('span');
+    const button = element.querySelector('button');
+    let action = null;
+    if (vsSound.locked) {
+        text.textContent = 'Tap here to turn on the sound';
+        action = vsSound.locked;
+    } else if (vsSound.failed) {
+        text.textContent = 'No sound: the sounds could not be downloaded.';
+        button.textContent = 'Try again';
+        action = vsSound.failed;
+    } else if (vsSound.loading !== null) {
+        text.textContent = 'Loading the sounds…' + (vsSound.loading >= 0 ? ` ${Math.round(vsSound.loading * 100)}%` : '');
+    }
+    const isLoadingShown = vsSound.loading !== null && Date.now() - vsSound.loadingSince >= VS_SOUND_LOADING_SHOWN_AFTER_MS;
+    element.style.display = vsSound.locked || vsSound.failed || isLoadingShown ? 'flex' : 'none';
+    button.style.display = vsSound.failed && !vsSound.locked ? 'inline-block' : 'none';
+    element.classList.toggle('vs-action', action !== null);
+    element.onclick = action;
+}
+
+// The sound font (about 50 MB): after the start (the app shows up sooner), from Cache Storage or downloaded and kept
+// there (vsFetchKept), then given to the app. Playback is silent until then: the page says so.
+async function vibescoreLoadSoundFont(instance) {
+    const name = 'MS Basic.sf3';
+    const url = vibescoreFileUrl('sound/' + name);
+    for (let attempt = 1; ; ++attempt) {
+        try {
+            vsSound.loading = -1;
+            vsSound.loadingSince = Date.now();
+            const showLoading = setTimeout(vsShowSound, VS_SOUND_LOADING_SHOWN_AFTER_MS);
+            const data = await vsDownloadKept(url, {
+                fresh: attempt > 1,
+                onProgress: (received, total) => {
+                    vsSound.loading = total > 0 ? Math.min(received / total, 1) : -1;
+                    vsShowSound();
+                },
+            });
+            clearTimeout(showLoading);
+            vsMakeTree(instance.FS, VS_SOUND_FOLDER);
+            // The file system takes the buffer as it is (no copy)
+            instance.FS.writeFile(VS_SOUND_FOLDER + '/' + name, data, { canOwn: true });
+            instance.vibescoreSoundFontsChanged();
+            vsSound.loading = null;
+            vsSound.failed = null;
+            vsShowSound();
+            // Before, the sound font was kept in IndexedDB (an IDBFS folder): that copy is not used any more
+            try {
+                indexedDB.deleteDatabase(VS_SOUND_FOLDER);
+            } catch (e) {
+                // no IndexedDB
+            }
+            return;
+        } catch (error) {
+            console.error('VibeScore: could not load the sound font', error);
+            if (attempt < VS_DOWNLOAD_ATTEMPTS) {
+                continue;
+            }
+            // The user may try again (e.g. once the phone has a connection again)
+            vsSound.loading = null;
+            await new Promise(resolve => {
+                vsSound.failed = resolve;
+                vsShowSound();
+            });
+            vsSound.failed = null;
+            attempt = 0;
+        }
+    }
+}
+
+// The app made its AudioContext (see the web audio driver, which resumes it at the user's taps and clicks): when the
+// browser still does not play it after the user touched the page (it did not let the page play audio), the line at
+// the bottom says so, and a tap on it turns the sound on
+function vibescoreAudioCreated(ctx) {
+    let check = null;
+    const unlock = () => {
+        ctx.resume().catch(() => {});
+    };
+    const update = () => {
+        vsSound.locked = ctx.state === 'running' ? null : unlock;
+        vsShowSound();
+    };
+    for (const type of ['pointerup', 'keydown']) {
+        document.addEventListener(type, () => {
+            if (ctx.state !== 'running') {
+                clearTimeout(check);
+                check = setTimeout(update, 1000);
+            }
+        }, { capture: true });
+    }
+    ctx.addEventListener('statechange', () => {
+        if (ctx.state === 'running') {
+            update();
+        }
+    });
 }
 
 // Qt for WebAssembly can leave the keyboard focus on the page itself, outside the app, when its windows change (seen
