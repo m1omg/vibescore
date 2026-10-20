@@ -5,7 +5,8 @@ opens scores and logs the page's workers (Emscripten's threads; a 9th would mean
 memory of the page's process, how long the page's thread was busy (the longest gap between ticks of a 100 ms timer,
 and their sum since the last mark), and the console (errors, a thread pool exhausted, an abort).
 
-Usage: load_check.py URL OUT_DIR [--cores N] [--cpu-slowdown N] [--chrome-arg ARG]... [--video 1] STEP...
+Usage: load_check.py URL OUT_DIR [--cores N] [--cpu-slowdown N] [--chrome-arg ARG]... [--video 1]
+                     [--device "Galaxy Tab S4"] STEP...
 Steps: start, reload (the page again, in the same browser profile: the second start), mark (the busy time from
        here), open:X,Y=FILE (tap the "Open other" button at X,Y and give FILE), waitload:S (until the page's thread
        was busy and is idle again, at most S seconds; a dialog that waits, e.g. "save changes?", looks loaded too),
@@ -35,6 +36,7 @@ cores = 8
 slowdown = 1
 chrome_args = []
 video = False
+device_name = "Pixel 7"
 while steps and steps[0].startswith("--"):
     if steps[0] == "--cores":
         cores = int(steps[1])
@@ -44,6 +46,8 @@ while steps and steps[0].startswith("--"):
         chrome_args.append(steps[1])
     elif steps[0] == "--video":
         video = steps[1] == "1"
+    elif steps[0] == "--device":
+        device_name = steps[1]
     steps = steps[2:]
 os.makedirs(out, exist_ok=True)
 t0 = time.time()
@@ -82,7 +86,7 @@ def state(page):
 
 
 with sync_playwright() as p:
-    device = dict(p.devices["Pixel 7"])
+    device = dict(p.devices[device_name])
     proxy = {"server": os.environ["HTTPS_PROXY"]} if url.startswith("https:") else None
     context = p.chromium.launch_persistent_context(
         os.path.join(out, "profile"), headless=False, proxy=proxy,

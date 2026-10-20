@@ -43,6 +43,10 @@ Row {
     property var customButtons: []
     property int defaultButtonId: 0
 
+    //! The width there is for the panel (a narrow window, see StandardDialog): the text wraps to it, and the buttons
+    //! are stacked when their row does not fit (see ButtonBox); 0: as wide as the text and the buttons need
+    property real availableWidth: 0
+
     property alias navigation: navPanel
 
     signal clicked(int buttonId, bool showAgain)
@@ -166,7 +170,12 @@ Row {
         readonly property real textsImplicitWidthBounded: Math.min(420, textsImplicitWidth)
 
         // But if the buttons need more space, then the dialog becomes as wide as necessary
-        width: Math.max(buttons.implicitWidth, textsImplicitWidthBounded)
+        readonly property real naturalWidth: Math.max(buttons.implicitWidth, textsImplicitWidthBounded)
+
+        // ... unless the window has no room for that (phones): what is left beside the icon
+        readonly property real roomWidth: root.availableWidth - (icon.visible ? icon.width + root.spacing : 0)
+
+        width: root.availableWidth > 0 ? Math.max(Math.min(naturalWidth, roomWidth), 0) : naturalWidth
 
         spacing: 18
 

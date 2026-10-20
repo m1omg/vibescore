@@ -70,6 +70,13 @@ T.Popup {
             item.height = Qt.binding(function() {
                 return root.fillsWindow ? root.spaceHeight - titleBar.height : item.implicitHeight
             })
+
+            // Dialogs that adapt their content to the width there is (an "availableWidth" property, see
+            // StyledDialogView) are told it, so that they are no wider than a narrow window (phones).
+            // (Whether the host is a dialog is set after the content is attached: not a condition here)
+            if (item.availableWidth !== undefined) {
+                item.availableWidth = Qt.binding(function() { return root.spaceWidth })
+            }
         }
     }
 
