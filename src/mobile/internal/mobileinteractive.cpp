@@ -222,12 +222,22 @@ void MobileInteractive::showProgress(const std::string& title, Progress progress
     // and nothing can be drawn until it is done: the busy dialog is drawn before this returns, together with the other
     // changes of the windows (e.g. the dialog that asked about saving the previous score is gone). It has no progress
     // bar or Cancel button, which could neither move nor react meanwhile.
+#ifdef Q_OS_WASM
+    // The page shows the dialog instead, with a spinner that the browser keeps turning meanwhile (a page that shows
+    // nothing moving for minutes, as a big score takes on a phone, looks frozen)
+    web::showBusy(title);
+#else
     UriQuery query(BUSY_URI);
     query.set("text", title);
     m_origin->open(query);
+#endif
 
     progress.finished().onReceive(this, [this](const ProgressResult&) {
+#ifdef Q_OS_WASM
+        web::showBusy(std::string());
+#else
         m_origin->close(BUSY_URI);
+#endif
     });
 
     drawWindowsNow(BUSY_DRAWN_TIMEOUT_MS);
