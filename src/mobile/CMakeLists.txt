@@ -67,9 +67,9 @@ if (OS_IS_WASM)
         internal/platform/web/webplatform.cpp
         internal/platform/web/webplatform.h
     )
-    # QWasmSuspendResumeControl (see web::fixNestedEventLoops)
-    find_package(Qt6 REQUIRED COMPONENTS CorePrivate)
-    target_link_libraries(mobile PRIVATE Qt::CorePrivate)
+    # QWasmSuspendResumeControl (see web::fixNestedEventLoops), QWindowSystemInterface (see web::watchPageVisibility)
+    find_package(Qt6 REQUIRED COMPONENTS CorePrivate GuiPrivate)
+    target_link_libraries(mobile PRIVATE Qt::CorePrivate Qt::GuiPrivate)
 endif()
 
 add_subdirectory(qml/MuseScore/Mobile)

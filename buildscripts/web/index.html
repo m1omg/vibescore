@@ -11,6 +11,13 @@
     <title>VibeScore</title>
     <link rel="icon" href="vibescore.svg" type="image/svg+xml">
     <link rel="manifest" href="manifest.json">
+    <!-- Added to the Home Screen of an iPhone or iPad: an app with its own icon and window (iOS takes neither from the
+         manifest before iOS 26). The status bar stays above the page. -->
+    <link rel="apple-touch-icon" href="apple-touch-icon.png">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-title" content="VibeScore">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
     <style>
         html, body { margin: 0; padding: 0; height: 100%; overflow: hidden; background: #F5F5F6;
                      font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; color: #111132; }
@@ -33,6 +40,7 @@
                   color: #3D2E00; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25); }
         #banner button { flex: none; border: none; border-radius: 4px; padding: 6px 10px; font: inherit;
                          background: rgba(0, 0, 0, 0.1); color: inherit; cursor: pointer; }
+        #install { display: none; font-size: 13px; max-width: 480px; }
         #notice { font-size: 12px; opacity: 0.6; max-width: 480px; }
         #notice a { color: inherit; }
     </style>
@@ -44,6 +52,10 @@
         <div id="status">Loading…</div>
         <div id="progress"><div></div></div>
         <div id="problem"></div>
+        <div id="install">
+            On iPad and iPhone: tap Share, then Add to Home Screen. VibeScore then opens full screen, keeps your scores
+            and comes back where you left off.
+        </div>
         <noscript>VibeScore needs JavaScript.</noscript>
         <div id="notice">
             Based on MuseScore Studio. Not affiliated with or endorsed by Muse Group.
@@ -81,6 +93,7 @@
             if (!loader.checkBrowser()) {
                 return;
             }
+            vibescoreShowInstallHint(document.querySelector('#install'));
 
             // The service worker makes the page cross-origin isolated, which the app with threads needs: the page is
             // loaded again once it is there (only the first time)

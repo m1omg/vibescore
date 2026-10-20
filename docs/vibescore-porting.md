@@ -259,6 +259,19 @@ fail (Qt's timers stopped until the next input event): `vsLengthenQtTimers()` ma
 Chromium keeps the compiled app in its code cache only when the fetched response itself is compiled (the loader
 counts the download on a copy).
 
+Installed app (from the Home Screen of an iPhone or iPad, or installed from Chrome/Edge; `vibescoreIsInstalled()`:
+`display-mode: standalone` or `navigator.standalone`): phones and tablets close such an app in the background to
+free memory, like any app, so it behaves like the mobile apps. The page tells the app when it is hidden or shown
+(`web::watchPageVisibility`: the application state becomes inactive or active, through Qt's queue of browser events),
+and the changes of the open score are autosaved when it is hidden (`ProjectAutoSaver`, as on Android and iOS; also in
+a browser tab, which a phone's browser may close too) and written to IndexedDB. At the next start, an installed app
+opens the scores that were open (`StartupScenario::restoreLastSession`); in a browser tab, closing the page is the
+usual way to quit, so it starts with the Scores page. An installed app asks for persistent storage at the start
+(browsers give it to such apps without asking; Safari also does not remove the data of a Home Screen app after 7
+days without use, as it does for a site); in a tab it is asked after the first save. iOS needs PNG icons
+(`apple-touch-icon.png`, made from the iOS app's icon) and, before iOS 26, the `apple-mobile-web-app-*` meta tags;
+in Safari on an iPhone or iPad (not from the Home Screen) the loading screen says how to add the app there.
+
 Keyboard focus: Qt for WebAssembly can leave the browser's focus on the page itself (seen when the Properties
 panel was opened), and the app then got no keys; `vibescoreKeepKeyboardFocus` gives the focus back to the
 window that is clicked, or that lost it to no element.

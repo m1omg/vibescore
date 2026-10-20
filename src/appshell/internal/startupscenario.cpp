@@ -25,6 +25,10 @@
 #include <QCoreApplication>
 #include <QFileInfo>
 
+#ifdef Q_OS_WASM
+#include <emscripten.h>
+#endif
+
 #include "async/async.h"
 #include "translation.h"
 
@@ -336,7 +340,18 @@ void StartupScenario::openScore(const project::ProjectFile& file)
 void StartupScenario::restoreLastSession()
 {
 #if defined(Q_OS_WASM)
-    // In the browser, closing the page is the usual way to quit, so the scores that were open then are not opened
+    // Started as an installed app (from the Home Screen of an iPhone or iPad, or installed from the browser; see
+    // vibescoreIsInstalled in vibescore-web.js): the system closes it in the background like a mobile app, so this is
+    // the usual way back to it, as on Android and iOS
+    const bool isInstalledApp = EM_ASM_INT({
+        return window.vibescoreIsInstalled && window.vibescoreIsInstalled() ? 1 : 0;
+    }) != 0;
+    if (isInstalledApp) {
+        sessionsManager()->restore();
+        return;
+    }
+
+    // In a browser tab, closing the page is the usual way to quit, so the scores that were open then are not opened
     // again at every start (a big one takes long to open): they are in the library, and their unsaved changes are
     // kept and come back when they are opened. Only a new score that was never saved is opened again, as there is
     // no other way back to it

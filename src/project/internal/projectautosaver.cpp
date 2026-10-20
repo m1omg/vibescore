@@ -57,8 +57,9 @@ void ProjectAutoSaver::init()
         m_timer.setInterval(minutes * 60000);
     });
 
-#if defined(Q_OS_ANDROID) || defined(Q_OS_IOS)
-    // Mobile systems may close apps in the background without notice: save as soon as the app is left
+#if defined(Q_OS_ANDROID) || defined(Q_OS_IOS) || defined(Q_OS_WASM)
+    // Mobile systems may close apps in the background without notice: save as soon as the app is left (in the
+    // browser: the page is hidden, see web::watchPageVisibility; a phone or tablet may close it then)
     QObject::connect(qApp, &QGuiApplication::applicationStateChanged, &m_timer, [this](Qt::ApplicationState state) {
         if (state != Qt::ApplicationActive && configuration()->isAutoSaveEnabled()) {
             onTrySave();
