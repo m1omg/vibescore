@@ -326,6 +326,8 @@ if (CC_IS_EMCC)
     # compiler then compiles it again in the background: >1 GB of memory and ~20 s of a desktop CPU (minutes on a
     # phone or tablet), which froze the start on tablets
     target_link_options(MuseScoreStudio PRIVATE "SHELL:-s BINARYEN_EXTRA_PASSES=--one-caller-inline-max-function-size=1000")
+    # The functions' names (VibeScore.js.symbols), which the packaging needs (see SetupWebPackaging.cmake)
+    target_link_options(MuseScoreStudio PRIVATE "--emit-symbol-map")
 
     if (VS_WEB_THREADS)
         # The threads (web workers) are started with the app: the audio engine's (its driver and its mixer's pool,
