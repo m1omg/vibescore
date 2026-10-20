@@ -167,6 +167,15 @@ void syncFileSystem()
         }
     });
 }
+
+void showBusy(const std::string& title)
+{
+    EM_ASM({
+        if (window.vibescoreBusy) {
+            window.vibescoreBusy(UTF8ToString($0));
+        }
+    }, title.c_str());
+}
 }
 
 EMSCRIPTEN_BINDINGS(vibescore) {

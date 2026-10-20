@@ -206,6 +206,11 @@ answered stayed on the screen meanwhile, as if the app had frozen. Opening a sco
 (`ProjectActionsController::doOpenProject`, `MobileInteractive::showProgress`), and waits until each window has drawn
 two frames (an event loop until `QQuickWindow::frameSwapped`, at most 1 s) before it starts: a browser shows a drawn
 frame at its next refresh, which can come after a task that starts at once (Firefox), and asks for the next frame then.
+On the web that dialog is the page's (`web::showBusy`, `vibescoreBusy`, `#busy` in `index.html`), with a spinner
+that the browser keeps turning on its compositor thread (a CSS transform animation) while the app's thread is busy:
+a big score takes minutes on a phone (Dawn x60, 1140 measures on 13 staves: 16 s on a desktop CPU, Dawn x150: 44 s),
+and a page that shows nothing moving that long looks frozen; the dialog also takes the taps meanwhile, which the app
+would otherwise get after the work.
 
 Threads: the app with threads needs shared memory (SharedArrayBuffer), which browsers give only to a cross-origin
 isolated page (headers COOP/COEP, which GitHub Pages does not send). The service worker `vibescore-sw.js` adds them

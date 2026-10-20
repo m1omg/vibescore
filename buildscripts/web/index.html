@@ -53,6 +53,22 @@
                         background: rgba(255, 255, 255, 0.2); color: inherit; cursor: pointer; }
         #notice { font-size: 12px; opacity: 0.6; max-width: 480px; }
         #notice a { color: inherit; }
+        /* The app is busy for a while (vibescoreBusy): a spinner that keeps turning while the app's thread is busy.
+           Taps go nowhere meanwhile (the app would get them after the work) */
+        #busy { position: absolute; inset: 0; z-index: 15; display: none; align-items: center; justify-content: center;
+                padding: 16px; background: rgba(0, 0, 0, 0.3); }
+        #busy > div { display: flex; align-items: center; gap: 16px; max-width: min(400px, calc(100vw - 48px));
+                      box-sizing: border-box; padding: 20px 24px; border-radius: 8px; background: #F5F5F6;
+                      color: #111132; box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3); font-size: 15px; }
+        @media (prefers-color-scheme: dark) { #busy > div { background: #2D2D30; color: #EBEBEB; } }
+        #busy .vs-spinner { flex: none; width: 28px; height: 28px; border-radius: 50%; box-sizing: border-box;
+                            border: 3px solid rgba(75, 43, 209, 0.25); border-top-color: #4B2BD1;
+                            animation: vs-spin 0.9s linear infinite; will-change: transform; }
+        @media (prefers-color-scheme: dark) { #busy .vs-spinner { border-color: rgba(255, 255, 255, 0.2);
+                                                                  border-top-color: #A99BF5; } }
+        @keyframes vs-spin { to { transform: rotate(360deg); } }
+        #busy .vs-title { display: block; font-weight: 600; overflow-wrap: anywhere; }
+        #busy .vs-hint { display: block; font-size: 13px; opacity: 0.75; margin-top: 4px; }
     </style>
 </head>
 <body>
@@ -79,6 +95,9 @@
     <div id="banner" role="alert"><span></span><button onclick="this.parentElement.style.display = 'none'">OK</button></div>
     <!-- The sound, while the app cannot play it yet (see vsShowSound) -->
     <div id="sound" role="status"><span></span><button></button></div>
+    <!-- The app is busy for a while, e.g. opening a big score (see vibescoreBusy) -->
+    <div id="busy" role="alert"><div><div class="vs-spinner"></div><div><span class="vs-title"></span>
+        <span class="vs-hint">A big score takes a while, on a phone a few minutes.</span></div></div></div>
 
     <!-- The build (written by buildscripts/web/stamp_page.py): the address of each file of the app has the file's
          version (a hash of its content), so that the browser loads the files of this build, and keeps a file across

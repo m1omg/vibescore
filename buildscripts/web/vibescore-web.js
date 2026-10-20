@@ -946,6 +946,19 @@ function vibescoreAudioCreated(ctx) {
     });
 }
 
+// The app is busy for a while (web::showBusy: e.g. "Opening “name”…" before a big score loads, which takes minutes on
+// a phone): the page shows the title with a spinner, which the browser keeps turning on its compositor thread while
+// the app's thread is busy and nothing else of the page can change. With no title, the dialog goes away
+function vibescoreBusy(title) {
+    const busy = document.querySelector('#busy');
+    if (title) {
+        busy.querySelector('.vs-title').textContent = title;
+        busy.style.display = 'flex';
+    } else {
+        busy.style.display = 'none';
+    }
+}
+
 // Qt for WebAssembly can leave the keyboard focus on the page itself, outside the app, when its windows change (seen
 // when the Properties panel was opened): then the app gets no keys, not even after a click into the score. A click
 // or tap into the app gives the focus back to the window that was clicked, and focus that a window of the app lost to

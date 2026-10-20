@@ -39,6 +39,11 @@ void printPdf(const QString& path, const QString& jobName);
 //! Writes the folders kept in the browser's storage (IndexedDB) back now, e.g. after a score was saved
 void syncFileSystem();
 
+//! The page shows that the app is busy (e.g. "Opening “name”…", before a big score loads), with a spinner that the
+//! browser keeps turning while the app's thread is busy and nothing of the app can be drawn (see vibescore-web.js);
+//! an empty title takes it away again
+void showBusy(const std::string& title);
+
 //! Works around a bug of Qt 6.10 that breaks the event processing after a dialog that waits for an answer
 //! (a nested event loop); call it once the application object exists
 void fixNestedEventLoops();
