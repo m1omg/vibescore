@@ -166,7 +166,12 @@ the live threads app, `devtools/load_check.py`; the stand-ins are `devtools/mult
   - The migration question stays and fits a phone (`MigrationDialog` uses `availableWidth`, and its texts wrap).
   - The page's "Opening…" box steps aside for any dialog that waits for an answer (`MobileInteractive::waitForUser`).
   - The browser's file chooser shows MuseScore files first (`browserNameFilter`).
-  - This build was checked against the previous one with the same measurement, from a `workflow_dispatch` build of the branch (which does not deploy), before merging.
+  - Merged as [m1omg/vibescore#11](https://github.com/m1omg/vibescore/pull/11). Starting "Build: Web" on a branch (`workflow_dispatch`) is refused to this integration (403), so the threads build could only be measured after the merge, from its CI artifacts. It starts, opens and plays like the previous one: first-start opening of Dawn took 13.7 s, 11.5 s and 14.2 s vs 14.3 s, 11.4 s and 13.4 s; there were 0 missing frames during playback.
+- **"Playback stuttered like Quake on a Cyrix 486"** on the S24 after #9's deploy. This was not reproduced here.
+  - `devtools/gap_check.py` taps Play as soon as the button is enabled after a fresh first start, and records the output's loudness every 20 ms. It found 0 gaps and 0 missing frames in either build (4× CPU slowdown, 8 cores).
+  - Underruns that `load_check.py` counts right after a score opens are the instruments' sounds loading, while Play is still disabled.
+  - Most likely cause: a phone's first start after an update. Chrome runs the new wasm on its baseline compiler while it optimizes in the background.
+  - A suspect for a real phone: the threads player keeps only ~64 ms of audio ready (`AHEAD_FRAMES` in `webaudiodriver.cpp`), so any hiccup of the render thread longer than that is a gap. If the user still hears stutter on the second start after an update, a reserve that grows after underruns (with the cursor's lead in mind) is the next step.
 
 ## Building and testing in a cloud container
 
