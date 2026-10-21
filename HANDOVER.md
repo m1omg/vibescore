@@ -150,15 +150,6 @@ the live threads app, `devtools/load_check.py`; the stand-ins are `devtools/mult
 - [m1omg/vibescore#8](https://github.com/m1omg/vibescore/pull/8): the "save changes?" dialog fits a phone's screen
   (text wrapped, buttons stacked); `load_check.py --device`.
 
-### Third session (2026-10-21)
-
-- **The user's report.** A minuet saved by MuseScore 2.0.2 stayed at "Opening…" for good.
-- **Cause.** MuseScore asked about updating the old score (the migration dialog, `openSync`) *during* the load. The page's "Opening…" box from #7 lay over it and took every tap.
-- **Fix 1.** The page's box now steps aside for any dialog that waits for an answer, and comes back afterwards: `MobileInteractive::waitForUser`, used by `openSync`, `questionSync` and the other `…Sync` methods.
-- **Fix 2.** Phones and tablets no longer ask about migrating. The 590 px desktop dialog is skipped, and the score is updated with the dialog's defaults (`ProjectMigrator::askAboutMigration`).
-- **Requested by the user: the file chooser shows MuseScore files first.** The browser's chooser now gets the app's name filters (`browserNameFilter`), with "MuseScore files (*.mscz)" first.
-  - Chrome on Android still shows all files: Android does not know `.mscz`.
-
 ## Building and testing in a cloud container
 
 - **Toolchain** (about 3.6 GB, under a minute to install), as in `build_web.yml`:

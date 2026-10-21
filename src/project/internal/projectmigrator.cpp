@@ -34,7 +34,6 @@
 
 #include "io/file.h"
 
-#include "app_config.h"
 #include "muse_framework_config.h"
 
 #include "log.h"
@@ -101,19 +100,6 @@ Ret ProjectMigrator::migrateEngravingProjectIfNeed(engraving::EngravingProjectPt
 
 Ret ProjectMigrator::askAboutMigration(MigrationOptions& out, const QString& appVersion, MigrationType migrationType)
 {
-#ifdef MUE_CONFIGURATION_IS_APPMOBILE
-    //! NOTE VibeScore: phones and tablets do not ask. The dialog is the desktop's (590 px wide, about the engraving
-    //! fonts, with a video), wider than a phone, and opens while the score loads; the score is updated with the
-    //! dialog's own choices (the dialog for files of 3.6 does not offer the new fonts)
-    UNUSED(appVersion);
-
-    out.appVersion = mu::engraving::Constants::MSC_VERSION;
-    out.isApplyMigration = true;
-    if (migrationType == MigrationType::Ver_3_6) {
-        out.isApplyLeland = false;
-        out.isApplyEdwin = false;
-    }
-#else
     UriQuery query(MIGRATION_DIALOG_URI);
     query.addParam("appVersion", Val(appVersion));
     query.addParam("migrationType", Val(migrationType));
@@ -144,7 +130,6 @@ Ret ProjectMigrator::askAboutMigration(MigrationOptions& out, const QString& app
     out.isApplyLeland = vals.value("isApplyLeland").toBool();
     out.isApplyEdwin = vals.value("isApplyEdwin").toBool();
     out.isRemapPercussion = vals.value("isRemapPercussion").toBool();
-#endif
 #endif
 
     return true;
