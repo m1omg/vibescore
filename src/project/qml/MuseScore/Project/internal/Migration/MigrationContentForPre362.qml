@@ -68,26 +68,38 @@ ColumnLayout {
         }
     }
 
+    // The texts wrap where the dialog is narrower than they are (phones)
     ColumnLayout {
         id: header
         spacing: 8
+
+        Layout.fillWidth: true
 
         StyledTextLabel {
             id: headerTitle
             font: ui.theme.tabBoldFont
             text: qsTrc("project/migration", "This file was last saved in MuseScore %1").arg(root.appVersion)
+            wrapMode: Text.WordWrap
+            horizontalAlignment: Text.AlignLeft
+
+            Layout.fillWidth: true
         }
 
         StyledTextLabel {
             id: headerSubtitle
             text: qsTrc("project/migration", "Select the engraving improvements you would like to apply to your score")
+            wrapMode: Text.WordWrap
+            horizontalAlignment: Text.AlignLeft
+
+            Layout.fillWidth: true
         }
     }
 
     Rectangle {
         id: imageRect
         color: "#F9F9F9"
-        height: 178
+        // As tall as the picture is at this width (a narrow dialog), at most 178
+        height: Math.min(178, Math.round((width - 20) * 316 / 940) + 20)
         radius: 10
 
         border.width: 1
@@ -97,9 +109,9 @@ ColumnLayout {
 
         Image {
             source: "migration.png"
-            height: 158
             fillMode: Image.PreserveAspectFit
-            anchors.centerIn: parent
+            anchors.fill: parent
+            anchors.margins: 10
         }
     }
 
@@ -107,10 +119,14 @@ ColumnLayout {
         id: checkboxes
         spacing: 8
 
+        Layout.fillWidth: true
+
         CheckBox {
             id: lelandOption
             text: qsTrc("project/migration", "Our new notation font, Leland")
             checked: root.isApplyLeland
+
+            Layout.fillWidth: true
 
             navigation.panel: root.navigationPanel
             navigation.row: 1
@@ -124,6 +140,8 @@ ColumnLayout {
             id: edwinOption
             text: qsTrc("project/migration", "Our new text font, Edwin")
             checked: root.isApplyEdwin
+
+            Layout.fillWidth: true
 
             navigation.panel: root.navigationPanel
             navigation.row: 2
@@ -139,6 +157,8 @@ ColumnLayout {
                   .arg("https://musescore.org/node/367337") // non-'/en' URL should redirect to translated version, if available
             checked: root.isRemapPercussion
 
+            Layout.fillWidth: true
+
             navigation.panel: root.navigationPanel
             navigation.row: 3
 
@@ -152,9 +172,15 @@ ColumnLayout {
         id: info
         spacing: 12
 
+        Layout.fillWidth: true
+
         StyledTextLabel {
             id: affectedLabel
             text: qsTrc("project/migration", "Please note: score layouts will be affected by improvements to MuseScore Studio")
+            wrapMode: Text.WordWrap
+            horizontalAlignment: Text.AlignLeft
+
+            Layout.fillWidth: true
         }
 
         FlatButton {

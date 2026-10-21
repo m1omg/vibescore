@@ -152,7 +152,13 @@ USB), iOS `Documents` (shown by the Files app), the web: IndexedDB. Save, autosa
 desktop. `MobileInteractive` (on top of the default `IInteractive`) opens files with the system's document picker
 (the browser's file chooser on the web) and imports them, saves scores into the library, and shares exports
 (Android share sheet, iOS activity view; downloads on the web). Home has a Library tab with all the library's
-scores (rename, duplicate, delete, share).
+scores (rename, duplicate, delete, share). The native pickers get no name filters (Android does not know the MIME
+types of most score formats, and would hide those files); the browser's chooser gets the app's (`browserNameFilter`),
+with MuseScore files first: Chrome and Edge on the desktop (`showOpenFilePicker`) show those at first, Firefox and
+Safari offer all the score formats, and Chrome on Android still shows all files (an extension that Android does not
+know lets the user pick any file). Extensions that `showOpenFilePicker` rejects (`*.mscz~`) are left out: Chrome would
+open no chooser at all. A score from MuseScore 3.6 or older asks, as on the desktop, whether to update its engraving
+(`MigrationDialog`); in a narrow window it is as wide as the window (`availableWidth`), its texts wrapped.
 
 ### Audio and MIDI
 
@@ -214,7 +220,9 @@ On the web that dialog is the page's (`web::showBusy`, `vibescoreBusy`, `#busy` 
 that the browser keeps turning on its compositor thread (a CSS transform animation) while the app's thread is busy:
 a big score takes minutes on a phone (Dawn x60, 1140 measures on 13 staves: 16 s on a desktop CPU, Dawn x150: 44 s),
 and a page that shows nothing moving that long looks frozen; the dialog also takes the taps meanwhile, which the app
-would otherwise get after the work.
+would otherwise get after the work. A dialog that waits for an answer during the work (e.g. whether to update an old
+score, or "open anyway?") would be under it and could not be answered: the page's dialog steps aside meanwhile, and
+comes back for the rest of the work (`MobileInteractive::waitForUser`).
 
 Threads: the app with threads needs shared memory (SharedArrayBuffer), which browsers give only to a cross-origin
 isolated page (headers COOP/COEP, which GitHub Pages does not send). The service worker `vibescore-sw.js` adds them
