@@ -120,9 +120,6 @@ public:
     muse::RetVal<muse::Val> openSync(const muse::UriQuery& uri) override;
 
 private:
-    template<typename ShowDialog>
-    auto waitForUser(ShowDialog&& showDialog);
-
     muse::io::path_t selectScorePathInLibrary(const muse::io::path_t& suggestedPath, bool confirmOverwrite);
     muse::io::path_t makeExportPath(const muse::io::path_t& suggestedPath);
     QStringList lastExportedFiles(const muse::io::path_t& exportPath) const;
@@ -130,9 +127,5 @@ private:
     std::shared_ptr<muse::IInteractive> m_origin;
     ScoresLibrary m_library;
     QDateTime m_lastExportTime;
-#ifdef Q_OS_WASM
-    //! The title of the page's busy dialog while it is shown (see showProgress)
-    std::string m_busyTitle;
-#endif
 };
 }
