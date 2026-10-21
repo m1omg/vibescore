@@ -98,14 +98,15 @@ ColumnLayout {
     Rectangle {
         id: imageRect
         color: "#F9F9F9"
-        // As tall as the picture is at this width (a narrow dialog), at most 178
-        height: Math.min(178, Math.round((width - 20) * 316 / 940) + 20)
         radius: 10
 
         border.width: 1
         border.color: ui.theme.strokeColor
 
         Layout.fillWidth: true
+        // As tall as the picture is at the width the layout gives (a narrow dialog), at most 178 (the layout sets the
+        // height itself: a binding of the height would be overwritten)
+        Layout.preferredHeight: Math.min(178, Math.round((width - 20) * 316 / 940) + 20)
 
         Image {
             source: "migration.png"
