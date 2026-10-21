@@ -34,6 +34,7 @@
 #elif defined(Q_OS_IOS)
 #include "platform/ios/iosplatform.h"
 #elif defined(Q_OS_WASM)
+#include <QRegularExpression>
 #include <QTemporaryDir>
 #include "platform/web/webplatform.h"
 #endif
@@ -54,10 +55,52 @@ using namespace muse;
 #endif
 
 #ifdef Q_OS_WASM
-//! The browser's file chooser: the chosen file is copied into the library (scores) or the cache folder
-static void openFileFromDevice(const ScoresLibrary& library, const std::function<void(const io::path_t&)>& done)
+//! The types of files that the browser's file chooser offers, from the app's name filters ("MuseScore files (*.mscz)",
+//! ...): MuseScore files first, which the chooser shows at first where it has a list of types (Chrome and Edge on the
+//! desktop; Firefox and Safari offer all the types at once, and Chrome on Android shows all files, as Android does not
+//! know the score formats). A pattern that the browser rejects is left out (showOpenFilePicker throws a TypeError,
+//! and no chooser opens): an extension is a dot, then letters, digits, "+" and ".", at most 16 characters (*.mscz~ is
+//! not). Parentheses in a description become brackets: Qt takes the first parentheses for the patterns
+static QString browserNameFilter(const std::vector<std::string>& filter)
 {
-    web::openFile(QString(), [&library, done](const QString& fileName, const QByteArray& content) {
+    static const QRegularExpression NAME_FILTER(QStringLiteral("^(.*)\\(([^()]*)\\)\\s*$"));
+    static const QRegularExpression VALID_PATTERN(QStringLiteral("^\\*\\.[A-Za-z0-9+.]{0,14}[A-Za-z0-9+]$"));
+
+    QStringList result;
+    for (const std::string& nameFilter : filter) {
+        const QRegularExpressionMatch match = NAME_FILTER.match(QString::fromStdString(nameFilter));
+        if (!match.hasMatch()) {
+            continue;
+        }
+
+        QStringList patterns;
+        for (const QString& pattern : match.captured(2).split(u' ', Qt::SkipEmptyParts)) {
+            if (VALID_PATTERN.match(pattern).hasMatch()) {
+                patterns << pattern;
+            }
+        }
+        if (patterns.isEmpty()) {
+            continue;
+        }
+
+        QString description = match.captured(1).trimmed();
+        description.replace(u'(', u'[').replace(u')', u']');
+        const QString type = description + QStringLiteral(" (") + patterns.join(u' ') + u')';
+        if (patterns == QStringList { QStringLiteral("*.mscz") }) {
+            result.prepend(type);
+        } else {
+            result.append(type);
+        }
+    }
+
+    return result.join(QStringLiteral(";;"));
+}
+
+//! The browser's file chooser: the chosen file is copied into the library (scores) or the cache folder
+static void openFileFromDevice(const ScoresLibrary& library, const std::vector<std::string>& filter,
+                               const std::function<void(const io::path_t&)>& done)
+{
+    web::openFile(browserNameFilter(filter), [&library, done](const QString& fileName, const QByteArray& content) {
         if (fileName.isEmpty()) {
             done(io::path_t());
             return;
@@ -78,17 +121,18 @@ static void openFileFromDevice(const ScoresLibrary& library, const std::function
 }
 
 //! The same, waiting for the user (a nested event loop: Asyncify)
-static io::path_t openFileFromDeviceSync(const ScoresLibrary& library)
+static io::path_t openFileFromDeviceSync(const ScoresLibrary& library, const std::vector<std::string>& filter)
 {
     QEventLoop loop;
     io::path_t result;
-    openFileFromDevice(library, [&loop, &result](const io::path_t& path) {
+    openFileFromDevice(library, filter, [&loop, &result](const io::path_t& path) {
         result = path;
         loop.quit();
     });
     loop.exec();
     return result;
 }
+
 #endif
 
 static const Uri SAVE_TO_LIBRARY_URI("musescore://mobile/savetolibrary");
@@ -225,6 +269,7 @@ void MobileInteractive::showProgress(const std::string& title, Progress progress
 #ifdef Q_OS_WASM
     // The page shows the dialog instead, with a spinner that the browser keeps turning meanwhile (a page that shows
     // nothing moving for minutes, as a big score takes on a phone, looks frozen)
+    m_busyTitle = title;
     web::showBusy(title);
 #else
     UriQuery query(BUSY_URI);
@@ -234,6 +279,7 @@ void MobileInteractive::showProgress(const std::string& title, Progress progress
 
     progress.finished().onReceive(this, [this](const ProgressResult&) {
 #ifdef Q_OS_WASM
+        m_busyTitle.clear();
         web::showBusy(std::string());
 #else
         m_origin->close(BUSY_URI);
@@ -243,9 +289,32 @@ void MobileInteractive::showProgress(const std::string& title, Progress progress
     drawWindowsNow(BUSY_DRAWN_TIMEOUT_MS);
 }
 
+//! A dialog that waits for the user (a nested event loop), which can come while the app is busy: e.g. a score being
+//! opened turns out to be damaged ("Open anyway?"). The page's busy dialog would lie over it and take its taps, and the
+//! app would wait forever: it steps aside meanwhile, and comes back for the rest of the work. The native apps' busy
+//! dialog is in the window, under the dialogs that open after it
+template<typename ShowDialog>
+auto MobileInteractive::waitForUser(ShowDialog&& showDialog)
+{
+#ifdef Q_OS_WASM
+    if (!m_busyTitle.empty()) {
+        web::showBusy(std::string());
+        auto result = showDialog();
+        if (!m_busyTitle.empty()) {
+            web::showBusy(m_busyTitle);
+            // The answered dialog goes away, and the busy dialog appears, before the work goes on
+            drawWindowsNow(BUSY_DRAWN_TIMEOUT_MS);
+        }
+        return result;
+    }
+#endif
+    return showDialog();
+}
+
 // Files
 //! The system document picker shows the documents of all apps and cloud storage. Name filters are not
 //! passed on: Android does not know the MIME types of most score formats, and would hide those files.
+//! The browser's file chooser gets them (see browserNameFilter).
 
 async::Promise<io::path_t> MobileInteractive::selectOpeningFile(const std::string& title, const io::path_t& dir,
                                                                 const std::vector<std::string>& filter)
@@ -285,10 +354,9 @@ async::Promise<io::path_t> MobileInteractive::selectOpeningFile(const std::strin
 #elif defined(Q_OS_WASM)
     UNUSED(title);
     UNUSED(dir);
-    UNUSED(filter);
 
-    return async::make_promise<io::path_t>([this](auto resolve, auto reject) {
-        openFileFromDevice(m_library, [resolve, reject](const io::path_t& path) {
+    return async::make_promise<io::path_t>([this, filter](auto resolve, auto reject) {
+        openFileFromDevice(m_library, filter, [resolve, reject](const io::path_t& path) {
             if (path.empty()) {
                 Ret ret = make_ret(Ret::Code::Cancel);
                 (void)reject(ret.code(), ret.text());
@@ -317,10 +385,9 @@ io::path_t MobileInteractive::selectOpeningFileSync(const std::string& title, co
 #elif defined(Q_OS_WASM)
     UNUSED(title);
     UNUSED(dir);
-    UNUSED(filter);
     UNUSED(options);
 
-    return openFileFromDeviceSync(m_library);
+    return openFileFromDeviceSync(m_library, filter);
 #else
     return m_origin->selectOpeningFileSync(title, dir, filter, options);
 #endif
@@ -346,11 +413,10 @@ io::paths_t MobileInteractive::selectOpeningFilesSync(const std::string& title, 
 #elif defined(Q_OS_WASM)
     UNUSED(title);
     UNUSED(dir);
-    UNUSED(filter);
     UNUSED(options);
 
     // One file at a time in the browser
-    const io::path_t path = openFileFromDeviceSync(m_library);
+    const io::path_t path = openFileFromDeviceSync(m_library, filter);
     return path.empty() ? io::paths_t() : io::paths_t { path };
 #else
     return m_origin->selectOpeningFilesSync(title, dir, filter, options);
@@ -578,28 +644,38 @@ Ret MobileInteractive::revealInFileBrowser(const io::path_t& filePath) const
 IInteractive::Result MobileInteractive::questionSync(const std::string& contentTitle, const Text& text, const ButtonDatas& buttons,
                                                      int defBtn, const Options& options, const std::string& dialogTitle)
 {
-    return m_origin->questionSync(contentTitle, text, buttons, defBtn, options, dialogTitle);
+    return waitForUser([&]() {
+        return m_origin->questionSync(contentTitle, text, buttons, defBtn, options, dialogTitle);
+    });
 }
 
 IInteractive::Result MobileInteractive::infoSync(const std::string& contentTitle, const Text& text, const ButtonDatas& buttons,
                                                  int defBtn, const Options& options, const std::string& dialogTitle)
 {
-    return m_origin->infoSync(contentTitle, text, buttons, defBtn, options, dialogTitle);
+    return waitForUser([&]() {
+        return m_origin->infoSync(contentTitle, text, buttons, defBtn, options, dialogTitle);
+    });
 }
 
 IInteractive::Result MobileInteractive::warningSync(const std::string& contentTitle, const Text& text, const ButtonDatas& buttons,
                                                     int defBtn, const Options& options, const std::string& dialogTitle)
 {
-    return m_origin->warningSync(contentTitle, text, buttons, defBtn, options, dialogTitle);
+    return waitForUser([&]() {
+        return m_origin->warningSync(contentTitle, text, buttons, defBtn, options, dialogTitle);
+    });
 }
 
 IInteractive::Result MobileInteractive::errorSync(const std::string& contentTitle, const Text& text, const ButtonDatas& buttons,
                                                   int defBtn, const Options& options, const std::string& dialogTitle)
 {
-    return m_origin->errorSync(contentTitle, text, buttons, defBtn, options, dialogTitle);
+    return waitForUser([&]() {
+        return m_origin->errorSync(contentTitle, text, buttons, defBtn, options, dialogTitle);
+    });
 }
 
 RetVal<Val> MobileInteractive::openSync(const UriQuery& uri)
 {
-    return m_origin->openSync(uri);
+    return waitForUser([&]() {
+        return m_origin->openSync(uri);
+    });
 }

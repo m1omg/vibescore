@@ -150,6 +150,24 @@ the live threads app, `devtools/load_check.py`; the stand-ins are `devtools/mult
 - [m1omg/vibescore#8](https://github.com/m1omg/vibescore/pull/8): the "save changes?" dialog fits a phone's screen
   (text wrapped, buttons stacked); `load_check.py --device`.
 
+### Third session (2026-10-21)
+
+- **The user's report.** A minuet saved by MuseScore 2.0.2 stayed at "Opening…" for good.
+  - Cause: MuseScore asks whether to update an old score (the migration dialog, `openSync`) *during* the load, and the page's "Opening…" box from #7 lay over it and took every tap.
+- **First fix, reverted.** [m1omg/vibescore#9](https://github.com/m1omg/vibescore/pull/9) updated old scores without asking on mobile. The user then reported slow loading and stuttering sound, and asked to undo it at once: [m1omg/vibescore#10](https://github.com/m1omg/vibescore/pull/10).
+  - The revert's build was byte-identical to the build before #9: the builds are reproducible, and the wasm versions are the same.
+- **Measured afterwards.** The CI artifacts of both builds, served locally, under the same phone-like conditions (`load_check.py --cores 8 --cpu-slowdown 4`):
+  - first start: 26.2 s for both;
+  - opening Dawn: 11.4 s vs 12.4 s on the first start, 7.4 s for both on the second start;
+  - audio: 0 missing frames during 15 s of playback in both.
+  - So #9 was not slower. What the user saw was most likely the first start after an update, which **every deploy** costs a phone: Chrome downloads the ~124 MB threads wasm again, and runs it on its baseline compiler until the optimizing compiler is done, which takes minutes on a phone (slower loading, and possibly stuttering sound meanwhile).
+  - Keep deploys few, and judge speed on the second start after one.
+- **Second fix**, as the user chose:
+  - The migration question stays and fits a phone (`MigrationDialog` uses `availableWidth`, and its texts wrap).
+  - The page's "Opening…" box steps aside for any dialog that waits for an answer (`MobileInteractive::waitForUser`).
+  - The browser's file chooser shows MuseScore files first (`browserNameFilter`).
+  - This build was checked against the previous one with the same measurement, from a `workflow_dispatch` build of the branch (which does not deploy), before merging.
+
 ## Building and testing in a cloud container
 
 - **Toolchain** (about 3.6 GB, under a minute to install), as in `build_web.yml`:

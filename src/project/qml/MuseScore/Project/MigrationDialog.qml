@@ -46,7 +46,7 @@ StyledDialogView {
     property bool isRemapPercussion: true
     property bool isAskAgain: true
 
-    contentHeight: {
+    readonly property real fullContentHeight: {
         switch (root.migrationType) {
         case MigrationType.Pre_3_6: return 533 // 517 just fits, then add 16
         case MigrationType.Ver_3_6: return 271 // 255 just fits, then add 16
@@ -55,7 +55,7 @@ StyledDialogView {
         return 600
     }
 
-    contentWidth: {
+    readonly property real fullContentWidth: {
         switch (root.migrationType) {
         case MigrationType.Pre_3_6: return 590
         case MigrationType.Ver_3_6: return 491
@@ -63,6 +63,14 @@ StyledDialogView {
         }
         return 600
     }
+
+    //! In a narrow window (phones), the dialog is as wide as there is room for (availableWidth, set by the host of a
+    //! single window, see InWindowHost.qml), with a gutter beside it, and as tall as its wrapped content
+    readonly property real roomWidth: root.availableWidth > 0 ? Math.max(root.availableWidth - 2 * root.margins - 2 * 16, 0) : 0
+    readonly property bool isNarrowed: root.roomWidth > 0 && root.roomWidth < root.fullContentWidth
+
+    contentHeight: root.isNarrowed ? content.implicitHeight : root.fullContentHeight
+    contentWidth: root.isNarrowed ? root.roomWidth : root.fullContentWidth
 
     //! NOTE Different dialogs for different migration versions
     onOpened: {
@@ -100,6 +108,8 @@ StyledDialogView {
     }
 
     ColumnLayout {
+        id: content
+
         spacing: 0
         anchors.fill: parent
 
