@@ -170,8 +170,13 @@ open no chooser at all. A score from MuseScore 3.6 or older asks, as on the desk
 - Both: Preferences → Audio & MIDI → "Connect Bluetooth MIDI device…" runs the action `midi-connect-bluetooth`
   (`BluetoothMidiController` in the mobile module).
 - Web: `WebAudioDriver`. With threads, the engine runs in the driver mode on a thread of the driver, which keeps a
-  ring of audio in the shared memory filled ~64 ms ahead; the AudioWorklet plays it from there (the page's thread does
-  nothing for the audio), and the mixer renders the instruments in a pool of up to 4 threads. Without threads the
+  ring of audio in the shared memory filled ahead of the player: what the browser takes at once (its output buffer,
+  `AudioContext.baseLatency`) plus ~64 ms, and 1024 frames more each time the player ran out while music played (a
+  weak or busy device), up to 8192 frames (~170 ms; the sound then follows the user, and the cursor leads it, by that
+  much). The AudioWorklet plays it from there (the page's thread does nothing for the audio), and the mixer renders the
+  instruments in a pool of up to 4 threads. In the browser's console, `vibescoreInstance.vibescoreAudio.stats()` tells
+  how the ring fares (reserve, the least it held while music played, the longest rendering of a block, the silence
+  played) and `resetStats()` starts over; `?audioahead=FRAMES` in the page's address sets the reserve. Without threads the
   engine renders on the main thread, a little ahead of time, and the blocks are sent to the AudioWorklet. Browsers
   play audio after a user gesture; until then the engine runs in real time and its audio is dropped (the cursor
   moves, nothing is heard). The AudioContext is resumed at taps, clicks and keys (on a touch screen Chrome counts the
@@ -211,7 +216,12 @@ regularly and when the page is hidden. The start waits for IndexedDB (the app's 
 database that the browser does not open in 10 seconds fails instead, and the app starts without the saved data
 and says so. The app is linked with Asyncify, so that dialogs that wait for an answer
 (nested event loops) work; `web::fixNestedEventLoops()` works around a Qt 6.10 bug that stopped the event processing
-after such a dialog. Nothing is drawn while the app's thread is busy, e.g. opening a big score: a dialog that was just
+after such a dialog. It also keeps, on each browser event that Qt queues, what the browser gives only while it
+delivers the event (target, related target, composed path, a mouse event's offset): Qt handles a queued event after
+the earlier ones of its batch returned, which can be much later (one of them opened a score, or a dialog), and Qt's
+windows are in a shadow DOM, whose events have no target afterwards; Qt then threw on a pointer event
+(`dom::mapPoint`), which stopped the event processing for good (a computer's mouse only: the app froze after the
+question about updating an old score). Nothing is drawn while the app's thread is busy, e.g. opening a big score: a dialog that was just
 answered stayed on the screen meanwhile, as if the app had frozen. Opening a score shows "Opening “name”…" first
 (`ProjectActionsController::doOpenProject`, `MobileInteractive::showProgress`), and waits until each window has drawn
 two frames (an event loop until `QQuickWindow::frameSwapped`, at most 1 s) before it starts: a browser shows a drawn
@@ -222,7 +232,11 @@ a big score takes minutes on a phone (Dawn x60, 1140 measures on 13 staves: 16 s
 and a page that shows nothing moving that long looks frozen; the dialog also takes the taps meanwhile, which the app
 would otherwise get after the work. A dialog that waits for an answer during the work (e.g. whether to update an old
 score, or "open anyway?") would be under it and could not be answered: the page's dialog steps aside meanwhile, and
-comes back for the rest of the work (`MobileInteractive::waitForUser`).
+comes back for the rest of the work (`MobileInteractive::waitForUser`). Where opening a score goes, the first time,
+in a 2-core laptop-like setup: Dawn (13 staves) 3.3 s in the box (reading 0.2 s, layout 0.75 s, the playback data
+0.4 s, creating the score page 0.7 s, the palettes 0.75 s), then 2.6 s until the instruments' sounds are loaded and
+Play is enabled; a small score: ~0.3 s of the score, ~1.1 s of the page and the palettes. On tablets and computers
+the palettes beside the score are now created after it shows (the side sheet's panels load asynchronously).
 
 Threads: the app with threads needs shared memory (SharedArrayBuffer), which browsers give only to a cross-origin
 isolated page (headers COOP/COEP, which GitHub Pages does not send). The service worker `vibescore-sw.js` adds them

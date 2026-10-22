@@ -167,11 +167,34 @@ the live threads app, `devtools/load_check.py`; the stand-ins are `devtools/mult
   - The page's "Opening…" box steps aside for any dialog that waits for an answer (`MobileInteractive::waitForUser`).
   - The browser's file chooser shows MuseScore files first (`browserNameFilter`).
   - Merged as [m1omg/vibescore#11](https://github.com/m1omg/vibescore/pull/11). Starting "Build: Web" on a branch (`workflow_dispatch`) is refused to this integration (403), so the threads build could only be measured after the merge, from its CI artifacts. It starts, opens and plays like the previous one: first-start opening of Dawn took 13.7 s, 11.5 s and 14.2 s vs 14.3 s, 11.4 s and 13.4 s; there were 0 missing frames during playback.
-- **"Playback stuttered like Quake on a Cyrix 486"** on the S24 after #9's deploy. This was not reproduced here.
+- **"Playback stuttered like Quake on a Cyrix 486"** after #9's deploy, on the user's Xiaomi Pad 5 (Snapdragon 860, Android, Chrome; not the S24). This was not reproduced here (also not in a 1280×800, DPR 2 tablet emulation: the tablet layout's slow frames there were the container's software GPU; the page's thread was ~73% idle while playing).
   - `devtools/gap_check.py` taps Play as soon as the button is enabled after a fresh first start, and records the output's loudness every 20 ms. It found 0 gaps and 0 missing frames in either build (4× CPU slowdown, 8 cores).
   - Underruns that `load_check.py` counts right after a score opens are the instruments' sounds loading, while Play is still disabled.
   - Most likely cause: a phone's first start after an update. Chrome runs the new wasm on its baseline compiler while it optimizes in the background.
   - A suspect for a real phone: the threads player keeps only ~64 ms of audio ready (`AHEAD_FRAMES` in `webaudiodriver.cpp`), so any hiccup of the render thread longer than that is a gap. If the user still hears stutter on the second start after an update, a reserve that grows after underruns (with the cursor's lead in mind) is the next step.
+
+### Third session, continued (2026-10-22): MacBook Air 2017 in Chrome
+
+- **The user's report.** On a MacBook Air 2017 (i5-5350U, 2 cores / 4 threads, Chrome): opening a score takes long, and the sound "still stutters a bit" even after the app loaded and sat idle.
+- **Emulation.** `mac_check`-style runs in the scratchpad (not kept): 1440×900 at DPR 1, the second start, Dawn.
+  - The page's renderer and Chrome's audio service were pinned to 2 cores; also everything on 2 cores, also with two busy processes on those cores.
+  - Playback: 0 missing frames and 0 gaps in 60 s in every case. The audio threads used ~14% of one core. So the stutter was not reproduced.
+  - On a Mac, Chrome's `'playback'` output buffer is ~20 ms (1024 frames: `AudioLatency::GetHighLatencyBufferSize`), so it is not larger than the reserve.
+  - The user was asked to run a console check on the MacBook: `underrunFrames()` over 30 s while playing. With the new diagnostics, `vibescoreInstance.vibescoreAudio.stats()` tells more.
+- **Opening Dawn the first time, in the box** (temporary `VSPERF` timers in a local build):
+  - read 0.22 s, layout 0.75 s, `PlaybackModel::load` 0.38 s
+  - creating the score page 0.73 s, **the palettes panel 0.76 s**
+  - then 2.6 s until the sounds are loaded and Play is enabled
+  - A small score (the minuet) needs ~0.3 s for the score itself, and ~1.1 s for the page and the palettes.
+- **Found: a freeze on computers.** After the migration question was answered with the mouse in the desktop layout, the app froze: no more redraws or clicks. The engine still loaded the sounds. The live builds #11/#12 have it.
+  - Cause: a Qt 6.10 wasm bug. Queued browser events are handled after delivery. In Qt's shadow DOM their `target` is then null, `dom::mapPoint` throws ("Cannot read properties of null (reading 'getBoundingClientRect')"), and the event processing stops.
+  - Touch doesn't take that path, so phones and tablets were fine.
+  - Found with a build linked with `--profiling-funcs` (function names in the stack) and Playwright's `pageerror`.
+- **Changes:**
+  - **Freeze:** `vs_guard_pending_events` keeps target, current and related target, `composedPath()` and a mouse event's offset on each event when it is queued.
+  - **Palettes:** the side sheet's panels load asynchronously (`MobileSheet.asynchronousPanels`), after the score shows.
+  - **Audio reserve:** `browser output buffer + 3072` frames, plus 1024 for each underrun while music played (up to 8192); the ring is 16384 frames. `vibescoreAudio.stats()/resetStats()` and `?audioahead=FRAMES` for diagnosis.
+  - **Not done:** serial mixing on ≤4 cores. It would have been a risk for cheap quad-core phones, and it did not help in the emulation.
 
 ## Building and testing in a cloud container
 
