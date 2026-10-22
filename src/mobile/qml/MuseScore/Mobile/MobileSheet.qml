@@ -196,7 +196,8 @@ Rectangle {
                 // Created when first shown, then kept (with its state)
                 active: isCurrent || wasShown
                 asynchronous: root.asynchronousPanels
-                visible: isCurrent
+                // Not while it is created over a few frames, half done
+                visible: isCurrent && status === Loader.Ready
                 onIsCurrentChanged: if (isCurrent) wasShown = true
 
                 sourceComponent: modelData.component

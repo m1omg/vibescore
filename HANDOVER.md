@@ -193,7 +193,7 @@ the live threads app, `devtools/load_check.py`; the stand-ins are `devtools/mult
 - **Changes:**
   - **Freeze:** `vs_guard_pending_events` keeps target, current and related target, `composedPath()` and a mouse event's offset on each event when it is queued.
   - **Palettes:** the side sheet's panels load asynchronously (`MobileSheet.asynchronousPanels`), after the score shows.
-  - **Audio reserve:** `browser output buffer + 3072` frames, plus 1024 for each underrun while music played (up to 8192); the ring is 16384 frames. `vibescoreAudio.stats()/resetStats()` and `?audioahead=FRAMES` for diagnosis.
+  - **Audio reserve:** `browser output buffer (rounded up to 512) + 3072` frames, plus 1024 each time a full ring ran empty while music played (up to 8192; it never shrinks); the ring is 16384 frames. `vibescoreAudio.stats()/resetStats()` and `?audioahead=FRAMES` (1024 to 8192) for diagnosis.
   - **Not done:** serial mixing on ≤4 cores. It would have been a risk for cheap quad-core phones, and it did not help in the emulation.
 
 ## Building and testing in a cloud container
