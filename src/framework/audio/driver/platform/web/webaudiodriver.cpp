@@ -338,7 +338,8 @@ bool WebAudioDriver::open(const Spec& spec, Spec* activeSpec)
                                  / BLOCK_FRAMES * BLOCK_FRAMES;
     m_aheadFrames = std::clamp<uint32_t>(burstFrames + AHEAD_FRAMES, AHEAD_FRAMES, MAX_AHEAD_FRAMES);
     if (const int override = vs_audio_ahead_override(); override > 0) {
-        m_aheadFrames = std::clamp<uint32_t>(static_cast<uint32_t>(override), BLOCK_FRAMES, MAX_AHEAD_FRAMES);
+        // At least two blocks: with one, the ring is only refilled once the player has taken all of it
+        m_aheadFrames = std::clamp<uint32_t>(static_cast<uint32_t>(override), 2 * BLOCK_FRAMES, MAX_AHEAD_FRAMES);
     }
     m_lastUnderrunFrames = 0;
     m_soundWritten = false;
@@ -502,6 +503,10 @@ void WebAudioDriver::th_fillRing()
             m_soundWritten = true;
         }
     }
+
+    // What the player ran short of while the ring was refilled belongs to the same hiccup: only the next one, that
+    // empties a full ring, makes the ring fuller again
+    m_lastUnderrunFrames = m_ringCounters[2].load(std::memory_order_relaxed);
 }
 
 void WebAudioDriver::th_renderUnheard(double& framesDue)

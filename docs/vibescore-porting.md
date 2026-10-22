@@ -171,12 +171,13 @@ open no chooser at all. A score from MuseScore 3.6 or older asks, as on the desk
   (`BluetoothMidiController` in the mobile module).
 - Web: `WebAudioDriver`. With threads, the engine runs in the driver mode on a thread of the driver, which keeps a
   ring of audio in the shared memory filled ahead of the player: what the browser takes at once (its output buffer,
-  `AudioContext.baseLatency`) plus ~64 ms, and 1024 frames more each time the player ran out while music played (a
-  weak or busy device), up to 8192 frames (~170 ms; the sound then follows the user, and the cursor leads it, by that
-  much). The AudioWorklet plays it from there (the page's thread does nothing for the audio), and the mixer renders the
-  instruments in a pool of up to 4 threads. In the browser's console, `vibescoreInstance.vibescoreAudio.stats()` tells
-  how the ring fares (reserve, the least it held while music played, the longest rendering of a block, the silence
-  played) and `resetStats()` starts over; `?audioahead=FRAMES` in the page's address sets the reserve. Without threads the
+  `AudioContext.baseLatency`, rounded up to 512 frames) plus 3072 frames (~64 ms), and 1024 frames more each time the
+  player ran out while music played (a weak or busy device; once for each time a full ring ran empty), up to 8192
+  frames (~170 ms; the sound then follows the user, and the cursor leads it, by that much). The AudioWorklet plays it
+  from there (the page's thread does nothing for the audio), and the mixer renders the instruments in a pool of up to
+  4 threads. In the browser's console, `vibescoreInstance.vibescoreAudio.stats()` tells how the ring fares (reserve,
+  the least it held while music played, the longest rendering of a block, the silence played) and `resetStats()`
+  starts over; `?audioahead=FRAMES` in the page's address sets the reserve (1024 to 8192 frames). Without threads the
   engine renders on the main thread, a little ahead of time, and the blocks are sent to the AudioWorklet. Browsers
   play audio after a user gesture; until then the engine runs in real time and its audio is dropped (the cursor
   moves, nothing is heard). The AudioContext is resumed at taps, clicks and keys (on a touch screen Chrome counts the
