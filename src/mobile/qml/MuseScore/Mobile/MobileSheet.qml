@@ -32,9 +32,6 @@ Rectangle {
     property var panels: []
     property var shell: null
     property NavigationSection navigationSection: null
-    //! The panels are created over a few frames, after what shows them is on the screen: e.g. the palettes, open
-    //! beside the score on tablets, were most of the time it took to open a small score
-    property bool asynchronousPanels: false
 
     readonly property int currentIndex: {
         if (!root.shell) {
@@ -195,9 +192,7 @@ Rectangle {
 
                 // Created when first shown, then kept (with its state)
                 active: isCurrent || wasShown
-                asynchronous: root.asynchronousPanels
-                // Not while it is created over a few frames, half done
-                visible: isCurrent && status === Loader.Ready
+                visible: isCurrent
                 onIsCurrentChanged: if (isCurrent) wasShown = true
 
                 sourceComponent: modelData.component
