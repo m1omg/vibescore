@@ -192,9 +192,13 @@ the live threads app, `devtools/load_check.py`; the stand-ins are `devtools/mult
   - Found with a build linked with `--profiling-funcs` (function names in the stack) and Playwright's `pageerror`.
 - **Changes:**
   - **Freeze:** `vs_guard_pending_events` keeps target, current and related target, `composedPath()` and a mouse event's offset on each event when it is queued.
-  - **Palettes:** the side sheet's panels load asynchronously (`MobileSheet.asynchronousPanels`), after the score shows.
+  - **Palettes, tried and dropped:** the side sheet's panels loaded asynchronously (a `Loader` with `asynchronous`). The panels then appeared complete within 0.15 s of a click, but opening was not faster: Dawn's box 3.5–4.4 s against 3.7–5.0 s (2 cores for the page), ~5.8 s against 5.5–5.9 s (everything on 2 cores); a small score 2.7–2.9 s against 2.6–3.3 s. Why was not checked. A guess: the panel's costly part is one piece of work that the incubator cannot split, which then runs right after the box went and before the browser draws. A performance profile of that moment is the next step if opening is still too slow.
   - **Audio reserve:** `browser output buffer (rounded up to 512) + 3072` frames, plus 1024 each time a full ring ran empty while music played (up to 8192; it never shrinks); the ring is 16384 frames. `vibescoreAudio.stats()/resetStats()` and `?audioahead=FRAMES` (1024 to 8192) for diagnosis.
   - **Not done:** serial mixing on ≤4 cores. It would have been a risk for cheap quad-core phones, and it did not help in the emulation.
+- **Review.** A separate review agent read the diff. It confirmed two defects, both fixed. One hiccup grew the reserve two or three times, because the player kept running short while the ring was being refilled; the counter is now taken again after the refill. And `?audioahead` below two blocks guaranteed underruns. Its other points were risks it could not confirm, or nits.
+- **Measured after the changes** (a local build with threads, `crossOriginIsolated`, 2 cores, Dawn): 0 underruns in 60 s, the least the ring held while playing 70 ms, the reserve stayed at its start (93 ms here: Chrome on Linux has a 1024-frame buffer too). The old minuet with its question answered by mouse opens and the app goes on answering.
+  - `stats().underrunMs` counts from the start, including the silence while a score's sounds load (seconds; `longestBlockMs` is then the loading, 2–4 s). For the playback alone: `resetStats()`, play, then `stats()`.
+- **Local build with threads works in the container:** `qt-cmake` from `toolchain/qt/6.10.2/wasm_multithread` with `-DVS_WEB_THREADS=ON` (the other options as for the single-thread build), ~22 min from scratch on 4 cores; `add_threads_app.py` puts it in a single-thread site's `threads/`.
 
 ## Building and testing in a cloud container
 

@@ -236,8 +236,8 @@ score, or "open anyway?") would be under it and could not be answered: the page'
 comes back for the rest of the work (`MobileInteractive::waitForUser`). Where opening a score goes, the first time,
 in a 2-core laptop-like setup: Dawn (13 staves) 3.3 s in the box (reading 0.2 s, layout 0.75 s, the playback data
 0.4 s, creating the score page 0.7 s, the palettes 0.75 s), then 2.6 s until the instruments' sounds are loaded and
-Play is enabled; a small score: ~0.3 s of the score, ~1.1 s of the page and the palettes. On tablets and computers
-the palettes beside the score are now created after it shows (the side sheet's panels load asynchronously).
+Play is enabled; a small score: ~0.3 s of the score, ~1.1 s of the page and the palettes. Loading the side sheet's
+panels asynchronously did not make the opening faster (measured, so it was dropped).
 
 Threads: the app with threads needs shared memory (SharedArrayBuffer), which browsers give only to a cross-origin
 isolated page (headers COOP/COEP, which GitHub Pages does not send). The service worker `vibescore-sw.js` adds them
