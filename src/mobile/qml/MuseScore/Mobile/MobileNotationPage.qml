@@ -438,6 +438,7 @@ Item {
 
             panels: root.sidePanels
             shell: root.shell
+            asynchronousPanels: true
             navigationSection: sideSheetNavSec
         }
 
