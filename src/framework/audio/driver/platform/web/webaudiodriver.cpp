@@ -38,12 +38,20 @@ static const AudioDeviceID DEFAULT_DEVICE_ID = "default";
 
 #ifdef MUSE_THREADS_SUPPORT
 //! Frames in the ring (a power of two, so that the positions stay right when the counters wrap around)
-static constexpr uint32_t RING_FRAMES = 8192;
+static constexpr uint32_t RING_FRAMES = 16384;
 //! Frames the engine renders per call
 static constexpr samples_t BLOCK_FRAMES = 512;
-//! How far ahead of the player the ring is kept filled: more is safer against a thread that runs late, less makes
-//! the sound follow the user sooner (~64 ms)
+//! How far ahead of the player the ring is kept filled, beyond what the browser takes at once (its output buffer,
+//! AudioContext.baseLatency): more is safer against a thread that runs late, less makes the sound follow the user
+//! sooner (~64 ms)
 static constexpr uint32_t AHEAD_FRAMES = 3072;
+//! When the player still runs out while music plays (a slow or busy device), the ring is kept fuller, by a step
+//! each time, up to this (~170 ms): the sound then follows the user (and the cursor leads it) a bit later
+static constexpr uint32_t MAX_AHEAD_FRAMES = 8192;
+static constexpr uint32_t AHEAD_STEP_FRAMES = 1024;
+//! A block is music when a sample is louder than this; music played recently when a block was within this
+static constexpr float SOUND_LEVEL = 1e-5f;
+static constexpr double SOUND_RECENT_SECONDS = 0.5;
 //! How often the thread looks whether the player took audio (a block of 512 frames lasts ~11 ms)
 static constexpr int RENDER_INTERVAL_MS = 3;
 #else
@@ -96,6 +104,20 @@ EM_JS(int, vs_audio_create, (const char* playerCodePtr), {
 
     return Module.vibescoreAudio.ctx.sampleRate;
 });
+
+#ifdef MUSE_THREADS_SUPPORT
+// What the browser takes from the player at once (frames), when it says
+EM_JS(int, vs_audio_base_latency_frames, (), {
+    const ctx = Module.vibescoreAudio.ctx;
+    return ctx.baseLatency > 0 ? Math.round(ctx.baseLatency * ctx.sampleRate) : 0;
+});
+
+// For comparing on a device: the page's address can set how far ahead the ring is kept filled (?audioahead=frames)
+EM_JS(int, vs_audio_ahead_override, (), {
+    const value = parseInt(new URLSearchParams(location.search).get('audioahead'), 10);
+    return value > 0 ? value : 0;
+});
+#endif
 
 EM_JS(void, vs_audio_suspend, (), {
     const audio = Module.vibescoreAudio;
@@ -166,9 +188,27 @@ EM_JS(void, vs_audio_share_ring, (const float* ring, int frames, const uint32_t*
     } else {
         audio.onNodeCreated.push(share);
     }
-    // For diagnostics (the browser's console): the frames of silence the player played because the ring was empty
-    const ringCounters = new Uint32Array(memory, counters, 3);
+    // For diagnostics (the browser's console): the frames of silence the player played because the ring was empty,
+    // and how the ring fared (see WebAudioDriver::th_fillRing)
+    const ringCounters = new Uint32Array(memory, counters, 7);
     audio.underrunFrames = () => Atomics.load(ringCounters, 2);
+    audio.stats = () => {
+        const ms = (frames) => Math.round(frames * 10000 / audio.ctx.sampleRate) / 10;
+        const lowest = Atomics.load(ringCounters, 4);
+        return {
+            underrunMs: ms(Atomics.load(ringCounters, 2)),
+            reserveMs: ms(Atomics.load(ringCounters, 3)),
+            lowestFillMs: lowest === 0xFFFFFFFF ? null : ms(lowest),
+            longestBlockMs: Atomics.load(ringCounters, 5) / 1000,
+            reserveIncreases: Atomics.load(ringCounters, 6),
+            outputLatencyMs: Math.round((audio.ctx.baseLatency || 0) * 10000) / 10,
+            sampleRate: audio.ctx.sampleRate,
+        };
+    };
+    audio.resetStats = () => {
+        Atomics.store(ringCounters, 4, 0xFFFFFFFF);
+        Atomics.store(ringCounters, 5, 0);
+    };
     audio.ctx.addEventListener('statechange', update);
     update();
 });
@@ -294,9 +334,21 @@ bool WebAudioDriver::open(const Spec& spec, Spec* activeSpec)
 
 #ifdef MUSE_THREADS_SUPPORT
     m_ring.assign(static_cast<size_t>(RING_FRAMES) * 2, 0.f);
+    const uint32_t burstFrames = (static_cast<uint32_t>(std::max(vs_audio_base_latency_frames(), 0)) + BLOCK_FRAMES - 1)
+                                 / BLOCK_FRAMES * BLOCK_FRAMES;
+    m_aheadFrames = std::clamp<uint32_t>(burstFrames + AHEAD_FRAMES, AHEAD_FRAMES, MAX_AHEAD_FRAMES);
+    if (const int override = vs_audio_ahead_override(); override > 0) {
+        m_aheadFrames = std::clamp<uint32_t>(static_cast<uint32_t>(override), BLOCK_FRAMES, MAX_AHEAD_FRAMES);
+    }
+    m_lastUnderrunFrames = 0;
+    m_soundWritten = false;
     m_ringCounters[0] = 0;
     m_ringCounters[1] = 0;
     m_ringCounters[2] = 0;
+    m_ringCounters[3] = m_aheadFrames;
+    m_ringCounters[4] = UINT32_MAX;
+    m_ringCounters[5] = 0;
+    m_ringCounters[6] = 0;
     vs_audio_share_ring(m_ring.data(), static_cast<int>(RING_FRAMES),
                         reinterpret_cast<const uint32_t*>(m_ringCounters), reinterpret_cast<int32_t*>(&m_isPlaying));
 
@@ -405,10 +457,36 @@ void WebAudioDriver::th_render()
 void WebAudioDriver::th_fillRing()
 {
     const uint32_t blockFrames = static_cast<uint32_t>(m_block.size() / 2);
+    const uint32_t recentFrames = static_cast<uint32_t>(SOUND_RECENT_SECONDS * m_activeSpec.output.sampleRate);
     uint32_t written = m_ringCounters[0].load(std::memory_order_relaxed);
+    const bool musicPlayed = m_soundWritten && written - m_lastSoundWritten <= recentFrames;
 
-    while (written - m_ringCounters[1].load(std::memory_order_acquire) + blockFrames <= AHEAD_FRAMES) {
+    // The player ran out of audio while music played (not e.g. while the sounds of a score load, when nothing plays):
+    // the ring is kept fuller from now on
+    const uint32_t underrunFrames = m_ringCounters[2].load(std::memory_order_relaxed);
+    if (underrunFrames != m_lastUnderrunFrames) {
+        m_lastUnderrunFrames = underrunFrames;
+        if (musicPlayed && m_aheadFrames < MAX_AHEAD_FRAMES) {
+            m_aheadFrames = std::min(m_aheadFrames + AHEAD_STEP_FRAMES, MAX_AHEAD_FRAMES);
+            m_ringCounters[3].store(m_aheadFrames, std::memory_order_relaxed);
+            m_ringCounters[6].fetch_add(1, std::memory_order_relaxed);
+            LOGI() << "The player ran out of audio: " << m_aheadFrames << " frames are kept ready now";
+        }
+    }
+
+    const uint32_t fill = written - m_ringCounters[1].load(std::memory_order_acquire);
+    if (musicPlayed && fill < m_ringCounters[4].load(std::memory_order_relaxed)) {
+        m_ringCounters[4].store(fill, std::memory_order_relaxed);
+    }
+
+    while (written - m_ringCounters[1].load(std::memory_order_acquire) + blockFrames <= m_aheadFrames) {
+        const auto renderStart = std::chrono::steady_clock::now();
         m_activeSpec.callback(reinterpret_cast<uint8_t*>(m_block.data()), static_cast<int>(m_block.size() * sizeof(float)));
+        const auto renderMicros = static_cast<uint32_t>(
+            std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::steady_clock::now() - renderStart).count());
+        if (renderMicros > m_ringCounters[5].load(std::memory_order_relaxed)) {
+            m_ringCounters[5].store(renderMicros, std::memory_order_relaxed);
+        }
 
         // Into the ring, in two parts where it wraps around
         const uint32_t pos = written & (RING_FRAMES - 1);
@@ -418,6 +496,11 @@ void WebAudioDriver::th_fillRing()
 
         written += blockFrames;
         m_ringCounters[0].store(written, std::memory_order_release);
+
+        if (std::any_of(m_block.cbegin(), m_block.cend(), [](float v) { return std::abs(v) > SOUND_LEVEL; })) {
+            m_lastSoundWritten = written;
+            m_soundWritten = true;
+        }
     }
 }
 
