@@ -35,40 +35,11 @@ EM_JS(void, vs_guard_pending_events, (int noopHandler), {
     if (!control || control.vibescoreFixed) {
         return;
     }
-    // What Qt reads of a browser event that the browser only gives while it delivers the event: the windows are in a
-    // shadow DOM, whose events have no target, related target and path afterwards (and their offset is then relative
-    // to nothing). Qt handles a queued event after an earlier one of its batch returned, which can be much later (e.g.
-    // that one opened a score, or a dialog), and a pointer event without a target throws in Qt (dom::mapPoint): the
-    // exception stopped the event processing for good (the app froze). The values are kept on the event when it is
-    // queued, during its delivery.
-    const keep = (event) => {
-        if (!(event instanceof Event) || event.vibescoreKept) {
-            return;
-        }
-        const path = event.composedPath();
-        const values = { target: event.target, currentTarget: event.currentTarget, relatedTarget: event.relatedTarget };
-        if (event instanceof MouseEvent) {
-            values.offsetX = event.offsetX;
-            values.offsetY = event.offsetY;
-        }
-        for (const key of Object.keys(values)) {
-            Object.defineProperty(event, key, { value: values[key], configurable: true });
-        }
-        Object.defineProperty(event, 'composedPath', { value: () => path, configurable: true });
-        event.vibescoreKept = true;
-    };
     const guard = (queue) => {
         if (queue && !queue.vibescoreGuarded) {
             const shift = queue.shift;
             queue.shift = function() {
                 return this.length > 0 ? shift.call(this) : { index: noopHandler, arg: undefined };
-            };
-            const push = queue.push;
-            queue.push = function(...items) {
-                for (const item of items) {
-                    keep(item && item.arg);
-                }
-                return push.apply(this, items);
             };
             queue.vibescoreGuarded = true;
         }

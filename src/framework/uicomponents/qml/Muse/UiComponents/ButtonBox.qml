@@ -33,13 +33,8 @@ Container {
     property var buttons: []
     property alias buttonLayout: buttonBoxModel.buttonLayout
 
-    //! The buttons are stacked, each as wide as the box, where their row does not fit the width the box is given
-    //! (a narrow window: phones)
-    readonly property bool stacked: root.width > 0 && root.width < prv.rowWidth
-
-    // The width of the buttons in a row, also while they are stacked: what the box asks for
     implicitWidth: Math.max(implicitBackgroundWidth + leftInset + rightInset,
-                            prv.rowWidth + leftPadding + rightPadding)
+                            contentWidth + leftPadding + rightPadding)
     implicitHeight: Math.max(implicitBackgroundHeight + topInset + bottomInset,
                              contentHeight + topPadding + bottomPadding)
 
@@ -97,7 +92,6 @@ Container {
         button.navigation.panel = root.navigationPanel
         button.navigation.column = root.count
         button.accessible.ignored = root.isAccessibilityDisabledWhenInit
-        button.Layout.fillWidth = Qt.binding(function() { return root.stacked })
 
         root.addItem(button)
 
@@ -115,11 +109,8 @@ Container {
         }
     }
 
-    contentItem: GridLayout {
-        // A row, or a column when stacked
-        columns: root.stacked ? 1 : Math.max(root.count, 1)
-        rowSpacing: root.spacing
-        columnSpacing: root.spacing
+    contentItem: RowLayout {
+        spacing: root.spacing
         Repeater {
             model: root.contentModel
         }
@@ -154,21 +145,6 @@ Container {
 
     QtObject {
         id: prv
-
-        //! The width of the buttons in a row (also while they are stacked)
-        readonly property real rowWidth: {
-            var width = 0
-            var buttonCount = 0
-            for (var i = 0; i < root.count; i++) {
-                var item = root.itemAt(i)
-                if (!Boolean(item) || Boolean(item.isSeparator) || !item.visible) {
-                    continue
-                }
-                width += item.implicitWidth
-                buttonCount++
-            }
-            return width + Math.max(buttonCount - 1, 0) * root.spacing
-        }
 
         function layoutButtons() {
             var buttonsTypes = buttonBoxModel.load()
@@ -274,8 +250,6 @@ Container {
         Item {
             property bool isSeparator: true
             property string text: "separator"
-            // Between the buttons of the left side and the others; nothing to keep apart in a column
-            visible: !root.stacked
             Layout.fillWidth: true
             Layout.fillHeight: true
         }

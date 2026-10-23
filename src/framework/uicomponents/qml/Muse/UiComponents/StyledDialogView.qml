@@ -45,11 +45,6 @@ DialogView {
     //! for dialogs whose layout adapts to the width
     property bool fillsCompactWindow: false
 
-    //! The width that a single window (phones) has for the dialog, set by its host (see InWindowHost.qml): a dialog
-    //! whose content adapts to it (e.g. StandardDialog) is no wider than the window. 0 where the dialog has a window
-    //! of its own, or does not adapt
-    property alias availableWidth: rootContainer.availableWidth
-
     contentWidth: 240
     contentHeight: contentBody.childrenRect.height
 
@@ -75,8 +70,6 @@ DialogView {
         id: rootContainer
 
         readonly property bool fillsCompactWindow: root.fillsCompactWindow
-        // The host of a single window reads and sets these on the content item, which is what it is given
-        property real availableWidth: 0
         width: contentBody.width + root.margins * 2
         height: contentBody.height + root.margins * 2
 

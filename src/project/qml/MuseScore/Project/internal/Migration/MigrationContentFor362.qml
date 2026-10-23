@@ -68,11 +68,6 @@ ColumnLayout {
         id: headerTitle
         text: qsTrc("project/migration", "This file was last saved in MuseScore %1").arg(root.appVersion)
         font: ui.theme.tabBoldFont
-        // Wraps where the dialog is narrower than the text (phones)
-        wrapMode: Text.WordWrap
-        horizontalAlignment: Text.AlignLeft
-
-        Layout.fillWidth: true
     }
 
     StyledTextLabel {
@@ -90,8 +85,6 @@ ColumnLayout {
         text: qsTrc("project/migration", "Use our new notation and sound mapping for <a href=\"%1\">MDL percussion</a>")
               .arg("https://musescore.org/node/367337") // non-'/en' URL should redirect to translated version, if available
         checked: root.isRemapPercussion
-
-        Layout.fillWidth: true
 
         navigation.panel: root.navigationPanel
         navigation.row: 1
