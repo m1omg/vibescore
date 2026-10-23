@@ -86,18 +86,8 @@ private:
     //! Rendered audio (interleaved stereo) that the player reads from the shared memory
     std::vector<float> m_ring;
     //! [0]: the frames written to the ring, [1]: the frames the player took from it (counters that wrap around),
-    //! [2]: the frames of silence the player played because the ring was empty;
-    //! for diagnostics (vibescoreAudio.stats() in the browser's console): [3] how far ahead the ring is kept filled,
-    //! [4] the least it held while music played, [5] the longest rendering of a block (µs), [6] how often the
-    //! reserve grew
-    std::atomic<uint32_t> m_ringCounters[7] = { 0, 0, 0, 0, 0, 0, 0 };
-    //! How far ahead of the player the ring is kept filled (frames), see th_fillRing()
-    uint32_t m_aheadFrames = 0;
-    //! The player's silence counter ([2]) when the render thread last looked
-    uint32_t m_lastUnderrunFrames = 0;
-    //! The ring's write counter after the last block with sound in it
-    uint32_t m_lastSoundWritten = 0;
-    bool m_soundWritten = false;
+    //! [2]: the frames of silence the player played because the ring was empty
+    std::atomic<uint32_t> m_ringCounters[3] = { 0, 0, 0 };
     //! Whether the browser plays the audio (set by the page)
     std::atomic<int32_t> m_isPlaying = 0;
 #else

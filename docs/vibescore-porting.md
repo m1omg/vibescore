@@ -4,6 +4,14 @@ VibeScore is MuseScore Studio 4.7 for Android, iOS/iPadOS and the web browser. T
 is built and where its parts are, for people who work on the code. Installing and using the app is described in
 [README.md](../README.md).
 
+> **Since 2026-10-23 the code is the one of 2026-10-20 15:53 (`1a62de05`)**, because on the Xiaomi Pad 5 opening a score
+> stays at "Opening…" with the later changes (see [HANDOVER.md](../HANDOVER.md)). This document still describes some of
+> those later changes; they are **not in the code** now: the standard dialogs that adapt to the window's width
+> (`availableWidth`), the migration dialog that fits a phone, `MobileInteractive::waitForUser` (the page's "Opening…" box
+> stepping aside for dialogs), `browserNameFilter` (the browser's file chooser getting the name filters),
+> `vs_guard_pending_events` keeping the targets of queued events (`web::fixNestedEventLoops()` has only the empty-queue
+> part), and the audio reserve that grows with `vibescoreAudio.stats()` and `?audioahead=`.
+
 The work is kept additive where possible, so that upstream MuseScore releases (4.7.x, later 5.x) can be merged:
 new code is in new files (`src/mobile`, `platform/android|ios|web` folders), and changes to existing files are
 behind `MUE_CONFIGURATION_IS_APPMOBILE`, `MUE_CONFIGURATION_IS_APPWEB`, `MUSE_CONFIGURATION_IS_MOBILE` or

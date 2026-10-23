@@ -40,6 +40,51 @@ and MIDI" and "The web app"), which describes how everything works.
   - Use the attribution lines your own session gives you.
   - Never put model names in commits or PRs.
 
+## 2026-10-23: the app was restored to the build of 2026-10-20 15:53 (`1a62de05`), at the user's request
+
+**Why.** On the user's Xiaomi Pad 5 (Chrome), opening any score stays at "Opening…" for good, in the app with threads
+and in the one without (`?threads=0`), also an hour after the first start. The Galaxy S24 is fine. The user said that
+the Pad 5 worked before "the dialogue fix" and asked to go back to the version before it; of the three versions that
+were offered (before #11 / before #8 / only the Oct 22 changes) they chose **before #8**.
+
+**What was not found.** The failure was not reproduced here, in Chromium on Linux (software GL), with: a phone profile,
+a tablet profile (1138×712 and 1463×914, touch, mobile and desktop user agent), a desktop profile with a mouse, the
+app with and without threads, first start / later start / update from the previous deploy, a 2 MB/s network, 4 cores
+with a 5× slower CPU, scores in the formats MuseScore 2.0.2, 3.0, 4.2, 4.6 and 4.7 (27 to 34 KB), opening a second
+score (the "save changes?" question), a score from the library, a session restored after the system ended the page,
+and Firefox 158. The tools for that are in `buildscripts/web/devtools` (`load_check.py`, with `--device`; the others
+of that run were in a scratchpad: a mouse variant, a tablet variant that logs the page's `#busy` box every 2 s, a page
+crash/restore variant). CI's "Test: Web start" never opens a score, so nothing in CI would have caught it.
+
+**What the restore is.** Every file outside `HANDOVER.md`, `docs/` and `buildscripts/web/devtools/` is as it was at
+`1a62de05` (check: `git diff 1a62de05 -- . ':!HANDOVER.md' ':!docs' ':!buildscripts/web/devtools'` is empty). The page
+(`index.html`, `vibescore-web.js`, the service worker) did not change in these days, so only the app changed. The
+restore is **one commit**: `git revert` of it brings everything below back at once.
+
+**What is gone, and what it costs** (each change can be put back alone with `git checkout <commit> -- <files>`; the
+Pad 5 should be tried after each one, in this order, to find the one that breaks it):
+
+1. `b27e48fa` (#8): the standard dialogs adapt to the width of a single window (`StyledDialogView.availableWidth`,
+   `InWindowHost.qml`, `ButtonBox.qml` stacks its buttons, `StandardDialog*.qml`). Without it the "Do you want to save
+   changes…" dialog is wider than a phone in portrait, and its third button ("Save") is off the screen.
+2. `a29ece18` (#11): the page's "Opening…" box steps aside for dialogs that wait for an answer
+   (`MobileInteractive::waitForUser`, `m_busyTitle`), the migration question fits a phone (`MigrationDialog.qml`, the two
+   `MigrationContentFor*.qml`), and the browser's file chooser gets the app's name filters (`browserNameFilter`). Without
+   it a score saved by MuseScore 2 or 3 (the user's minuet) asks about updating its engraving under the page's box and
+   stays at "Opening…" for good. Then `7c9ece88`: the example picture's box of the migration dialog.
+3. `a52f5111` (#13): the queue of Qt's pending browser events keeps target, current/related target, path and offset on
+   each event (`vs_guard_pending_events` in `webplatform.cpp`). Without it, answering the migration question with a
+   mouse on a computer freezes the app (Qt 6.10 reads the target of a queued pointer event late, it is null in the
+   shadow DOM, `dom::mapPoint` throws).
+4. `c07792d2`, `c0d978bd` (#13): the audio kept ready by the app with threads grows when the player runs out while music
+   plays (`webaudiodriver.cpp/.h`, `vibescoreAudio.stats()`, `?audioahead=`). Without it a weak or busy device (the
+   user's 2017 MacBook Air) may stutter a bit.
+
+Item 4 is compiled only into the app with threads (`MUSE_THREADS_SUPPORT`), and the Pad 5 fails in the app without
+threads as well, so the cause is in 1, 2 or 3. Which one: not known. Of those, only 2 and 3 run during a plain load
+without any dialog (2: the file chooser's filter and `showProgress`; 3: every queued browser event), so look at 2 and 3
+first if the restore turns out to fix the Pad 5 and 1 is cleared.
+
 ## What the user reported, and what was done about it (2026-10-20, second session)
 
 The user's words: "It's not silent anymore, but it's kind of glitchy in that one time it didn't even load the
